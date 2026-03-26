@@ -112,5 +112,24 @@ exports.toggleBlockUser = async (req, res) => {
         res.status(500).json({ message: "Erreur serveur." });
     }
 };
+// Récupérer un utilisateur par son ID (pour le profil)
+exports.getUserById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query(
+            'SELECT id_utilisateur, nom, prenom, matricule, email, num_tel, role FROM utilisateur WHERE id_utilisateur = $1',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Utilisateur introuvable" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Erreur getUserById:', err);
+        res.status(500).json({ message: 'Erreur serveur' });
+    }
+};
 
 

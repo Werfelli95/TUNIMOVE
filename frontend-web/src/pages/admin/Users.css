@@ -7,6 +7,36 @@
     animation: fadeIn 0.5s ease-out;
 }
 
+/* Stats Grid System */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 20px;
+    border: 1px solid #eef2f6;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+}
+
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Header Section */
 .users-header-card {
     background: #ffffff;
@@ -471,4 +501,476 @@ tr:hover .row-actions {
     font-size: 0.875rem;
     margin-bottom: 1.25rem;
     border: 1px solid #fee2e2;
+}
+
+/* --- TARIFFS PAGE STYLES --- */
+.tarifs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.tarif-field {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1px solid #eef2f6;
+    transition: all 0.2s;
+}
+
+.tarif-field:focus-within {
+    background: #ffffff;
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+}
+
+.tarif-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.tarif-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tarif-input-wrapper input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    width: 100%;
+}
+
+.tarif-input-wrapper select {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-weight: 600;
+}
+
+.unit-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    padding: 0.25rem 0.5rem;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #f1f5f9;
+}
+
+.formula-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.formula-display {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.25rem;
+    color: #0369a1;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+    margin: 1rem 0;
+}
+
+.formula-val {
+    color: #6366f1;
+    font-weight: 800;
+}
+
+.tarif-message {
+    padding: 0.75rem 1.5rem;
+    background: #f0fdf4;
+    color: #166534;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* --- NETWORK PAGE STYLES --- */
+.network-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.network-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 1.5rem 2rem;
+    border-radius: 20px;
+    border: 1px solid #eef2f6;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    margin-bottom: 2rem;
+}
+
+.add-network-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: #6366f1;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+}
+
+.add-network-btn:hover {
+    background: #4f46e5;
+    transform: translateY(-1px);
+}
+
+/* Modal Specifics for Network */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.network-modal-card {
+    background: #ffffff;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 700px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+
+.modal-header-premium {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.net-badge {
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.x-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    display: flex;
+}
+
+.x-btn:hover {
+    background: #f1f5f9;
+    color: #ef4444;
+}
+
+/* Grid and Fields */
+.p-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    padding: 1.5rem 2rem;
+}
+
+.p-field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.p-input {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.65rem 1rem;
+    border-radius: 10px;
+    transition: all 0.2s;
+}
+
+.p-input:focus-within {
+    background: #ffffff;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.p-input input,
+.p-input select {
+    border: none;
+    background: transparent;
+    width: 100%;
+    font-size: 0.9rem;
+    outline: none;
+    color: #1e293b;
+}
+
+/* Stations */
+.st-passage {
+    padding: 0 2rem 1.5rem;
+}
+
+.st-passage h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.st-count {
+    font-size: 0.75rem;
+    background: #f1f5f9;
+    padding: 0.15rem 0.5rem;
+    border-radius: 5px;
+    color: #64748b;
+}
+
+.st-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.st-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #f1f5f9;
+}
+
+.st-number {
+    width: 22px;
+    height: 22px;
+    background: #6366f1;
+    color: white;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.st-name-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+}
+
+.st-km {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.st-km input {
+    width: 35px;
+    border: none;
+    text-align: right;
+    font-weight: 600;
+    outline: none;
+}
+
+.st-km span {
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+.st-remove {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.st-remove:hover {
+    color: #ef4444;
+}
+
+.st-add-btn {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px dashed #e2e8f0;
+    border-radius: 12px;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: none;
+    cursor: pointer;
+}
+
+.st-add-btn:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    background: #f5f3ff;
+}
+
+.modal-actions-premium {
+    padding: 1.25rem 2rem;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.btn-primary-gradient {
+    padding: 0.625rem 1.5rem;
+    background: #6366f1;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* --- TARIFFS PAGE STYLES --- */
+.tarifs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.tarif-field {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1px solid #eef2f6;
+    transition: all 0.2s;
+}
+
+.tarif-field:focus-within {
+    background: #ffffff;
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+}
+
+.tarif-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.tarif-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tarif-input-wrapper input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    width: 100%;
+}
+
+.unit-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    padding: 0.25rem 0.5rem;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #f1f5f9;
+}
+
+.formula-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.formula-display {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.25rem;
+    color: #0369a1;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+    margin: 1rem 0;
+}
+
+.formula-val {
+    color: #6366f1;
+    font-weight: 800;
+}
+
+.tarif-message {
+    padding: 0.75rem 1.5rem;
+    background: #f0fdf4;
+    color: #166534;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
 }

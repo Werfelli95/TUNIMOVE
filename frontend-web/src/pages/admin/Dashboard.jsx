@@ -62,17 +62,30 @@ const dataBar = [
 
 const Dashboard = () => {
   const [personnelCount, setPersonnelCount] = useState(0);
+  const [activeBusCount, setActiveBusCount] = useState(0);
+  const [activeLineCount, setActiveLineCount] = useState(0);
+
   useEffect(() => {
-    const fetchCount = async () => {
+    const fetchCounts = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/users/count');
-        const data = await response.json();
-        setPersonnelCount(data.count);
+        const [userRes, busRes, lineRes] = await Promise.all([
+          fetch('http://localhost:5000/api/users/count'),
+          fetch('http://localhost:5000/api/buses/active-count'),
+          fetch('http://localhost:5000/api/network/count')
+        ]);
+
+        const userData = await userRes.json();
+        const busData = await busRes.json();
+        const lineData = await lineRes.json();
+
+        setPersonnelCount(userData.count);
+        setActiveBusCount(busData.count);
+        setActiveLineCount(lineData.count);
       } catch (error) {
-        console.error("Erreur lors de la récupération du nombre d'utilisateurs:", error);
+        console.error("Erreur stats dashboard:", error);
       }
     };
-    fetchCount();
+    fetchCounts();
   }, []);
   return (
     <div className="animate-in fade-in duration-700">
@@ -87,13 +100,13 @@ const Dashboard = () => {
         />
         <StatCard
           title="Bus Actifs"
-          value="0"
+          value={activeBusCount}
           icon={<Bus size={24} />}
           color="green"
         />
         <StatCard
           title="Lignes Actives"
-          value="0"
+          value={activeLineCount}
           icon={<Network size={24} />}
           color="blue"
         />

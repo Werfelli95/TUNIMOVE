@@ -1,0 +1,279 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5%;
+  z-index: 1000;
+
+  /* Advanced Glassmorphism */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+
+  /* Subtle Professional Border */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+
+  /* Soft Shadow */
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 10px 40px -10px rgba(0, 0, 0, 0.04);
+
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Remove ALL default link styling in Navbar */
+.navbar a {
+  text-decoration: none !important;
+  color: inherit;
+  outline: none;
+}
+
+/* ===== LEFT SECTION: Branding ===== */
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.navbar-logo {
+  height: 40px;
+  width: 40px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.navbar-brand-wrapper:hover .navbar-logo {
+  transform: scale(1.1) rotate(-2deg);
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* ===== RIGHT SECTION: Actions ===== */
+.navbar-right {
+  display: flex;
+  align-items: center;
+}
+
+.admin-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: #6366f1;
+  color: white !important;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 4px 12px rgba(99, 102, 241, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.admin-link:hover {
+  background: #4f46e5;
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 20px rgba(79, 70, 229, 0.3),
+    0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.admin-link:active {
+  transform: translateY(0);
+}
+
+.admin-link svg {
+  margin-top: -1px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 1.5rem;
+    height: 64px;
+  }
+
+  .navbar-brand {
+    font-size: 1.25rem;
+  }
+
+  .navbar-logo {
+    height: 34px;
+    width: 34px;
+  }
+
+  .admin-link {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+}
+
+/* --- Styles de la Modal Profil --- */
+.profile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.profile-modal {
+  background: white;
+  width: 100%;
+  max-width: 450px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  padding: 40px 30px;
+  position: relative;
+  color: white;
+  text-align: center;
+}
+
+.profile-avatar-large {
+  width: 80px;
+  height: 80px;
+  background: white;
+  border-radius: 20px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.close-profile {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-body {
+  padding: 30px;
+}
+
+.profile-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.info-item {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.info-icon {
+  width: 40px;
+  height: 40px;
+  background: #f8fafc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+}
+
+.info-content label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.info-content p {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 1rem;
+}
+
+.role-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #eef2ff;
+  color: #4f46e5;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Trigger dans la Navbar */
+.admin-profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  background: #f8fafc;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s;
+}
+
+.admin-profile-trigger:hover {
+  background: #f1f5f9;
+}
+
+.admin-avatar {
+  width: 32px;
+  height: 32px;
+  background: #6366f1;
+  color: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

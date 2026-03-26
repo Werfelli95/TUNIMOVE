@@ -12,12 +12,18 @@ const AdminLogin = () => {
         e.preventDefault();
         try {
             const res = await axios.post('http://localhost:5000/api/auth/login/admin', { email, password });
+
+            // SAUVEGARDE DES DONNÉES
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('role', 'admin');
+
+            // ICI : On ajoute l'ID dans l'objet user
             localStorage.setItem('user', JSON.stringify({
+                id: res.data.user.id, // <--- AJOUT IMPORTANT
                 nom: res.data.user.nom,
                 prenom: res.data.user.prenom
             }));
+
             window.location.href = '/admin-dashboard';
         } catch (err) {
             setError(err.response?.data?.message || 'Erreur lors de la connexion');
@@ -32,7 +38,6 @@ const AdminLogin = () => {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="glass-card"
             >
-                {/* ... existing content ... */}
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -41,15 +46,8 @@ const AdminLogin = () => {
                 >
                     <div className="road-container">
                         <motion.div
-                            animate={{
-                                x: [-2, 2, -2],
-                                y: [0, -1, 0]
-                            }}
-                            transition={{
-                                repeat: Infinity,
-                                duration: 1.5,
-                                ease: "easeInOut"
-                            }}
+                            animate={{ x: [-2, 2, -2], y: [0, -1, 0] }}
+                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
                             className="bus-vibration"
                         >
                             <ShieldCheck size={44} className="text-indigo-600" strokeWidth={1.5} />
@@ -58,42 +56,18 @@ const AdminLogin = () => {
                     </div>
                 </motion.div>
 
-                <motion.h1
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    className="logo-text"
-                >
-                    Administration
-                </motion.h1>
-
-                <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                    style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '3rem', fontSize: '1.1rem', fontWeight: 500 }}
-                >
-                    Portail de Gestion Sécurisé
-                </motion.p>
+                <motion.h1 className="logo-text">Administration</motion.h1>
+                <motion.p className="text-center text-slate-500 mb-8"><center>Espace Admin Sécurisé</center></motion.p>
 
                 {error && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', padding: '1rem', borderRadius: '16px', marginBottom: '2rem', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.1)', fontSize: '0.9rem', fontWeight: 500 }}
-                    >
+                    <div className="bg-red-50 text-red-500 p-4 rounded-xl mb-6 text-center border border-red-100 italic">
                         {error}
-                    </motion.div>
+                    </div>
                 )}
 
                 <form onSubmit={handleLogin}>
-                    <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.5, duration: 0.5 }}
-                        className="input-group"
-                    >
-                        <label><Mail size={18} style={{ marginRight: '10px' }} /> Email Professionnel</label>
+                    <div className="input-group">
+                        <label><Mail size={18} style={{ marginRight: '10px' }} />Email Professionnel</label>
                         <input
                             type="email"
                             placeholder="admin@tunimove.tn"
@@ -101,14 +75,9 @@ const AdminLogin = () => {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
-                    </motion.div>
+                    </div>
 
-                    <motion.div
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.6, duration: 0.5 }}
-                        className="input-group"
-                    >
+                    <div className="input-group">
                         <label><Lock size={18} style={{ marginRight: '10px' }} /> Mot de passe</label>
                         <input
                             type="password"
@@ -117,16 +86,13 @@ const AdminLogin = () => {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
-                    </motion.div>
+                    </div>
 
                     <motion.button
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.7, duration: 0.5 }}
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         type="submit"
-                        className="btn-primary"
+                        className="btn-primary w-full py-4 mt-4"
                     >
                         Accès Administrateur
                     </motion.button>

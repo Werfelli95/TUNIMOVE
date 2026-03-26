@@ -1,25 +1,28 @@
-import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Users,
-  Bus,
-  GitPullRequest,
-  Network,
-  CircleDollarSign,
-  History,
-  LogOut,
-  Bell,
-  Search,
-  User
+  LayoutDashboard, Users, Bus, GitPullRequest, Network, CircleDollarSign,
+  History, LogOut, Bell, Search, User, Mail, Phone, Hash, Shield, X, Loader2, ShoppingCart
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import ProfileModal from '../components/ProfileModal';
+import '../components/Navbar.css';
 
 const AdminLayout = () => {
-  // Récupération de l'utilisateur depuis le localStorage
-  const [user, setUser] = React.useState(() => {
+  const navigate = useNavigate();
+
+  // État de l'utilisateur connecté
+  const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : { nom: 'Admin', prenom: 'TuniMove' };
   });
+
+  // État pour la modal de profil
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const handleOpenProfile = () => {
+    setIsProfileOpen(true);
+  };
 
   const navItems = [
     { icon: <LayoutDashboard />, label: 'Tableau de bord', path: '/admin-dashboard' },
@@ -27,18 +30,19 @@ const AdminLayout = () => {
     { icon: <Bus />, label: 'Flotte', path: '/admin-dashboard/fleet' },
     { icon: <GitPullRequest />, label: 'Affectations', path: '/admin-dashboard/assignments' },
     { icon: <Network />, label: 'Réseau', path: '/admin-dashboard/network' },
-    { icon: <CircleDollarSign />, label: 'Tarifs', path: '/admin-dashboard/tariffs' },
+    { icon: <CircleDollarSign />, label: 'Tarifs', path: '/admin-dashboard/tarifs' },
     { icon: <History />, label: 'Audit', path: '/admin-dashboard/audit' },
+    { icon: <ShoppingCart />, label: 'Historique des Ventes', path: '/admin-dashboard/sales-history' },
+
   ];
 
   const handleLogout = () => {
-    console.log("Tentative de déconnexion...");
-    // Logique de déconnexion à ajouter ici
+    localStorage.clear();
+    navigate('/admin-secure-portal');
   };
 
   return (
     <div className="admin-layout">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="bg-indigo-600 p-2 rounded-xl">
@@ -62,19 +66,14 @@ const AdminLayout = () => {
         </nav>
 
         <div className="mt-auto">
-          <button
-            onClick={handleLogout}
-            className="nav-item w-full text-red-500 hover:bg-red-50"
-          >
+          <button onClick={handleLogout} className="nav-item w-full text-red-500 hover:bg-red-50">
             <LogOut />
             <span>Déconnexion</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="main-wrapper">
-        {/* Header */}
         <header className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Administration</h1>
@@ -82,23 +81,32 @@ const AdminLayout = () => {
           </div>
 
           <div className="flex items-center gap-4">
-
             <button className="p-2 bg-white border border-slate-200 rounded-full text-slate-500 hover:bg-slate-50 relative">
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
 
-            <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 border border-indigo-200">
+            {/* BOUTON PROFIL CORRIGÉ */}
+            <div
+              className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 border border-indigo-200 cursor-pointer hover:bg-indigo-200 transition-all"
+              onClick={handleOpenProfile}
+            >
               <User size={24} />
             </div>
           </div>
         </header>
 
-        {/* Content */}
         <div className="content-area">
           <Outlet />
         </div>
       </main>
+
+      {/* MODAL DE PROFIL REUTILISABLE */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        userId={user.id}
+      />
     </div>
   );
 };

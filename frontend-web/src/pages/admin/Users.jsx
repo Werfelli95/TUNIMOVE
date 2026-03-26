@@ -90,12 +90,12 @@ const Users = () => {
             }
 
             const data = await response.json();
-            
+
             // Mettre à jour la liste des utilisateurs pour refléter le nouveau statut
-            setUsers(prevUsers => prevUsers.map(user => 
+            setUsers(prevUsers => prevUsers.map(user =>
                 user.id_utilisateur === id_utilisateur ? { ...user, est_bloque: !estBloqueActuellement } : user
             ));
-            
+
             alert(data.message);
 
         } catch (err) {
@@ -132,7 +132,7 @@ const Users = () => {
     };
 
     const filteredUsers = users.filter(user =>
-        `${user.nom} ${user.prenom} ${user.email} ${user.num_tel} ${user.matricule}`.toLowerCase().includes(searchQuery.toLowerCase())
+        `${user.nom} ${user.prenom} ${user.email} ${user.num_tel} ${user.matricule} ${user.role}`.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
@@ -225,16 +225,14 @@ const Users = () => {
                                                 </td>
                                                 <td>
                                                     <div className="row-actions">
-                                                        <button 
-                                                            title={user.est_bloque ? "Débloquer" : "Restreindre"} 
+                                                        <button
+                                                            title={user.est_bloque ? "Débloquer" : "Restreindre"}
                                                             className={`action-btn btn-lock ${user.est_bloque ? 'is-blocked' : ''}`}
                                                             onClick={() => handleToggleBlock(user.id_utilisateur, user.est_bloque)}
                                                         >
                                                             {user.est_bloque ? <Unlock size={16} color="#ef4444" /> : <Lock size={16} />}
                                                         </button>
-                                                        <button title="Éditer" className="action-btn btn-edit">
-                                                            <Edit2 size={16} />
-                                                        </button>
+
                                                         <button title="Supprimer" className="action-btn btn-trash" onClick={() => handleDeleteUser(user.id_utilisateur)}>
                                                             <Trash2 size={16} />
                                                         </button>
@@ -313,6 +311,7 @@ const Users = () => {
                                                 <option value="ADMIN">Admin</option>
                                                 <option value="AGENT">Agent</option>
                                                 <option value="RECEVEUR">Receveur</option>
+                                                <option value="Controleur">Controleur</option>
                                             </select>
                                         </div>
                                         <div className="form-group">
