@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const busRoutes = require('./routes/busRoutes');
@@ -9,6 +10,10 @@ const networkRoutes = require('./routes/networkRoutes');
 const tarifRoutes = require('./routes/tarifRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const saleRoutes = require('./routes/saleRoutes');
+
+//  IMPORTANT
+const agentSaleRoutes = require('./routes/agentSaleRoutes');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -23,7 +28,13 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/tarifs', tarifRoutes);
 app.use('/api/audit', auditRoutes);
-app.use('/api/Sales', saleRoutes);
+
+//  correction minuscule
+app.use('/api/sales', saleRoutes);
+
+//  agent guichet
+app.use('/api/agent', agentSaleRoutes);
+
 app.get('/', (req, res) => {
     res.send('TuniMove API is running...');
 });

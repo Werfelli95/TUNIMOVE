@@ -13,6 +13,10 @@ import Network from './pages/admin/Network';
 import Tarifs from './pages/admin/Tarifs';
 import Audit from './pages/admin/Audit';
 import SalesHistory from './pages/admin/SalesHistory';
+import TicketSale from "./pages/agent/TicketSale";
+import ReservationPage from "./pages/agent/ReservationPage";
+import HistoryPage from "./pages/agent/HistoryPage";
+
 function App() {
     return (
         <Router>
@@ -23,6 +27,7 @@ function App() {
                     <Route path="/admin-secure-portal" element={<AdminLogin />} />
                 </Route>
 
+                {/* Routes Admin protégées */}
                 <Route element={<ProtectedRoute allowedRole="admin" />}>
                     <Route path="/admin-dashboard" element={<AdminLayout />}>
                         <Route index element={<Dashboard />} />
@@ -33,8 +38,15 @@ function App() {
                         <Route path="tarifs" element={<Tarifs />} />
                         <Route path="audit" element={<Audit />} />
                         <Route path="sales-history" element={<SalesHistory />} />
-
                     </Route>
+                </Route>
+
+                {/* Routes Agent protégées */}
+                <Route element={<ProtectedRoute allowedRole="agent" />}>
+                    <Route path="/agent-dashboard" element={<Navigate to="/agent/ticket" replace />} />
+                    <Route path="/agent/ticket" element={<TicketSale />} />
+                    <Route path="/agent/reservations" element={<ReservationPage />} />
+                    <Route path="/agent/history" element={<HistoryPage />} />
                 </Route>
 
 
