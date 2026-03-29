@@ -14,6 +14,7 @@ const AgentLogin = () => {
             const res = await axios.post('http://localhost:5000/api/auth/login/agent', { matricule, password });
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('role', 'agent');
+            localStorage.setItem('agentMatricule', matricule);
             localStorage.setItem('user', JSON.stringify({
                 nom: res.data.user.nom,
                 prenom: res.data.user.prenom

@@ -45,34 +45,68 @@ exports.getActiveLines = async (req, res) => {
     }
 };
 
-// GET services du jour
 exports.getTodayServices = async (req, res) => {
     try {
-        const result = await db.query(`
+        const { date } = req.query;
+        const targetDate = date || 'CURRENT_DATE';
+        
+        // 1. Identifier les lignes actives avec bus statique qui n'ont pas de service aujourd'hui
+        const checkQuery = `
+            SELECT l.num_ligne, b.id_bus
+            FROM ligne l
+            JOIN bus b ON l.num_ligne = b.num_ligne
+            LEFT JOIN service s ON (
+                s.num_ligne = l.num_ligne AND 
+                s.id_bus = b.id_bus AND 
+                s.date_service::date = ${targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : '$1'}::date
+            )
+            WHERE l.statut_ligne ILIKE 'active' AND s.id_service IS NULL
+        `;
+        const checkParams = targetDate === 'CURRENT_DATE' ? [] : [targetDate];
+        const toCreate = await db.query(checkQuery, checkParams);
+
+        // 2. Créer les services manquants
+        for (const row of toCreate.rows) {
+            const insertQuery = targetDate === 'CURRENT_DATE' 
+                ? `INSERT INTO service (date_service, num_ligne, id_bus) VALUES (CURRENT_DATE, $1, $2) ON CONFLICT DO NOTHING`
+                : `INSERT INTO service (date_service, num_ligne, id_bus) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`;
+            
+            const insertParams = targetDate === 'CURRENT_DATE' 
+                ? [row.num_ligne, row.id_bus] 
+                : [targetDate, row.num_ligne, row.id_bus];
+
+            await db.query(insertQuery, insertParams);
+        }
+
+        // 3. Retourner la liste complète mise à jour
+        const finalQuery = `
             SELECT
-                s.id_service,
-                s.date_service,
-                s.num_ligne,
-                s.id_bus,
+                l.num_ligne,
                 l.ville_depart,
                 l.ville_arrivee,
                 l.horaire,
                 l.statut_ligne,
+                b.id_bus,
                 b.numero_bus,
                 b.capacite,
-                b.etat
-            FROM service s
-            INNER JOIN ligne l ON s.num_ligne = l.num_ligne
-            INNER JOIN bus b ON s.id_bus = b.id_bus
-            WHERE s.date_service = CURRENT_DATE
-              AND l.statut_ligne = 'active'
+                b.etat,
+                s.id_service,
+                s.date_service
+            FROM ligne l
+            LEFT JOIN bus b ON l.num_ligne = b.num_ligne
+            LEFT JOIN service s ON (
+                s.num_ligne = l.num_ligne AND 
+                s.id_bus = b.id_bus AND 
+                s.date_service::date = ${targetDate === 'CURRENT_DATE' ? 'CURRENT_DATE' : '$1'}::date
+            )
+            WHERE l.statut_ligne ILIKE 'active'
             ORDER BY l.horaire ASC
-        `);
-
+        `;
+        const result = await db.query(finalQuery, checkParams);
         res.json(result.rows);
     } catch (err) {
-        console.error('Erreur getTodayServices:', err);
-        res.status(500).json({ message: 'Erreur récupération des services du jour' });
+        console.error('Erreur getTodayServices (Auto-Create):', err);
+        res.status(500).json({ message: 'Erreur lors de la préparation des services du jour' });
     }
 };
 
@@ -104,15 +138,18 @@ exports.getOccupiedSeats = async (req, res) => {
     try {
         const { id_service } = req.params;
 
+        if (!id_service || id_service === "null" || id_service === "undefined") {
+            return res.json([]);
+        }
+
         const result = await db.query(`
-            SELECT siege
-            FROM ticket
-            WHERE id_service = $1
-              AND siege IS NOT NULL
+            SELECT siege FROM ticket WHERE id_service = $1 AND siege IS NOT NULL
+            UNION
+            SELECT siege FROM reservation WHERE id_service = $1 AND siege IS NOT NULL AND statut = 'CONFIRMEE'
             ORDER BY siege ASC
         `, [id_service]);
 
-        res.json(result.rows.map(r => Number(r.siege)));
+        res.json(result.rows.map(row => row.siege));
     } catch (err) {
         console.error('Erreur getOccupiedSeats:', err);
         res.status(500).json({ message: 'Erreur récupération des sièges occupés' });
@@ -201,16 +238,54 @@ exports.createTicket = async (req, res) => {
             type_reduction = 'AUCUNE'
         } = req.body;
 
-        const agentId = req.user?.id_utilisateur;
+        const agentId = req.user?.id_utilisateur || req.user?.id;
 
         if (!agentId) {
             await client.query('ROLLBACK');
-            return res.status(401).json({ message: 'Agent non authentifié' });
+            return res.status(401).json({ message: 'Agent non authentifié (Token invalide ou ID manquant)' });
         }
 
-        if (!id_service || !arret_depart || !arret_arrivee) {
+        if ((!id_service && !req.body.num_ligne) || !arret_depart || !arret_arrivee) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Champs requis manquants' });
+            return res.status(400).json({ message: 'Champs requis manquants (Service ou Ligne, Départ, Arrivée)' });
+        }
+
+        let service;
+        let finalServiceId = id_service;
+
+        // Si id_service n'est pas fourni, on tente de le trouver ou de le créer pour aujourd'hui
+        if (!finalServiceId) {
+            // Dans ce module, on s'attendait à recevoir un id_service.
+            // Cependant, avec la nouvelle logique de static assignment (bus.num_ligne), 
+            // l'agent peut avoir choisi une ligne/bus sans qu'un service existe.
+            // On va essayer de trouver le service existant pour aujourd'hui pour ce bus/ligne.
+            const findService = await client.query(`
+                SELECT id_service FROM service 
+                WHERE num_ligne = (SELECT num_ligne FROM ligne WHERE num_ligne = $1)
+                AND id_bus = (SELECT id_bus FROM bus WHERE num_ligne = $1 LIMIT 1)
+                AND date_service = CURRENT_DATE
+                LIMIT 1
+            `, [req.body.num_ligne || null]); // On peut avoir besoin du num_ligne si id_service est null
+
+            if (findService.rows.length > 0) {
+                finalServiceId = findService.rows[0].id_service;
+            } else {
+                // On doit créer le service pour aujourd'hui
+                // On récupère d'abord le bus assigné à cette ligne
+                const busAssigned = await client.query('SELECT id_bus FROM bus WHERE num_ligne = $1 LIMIT 1', [req.body.num_ligne]);
+                if (busAssigned.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Aucun bus n’est assigné à cette ligne.' });
+                }
+                
+                const newService = await client.query(`
+                    INSERT INTO service (date_service, num_ligne, id_bus)
+                    VALUES (CURRENT_DATE, $1, $2)
+                    RETURNING id_service
+                `, [req.body.num_ligne, busAssigned.rows[0].id_bus]);
+                
+                finalServiceId = newService.rows[0].id_service;
+            }
         }
 
         const serviceResult = await client.query(`
@@ -232,14 +307,14 @@ exports.createTicket = async (req, res) => {
             LEFT JOIN utilisateur u ON u.id_utilisateur = $2
             WHERE s.id_service = $1
             LIMIT 1
-        `, [id_service, agentId]);
+        `, [finalServiceId, agentId]);
 
         if (serviceResult.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Service introuvable' });
         }
 
-        const service = serviceResult.rows[0];
+        service = serviceResult.rows[0];
 
         if (siege !== null && siege !== undefined && siege !== '') {
             const seatNumber = Number(siege);
@@ -334,7 +409,7 @@ exports.createTicket = async (req, res) => {
             codeTicket,
             qrCode,
             Number(finalPrice.toFixed(3)),
-            id_service,
+            finalServiceId,
             siege || null,
             agentId,
             arret_depart,
@@ -409,11 +484,15 @@ exports.getMySales = async (req, res) => {
     }
 };
 
-// POST Créer réservation
 exports.createReservation = async (req, res) => {
+    const client = await db.connect();
     try {
+        await client.query('BEGIN');
+
         const {
             id_service,
+            num_ligne,
+            date_voyage,
             id_agent,
             siege,
             arret_depart,
@@ -422,7 +501,55 @@ exports.createReservation = async (req, res) => {
             montant_total
         } = req.body;
 
-        const result = await db.query(`
+        const voyageDateObj = new Date(date_voyage);
+        const todayObj = new Date();
+        todayObj.setHours(0, 0, 0, 0);
+
+        if (voyageDateObj < todayObj) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Impossible de réserver pour une date passée.' });
+        }
+
+        let finalServiceId = id_service;
+
+        // Auto-create/find service for the travel date if id_service is missing
+        if (!finalServiceId) {
+            const dateToUse = date_voyage || new Date().toISOString().split('T')[0];
+            const lineToUse = num_ligne;
+
+            if (!lineToUse) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Ligne non spécifiée' });
+            }
+
+            const findService = await client.query(`
+                SELECT id_service FROM service 
+                WHERE num_ligne = $1
+                AND id_bus = (SELECT id_bus FROM bus WHERE num_ligne = $1 LIMIT 1)
+                AND date_service = $2
+                LIMIT 1
+            `, [lineToUse, dateToUse]);
+
+            if (findService.rows.length > 0) {
+                finalServiceId = findService.rows[0].id_service;
+            } else {
+                const busAssigned = await client.query('SELECT id_bus FROM bus WHERE num_ligne = $1 LIMIT 1', [lineToUse]);
+                if (busAssigned.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Aucun bus n’est assigné à cette ligne.' });
+                }
+                
+                const newService = await client.query(`
+                    INSERT INTO service (date_service, num_ligne, id_bus)
+                    VALUES ($1, $2, $3)
+                    RETURNING id_service
+                `, [dateToUse, lineToUse, busAssigned.rows[0].id_bus]);
+                
+                finalServiceId = newService.rows[0].id_service;
+            }
+        }
+
+        const result = await client.query(`
             INSERT INTO reservation (
                 id_service,
                 id_agent,
@@ -438,7 +565,7 @@ exports.createReservation = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, 1, NOW(), 'CONFIRMEE')
             RETURNING *
         `, [
-            id_service,
+            finalServiceId,
             id_agent,
             siege,
             arret_depart,
@@ -447,13 +574,61 @@ exports.createReservation = async (req, res) => {
             montant_total
         ]);
 
+        const reservation = result.rows[0];
+
+        // Fetch additional details for the printable ticket
+        const details = await client.query(`
+            SELECT 
+                l.ville_depart, l.ville_arrivee, l.num_ligne,
+                b.numero_bus,
+                s.date_service
+            FROM service s
+            JOIN ligne l ON s.num_ligne = l.num_ligne
+            JOIN bus b ON s.id_bus = b.id_bus
+            WHERE s.id_service = $1
+        `, [finalServiceId]);
+
+        const fullReservation = {
+            ...reservation,
+            ...details.rows[0]
+        };
+
+        await client.query('COMMIT');
+
         res.status(201).json({
             message: 'Réservation confirmée',
-            reservation: result.rows[0]
+            reservation: fullReservation
         });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Erreur createReservation:', err);
         res.status(500).json({ message: 'Erreur création réservation' });
+    } finally {
+        client.release();
+    }
+};
+
+// GET Mes réservations
+exports.getMyReservations = async (req, res) => {
+    try {
+        const agentId = req.user?.id_utilisateur || req.user?.id;
+        const result = await db.query(`
+            SELECT 
+                r.*,
+                l.ville_depart, l.ville_arrivee, l.num_ligne,
+                b.numero_bus,
+                s.date_service
+            FROM reservation r
+            JOIN service s ON r.id_service = s.id_service
+            JOIN ligne l ON s.num_ligne = l.num_ligne
+            JOIN bus b ON s.id_bus = b.id_bus
+            WHERE r.id_agent = $1
+            ORDER BY r.date_reservation DESC
+        `, [agentId]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getMyReservations:', err);
+        res.status(500).json({ message: 'Erreur historique réservations' });
     }
 };
 

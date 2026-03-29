@@ -13,5 +13,6 @@ router.post('/tickets', authMiddleware, agentSaleController.createTicket);
 router.post('/tickets/:id/print', authMiddleware, agentSaleController.printTicketOnce);
 router.post('/reservations', authMiddleware, agentSaleController.createReservation);
 router.get('/tickets/me', authMiddleware, agentSaleController.getMySales);
+router.get('/reservations/me', authMiddleware, agentSaleController.getMyReservations);
 
 module.exports = router;

@@ -12,6 +12,10 @@ module.exports = (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         req.user = decoded;
+        // Ensure id_utilisateur is also available for components expecting it
+        if (decoded.id && !decoded.id_utilisateur) {
+            req.user.id_utilisateur = decoded.id;
+        }
         next();
     } catch (err) {
         console.error('Erreur authMiddleware:', err);

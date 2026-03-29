@@ -66,12 +66,16 @@ const TicketSale = () => {
         const servicesRes = await axios.get("http://localhost:5000/api/agent/services/today", authHeaders);
         const service = servicesRes.data.find(s => String(s.num_ligne) === String(line.num_ligne));
         
-        if (service) {
+        if (service && service.id_service) {
             setTodayService(service);
             const seatsRes = await axios.get(`http://localhost:5000/api/agent/services/${service.id_service}/occupied-seats`, authHeaders);
             setOccupiedSeats(seatsRes.data);
+        } else if (service) {
+            // Bus assigné statiquement mais pas encore de service (on l'affichera mais sans sièges occupés)
+            setTodayService(service);
+            setOccupiedSeats([]);
         } else {
-            console.log("Aucun service programmé pour cette ligne aujourd'hui.");
+            console.log("Aucun service ou bus programmé pour cette ligne aujourd'hui.");
             setOccupiedSeats([]);
         }
     } catch (err) {
@@ -114,6 +118,7 @@ const TicketSale = () => {
           "http://localhost:5000/api/agent/tickets",
           {
             id_service: todayService?.id_service || null,
+            num_ligne: selectedLine.num_ligne,
             siege: selectedSeat,
             arret_depart: depart,
             arret_arrivee: arrivee,
@@ -122,19 +127,24 @@ const TicketSale = () => {
           authHeaders
         );
 
+        const newTicket = res.data.ticket;
         setCreatedTicket({
-            ...res.data.ticket,
+            ...newTicket,
             nom_ligne: `${selectedLine.ville_depart} - ${selectedLine.ville_arrivee}`,
             numero_bus: todayService?.numero_bus || "Non assigné"
         });
 
-        if (todayService) {
-            const seatsRes = await axios.get(
-              `http://localhost:5000/api/agent/services/${todayService.id_service}/occupied-seats`,
-              authHeaders
-            );
-            setOccupiedSeats(seatsRes.data);
+        // Mettre à jour aujourd'huiService pour inclure le nouvel id_service si nécessaire
+        if (todayService && !todayService.id_service) {
+            setTodayService(prev => ({ ...prev, id_service: newTicket.id_service }));
         }
+
+        // Recharger les sièges occupés
+        const seatsRes = await axios.get(
+          `http://localhost:5000/api/agent/services/${newTicket.id_service}/occupied-seats`,
+          authHeaders
+        );
+        setOccupiedSeats(seatsRes.data);
     } catch (err) {
         console.error("Erreur vente ticket:", err);
         alert(err.response?.data?.message || "Erreur lors de la vente");
@@ -151,7 +161,7 @@ const TicketSale = () => {
               value={selectedLineId}
               onChange={(e) => handleSelectLine(e.target.value)}
             >
-              <option value="">Choisir une ligne</option>
+              <option value="" disabled hidden>Choisir une ligne</option>
               {lines.map(line => (
                 <option key={line.num_ligne} value={line.num_ligne}>
                   {line.num_ligne} : {line.ville_depart} - {line.ville_arrivee}
@@ -199,7 +209,7 @@ const TicketSale = () => {
                     setSelectedSeat(null);
                   }}
                 >
-                  <option value="">Choisir le départ</option>
+                  <option value="" disabled hidden>Choisir le départ</option>
                   {stops.map(stop => (
                     <option key={stop.id_trajet} value={stop.arret}>
                       {stop.arret}
@@ -219,7 +229,7 @@ const TicketSale = () => {
                   }}
                   disabled={!depart}
                 >
-                  <option value="">Choisir l’arrivée</option>
+                  <option value="" disabled hidden>Choisir l’arrivée</option>
                   {arrivalOptions.map(stop => (
                     <option key={stop.id_trajet} value={stop.arret}>
                       {stop.arret}

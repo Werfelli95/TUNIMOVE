@@ -3,6 +3,7 @@ import axios from "axios";
 import AgentLayout from "./AgentLayout";
 import StepCard from "../../components/agent/StepCard";
 import BusSeatSelector from "../../components/agent/BusSeatSelector";
+import ReservationPrintModal from "../../components/agent/ReservationPrintModal";
 import "./AgentModule.css";
 
 const ReservationPage = () => {
@@ -19,6 +20,9 @@ const ReservationPage = () => {
   const [seat, setSeat] = useState(null);
   const [reduction, setReduction] = useState("AUCUNE");
   const [fareDetails, setFareDetails] = useState(null);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [dateVoyage, setDateVoyage] = useState(todayStr);
+  const [createdReservation, setCreatedReservation] = useState(null);
 
   const authHeaders = useMemo(() => ({
     headers: { Authorization: `Bearer ${token}` }
@@ -30,32 +34,37 @@ const ReservationPage = () => {
       .catch(err => console.error("Erreur services:", err));
   }, [authHeaders]);
 
-  const handleLineSelect = async (numLigne) => {
+  const handleLineSelect = async (numLigne, date = dateVoyage) => {
     setSelectedLineId(numLigne);
     const line = lines.find(l => String(l.num_ligne) === String(numLigne));
     setSelectedLine(line || null);
-    setDepart("");
     setArrivee("");
     setSeat(null);
     setFareDetails(null);
     setTodayService(null);
+    setOccupiedSeats([]);
 
     if (!line) return;
 
     try {
-        const [stopsRes, servicesRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/agent/lignes/${line.num_ligne}/stations`, authHeaders),
-          axios.get(`http://localhost:5000/api/agent/services/today`, authHeaders)
-        ]);
-
+        // Fetch stops
+        const stopsRes = await axios.get(`http://localhost:5000/api/agent/lignes/${line.num_ligne}/stations`, authHeaders);
         setStops(stopsRes.data);
+
+        // Fetch services for the selected date
+        const servicesRes = await axios.get(`http://localhost:5000/api/agent/services/today?date=${date}`, authHeaders);
         const service = servicesRes.data.find(s => String(s.num_ligne) === String(line.num_ligne));
         
-        if (service) {
+        if (service && service.id_service && service.id_service !== "null") {
             setTodayService(service);
             const seatsRes = await axios.get(`http://localhost:5000/api/agent/services/${service.id_service}/occupied-seats`, authHeaders);
             setOccupiedSeats(seatsRes.data);
+        } else if (service) {
+            setTodayService(service);
+            setOccupiedSeats([]);
         } else {
+            console.log("Aucun service ou bus programmé pour cette ligne à cette date.");
+            setTodayService(null);
             setOccupiedSeats([]);
         }
     } catch (err) {
@@ -93,16 +102,18 @@ const ReservationPage = () => {
     try {
         const payload = {
             id_service: todayService?.id_service || null,
-            id_agent: JSON.parse(atob(token.split(".")[1])).id_utilisateur,
+            num_ligne: selectedLine.num_ligne,
+            date_voyage: dateVoyage,
+            id_agent: JSON.parse(atob(token.split(".")[1])).id,
             siege: seat,
             arret_depart: depart,
             arret_arrivee: arrivee,
             type_reduction: reduction,
             montant_total: fareDetails.final_price
         };
-        await axios.post("http://localhost:5000/api/agent/reservations", payload, authHeaders);
+        const res = await axios.post("http://localhost:5000/api/agent/reservations", payload, authHeaders);
 
-        alert("Réservation confirmée");
+        setCreatedReservation(res.data.reservation);
         handleLineSelect(selectedLineId);
     } catch (err) {
         console.error("Erreur réservation:", err);
@@ -114,15 +125,33 @@ const ReservationPage = () => {
     <AgentLayout title="Réservations">
       <div className="agent-two-columns">
         <div className="agent-left-flow">
-          <StepCard title="Sélection de la ligne" visible>
-            <select className="agent-input" value={selectedLineId} onChange={(e) => handleLineSelect(e.target.value)}>
-              <option value="">Choisir une ligne</option>
-              {lines.map(line => (
-                <option key={line.num_ligne} value={line.num_ligne}>
-                  {line.num_ligne} : {line.ville_depart} - {line.ville_arrivee}
-                </option>
-              ))}
-            </select>
+          <StepCard title="Détails du voyage" visible>
+            <div className="agent-grid-2">
+              <div>
+                <label>Date du voyage</label>
+                <input 
+                  type="date" 
+                  className="agent-input" 
+                  min={todayStr}
+                  value={dateVoyage} 
+                  onChange={(e) => {
+                    setDateVoyage(e.target.value);
+                    if (selectedLineId) handleLineSelect(selectedLineId, e.target.value);
+                  }} 
+                />
+              </div>
+              <div>
+                <label>Ligne</label>
+                <select className="agent-input" value={selectedLineId} onChange={(e) => handleLineSelect(e.target.value)}>
+                  <option value="" disabled hidden>Choisir une ligne</option>
+                  {lines.map(line => (
+                    <option key={line.num_ligne} value={line.num_ligne}>
+                      {line.num_ligne} : {line.ville_depart} - {line.ville_arrivee}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </StepCard>
 
           <StepCard title="Détails de voyage" visible={!!selectedLine}>
@@ -141,11 +170,11 @@ const ReservationPage = () => {
           <StepCard title="Sélection des arrêts" visible={!!selectedLine}>
             <div className="agent-grid-2">
               <select className="agent-input" value={depart} onChange={(e) => setDepart(e.target.value)}>
-                <option value="">Départ</option>
+                <option value="" disabled hidden>Départ</option>
                 {stops.map(stop => <option key={stop.id_trajet} value={stop.arret}>{stop.arret}</option>)}
               </select>
               <select className="agent-input" value={arrivee} onChange={(e) => setArrivee(e.target.value)}>
-                <option value="">Arrivée</option>
+                <option value="" disabled hidden>Arrivée</option>
                 {arrivalOptions.map(stop => <option key={stop.id_trajet} value={stop.arret}>{stop.arret}</option>)}
               </select>
             </div>
@@ -194,6 +223,12 @@ const ReservationPage = () => {
           </div>
         </div>
       </div>
+      {createdReservation && (
+        <ReservationPrintModal
+          reservation={createdReservation}
+          onClose={() => setCreatedReservation(null)}
+        />
+      )}
     </AgentLayout>
   );
 };

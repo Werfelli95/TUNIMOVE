@@ -4,7 +4,8 @@ import { NavLink, useNavigate } from "react-router-dom";
 import "./AgentModule.css";
 
 const AgentLayout = ({ children, title = "Guichet de Vente" }) => {
-  const agentName = localStorage.getItem("agentName") || "Agent";
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const agentName = user.nom ? `${user.prenom} ${user.nom}` : "Agent";
   const matricule = localStorage.getItem("agentMatricule") || "";
   const navigate = useNavigate();
 

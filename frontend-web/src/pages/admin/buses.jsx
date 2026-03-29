@@ -11,17 +11,10 @@ const Fleet = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingBus, setEditingBus] = useState(null);
+    const [lines, setLines] = useState([]); // Pour la sélection des lignes
 
-    const [formData, setFormData] = useState({
-        numero_bus: '',
-        capacite: '',
-        etat: 'En service'
-    });
-
-    // --- CHARGEMENT DES DONNÉES ---
     const fetchBuses = async () => {
         try {
-            setLoading(true);
             const response = await fetch('http://localhost:5000/api/buses');
             const data = await response.json();
             setBuses(data);
@@ -32,8 +25,31 @@ const Fleet = () => {
         }
     };
 
+    const [formData, setFormData] = useState({
+        numero_bus: '',
+        capacite: '',
+        etat: 'En service',
+        num_ligne: ''
+    });
+
+    // --- CHARGEMENT DES DONNÉES ---
+    const fetchLines = async () => {
+        try {
+            const response = await fetch('http://localhost:5000/api/network');
+            const data = await response.json();
+            setLines(data);
+        } catch (error) {
+            console.error("Erreur chargement lignes:", error);
+        }
+    };
+
     useEffect(() => {
-        fetchBuses();
+        const loadInitialData = async () => {
+            setLoading(true);
+            await Promise.all([fetchBuses(), fetchLines()]);
+            setLoading(false);
+        };
+        loadInitialData();
     }, []);
 
     // --- LOGIQUE DE RECHERCHE ---
@@ -45,7 +61,7 @@ const Fleet = () => {
     // --- GESTION DU MODAL ---
     const handleOpenAddModal = () => {
         setEditingBus(null);
-        setFormData({ numero_bus: '', capacite: '', etat: 'En service' });
+        setFormData({ numero_bus: '', capacite: '', etat: 'En service', num_ligne: '' });
         setIsModalOpen(true);
     };
 
@@ -54,7 +70,8 @@ const Fleet = () => {
         setFormData({
             numero_bus: bus.numero_bus,
             capacite: bus.capacite,
-            etat: bus.etat
+            etat: bus.etat,
+            num_ligne: bus.num_ligne || ''
         });
         setIsModalOpen(true);
     };
@@ -158,6 +175,7 @@ const Fleet = () => {
                                     <th>ID</th>
                                     <th>Numéro</th>
                                     <th>Capacité</th>
+                                    <th>Ligne Assignée</th>
                                     <th>État</th>
                                     <th style={{ textAlign: 'center' }}>Actions</th>
                                 </tr>
@@ -180,6 +198,13 @@ const Fleet = () => {
                                                     </div>
                                                 </td>
                                                 <td><span style={{ color: '#64748b' }}>{bus.capacite} places</span></td>
+                                                <td>
+                                                    {bus.num_ligne ? (
+                                                        <span className="role-badge badge-admin">Ligne {bus.num_ligne}</span>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Non assignée</span>
+                                                    )}
+                                                </td>
                                                 <td>{getStatusBadge(bus.etat)}</td>
                                                 <td>
                                                     <div className="row-actions">
@@ -247,6 +272,21 @@ const Fleet = () => {
                                             <option value="En service">En service</option>
                                             <option value="Maintenance">Maintenance</option>
                                             <option value="En panne">En panne</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Ligne Assignée (Statique)</label>
+                                        <select
+                                            className="form-select"
+                                            value={formData.num_ligne}
+                                            onChange={(e) => setFormData({ ...formData, num_ligne: e.target.value })}
+                                        >
+                                            <option value="">Aucune ligne</option>
+                                            {lines.map(line => (
+                                                <option key={line.num_ligne} value={line.num_ligne}>
+                                                    Ligne {line.num_ligne} ({line.ville_depart} - {line.ville_arrivee})
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
