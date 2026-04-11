@@ -16,7 +16,7 @@ exports.getSalesHistory = async (req, res) => {
                 (l.ville_depart || ' → ' || l.ville_arrivee) as trajet
             FROM ticket t
             JOIN service s ON t.id_service = s.id_service
-            JOIN ligne l ON s.num_ligne = l.num_ligne
+            LEFT JOIN ligne l ON s.num_ligne = l.num_ligne
             ORDER BY t.date_emission DESC;
         `;
         const result = await db.query(query);

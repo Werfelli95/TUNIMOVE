@@ -1,22 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X } from 'lucide-react';
+import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On réutilise vos styles premium
 
 const Assignments = () => {
-    const [assignments, setAssignments] = useState([]);
-    const [stats, setStats] = useState({ withReceiver: 0, withoutReceiver: 0, availableReceivers: 0 });
+    // États généraux
+    const [activeTab, setActiveTab] = useState('bus');
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedBus, setSelectedBus] = useState(null);
-    const [availableReceivers, setAvailableReceivers] = useState([]);
-    const [selectedReceiverId, setSelectedReceiverId] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const fetchData = async () => {
+    // États pour les Bus
+    const [assignments, setAssignments] = useState([]);
+    const [stats, setStats] = useState({ withReceiver: 0, withoutReceiver: 0, availableReceivers: 0 });
+
+    // États pour les Guichets
+    const [guichets, setGuichets] = useState([]);
+    const [guichetStats, setGuichetStats] = useState({ total: 0, withAgent: 0, withoutAgent: 0, availableAgents: 0 });
+
+    // États du Modal d'Affectation
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null); // Peut être un bus ou un guichet
+    const [availableStaff, setAvailableStaff] = useState([]);
+    const [selectedStaffId, setSelectedStaffId] = useState('');
+    const [dateDebut, setDateDebut] = useState('');
+    const [dateFin, setDateFin] = useState('');
+
+    // États pour l'Ajout de Guichet
+    const [isAddGuichetModalOpen, setIsAddGuichetModalOpen] = useState(false);
+    const [newGuichet, setNewGuichet] = useState({ nom_guichet: '', emplacement: '' });
+
+    const fetchBusData = async () => {
         try {
-            setLoading(true);
             const [assignRes, statsRes] = await Promise.all([
                 fetch('http://localhost:5000/api/assignments'),
                 fetch('http://localhost:5000/api/assignments/stats')
@@ -24,36 +39,104 @@ const Assignments = () => {
             setAssignments(await assignRes.json());
             setStats(await statsRes.json());
         } catch (error) {
-            console.error("Erreur chargement:", error);
-        } finally {
-            setLoading(false);
+            console.error("Erreur chargement bus:", error);
         }
+    };
+
+    const fetchGuichetData = async () => {
+        try {
+            const [guichetRes, statsRes] = await Promise.all([
+                fetch('http://localhost:5000/api/guichets'),
+                fetch('http://localhost:5000/api/guichets/stats')
+            ]);
+            setGuichets(await guichetRes.json());
+            setGuichetStats(await statsRes.json());
+        } catch (error) {
+            console.error("Erreur chargement guichets:", error);
+        }
+    };
+
+    const fetchData = async () => {
+        setLoading(true);
+        if (activeTab === 'bus') {
+            await fetchBusData();
+        } else {
+            await fetchGuichetData();
+        }
+        setLoading(false);
     };
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [activeTab]);
 
-    const handleOpenModal = async (bus) => {
-        setSelectedBus(bus);
+    const handleOpenModal = async (item) => {
+        setSelectedItem(item);
         try {
-            const res = await fetch('http://localhost:5000/api/assignments/available-receivers');
-            setAvailableReceivers(await res.json());
-            setSelectedReceiverId('');
+            const endpoint = activeTab === 'bus'
+                ? 'http://localhost:5000/api/assignments/available-receivers'
+                : 'http://localhost:5000/api/guichets/available-agents';
+
+            const res = await fetch(endpoint);
+            let available = await res.json();
+
+            // Ajouter la personne déjà affectée à la liste pour pouvoir la conserver
+            const currentStaffId = activeTab === 'bus' ? item.id_receveur : item.id_agent;
+            if (currentStaffId) {
+                const staffName = activeTab === 'bus'
+                    ? { id_utilisateur: item.id_receveur, nom: item.receveur_nom, prenom: item.receveur_prenom }
+                    : { id_utilisateur: item.id_agent, nom: item.agent_nom, prenom: item.agent_prenom };
+
+                // Éviter les doublons
+                if (!available.find(u => u.id_utilisateur === currentStaffId)) {
+                    available.unshift(staffName);
+                }
+            }
+            setAvailableStaff(available);
+
+            if (currentStaffId) {
+                setSelectedStaffId(currentStaffId);
+                if (activeTab === 'bus') {
+                    setDateDebut(item.date_debut_affectation ? new Date(item.date_debut_affectation).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                    setDateFin(item.date_fin_affectation ? new Date(item.date_fin_affectation).toISOString().split('T')[0] : '');
+                }
+            } else {
+                setSelectedStaffId('');
+                if (activeTab === 'bus') {
+                    setDateDebut(new Date().toISOString().split('T')[0]);
+                    setDateFin('');
+                }
+            }
+
             setIsModalOpen(true);
         } catch (error) {
-            alert("Erreur lors de la récupération des receveurs");
+            alert("Erreur lors de la récupération du personnel disponible");
         }
     };
-    // Affectation d un receveur
-    const handleAssign = async (id_receveur) => {
+
+    const handleAssign = async () => {
         setIsSubmitting(true);
         try {
-            const res = await fetch('http://localhost:5000/api/assignments/update', {
+            const url = activeTab === 'bus'
+                ? 'http://localhost:5000/api/assignments/update'
+                : 'http://localhost:5000/api/guichets/update';
+
+            const body = activeTab === 'bus' ? {
+                id_bus: selectedItem.id_bus,
+                id_receveur: selectedStaffId,
+                date_debut: dateDebut,
+                date_fin: dateFin
+            } : {
+                id_guichet: selectedItem.id_guichet,
+                id_agent: selectedStaffId
+            };
+
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_bus: selectedBus.id_bus, id_receveur })
+                body: JSON.stringify(body)
             });
+
             if (res.ok) {
                 await fetchData();
                 setIsModalOpen(false);
@@ -64,73 +147,174 @@ const Assignments = () => {
             setIsSubmitting(false);
         }
     };
-    // supprimer l affectation d'un receveur
-    const handleUnassign = async (id_bus) => {
-        // Une petite confirmation par sécurité
-        if (!window.confirm("Voulez-vous vraiment retirer ce receveur de ce bus ?")) return;
+
+    const handleUnassign = async (id) => {
+        const msg = activeTab === 'bus'
+            ? "Voulez-vous vraiment retirer ce receveur de ce bus ?"
+            : "Voulez-vous vraiment retirer cet agent de ce guichet ?";
+
+        if (!window.confirm(msg)) return;
 
         try {
-            const res = await fetch('http://localhost:5000/api/assignments/update', {
+            const url = activeTab === 'bus'
+                ? 'http://localhost:5000/api/assignments/update'
+                : 'http://localhost:5000/api/guichets/update';
+
+            const body = activeTab === 'bus'
+                ? { id_bus: id, id_receveur: null }
+                : { id_guichet: id, id_agent: null };
+
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_bus, id_receveur: null }) // On envoie null pour détacher le receveur
+                body: JSON.stringify(body)
             });
 
             if (res.ok) {
-                await fetchData(); // On rafraîchit le tableau et les compteurs
+                await fetchData();
             }
         } catch (error) {
             alert("Erreur lors de la suppression de l'affectation");
         }
     };
 
+    const handleToggleStatus = async (item) => {
+        const newStatus = item.statut === 'Actif' ? 'Inactif' : 'Actif';
+        try {
+            const res = await fetch('http://localhost:5000/api/guichets/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_guichet: item.id_guichet, statut: newStatus })
+            });
+            if (res.ok) {
+                await fetchGuichetData();
+            }
+        } catch (error) {
+            alert("Erreur lors de la mise à jour du statut");
+        }
+    };
 
-    const filtered = assignments.filter(a =>
+    const handleCreateGuichet = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('http://localhost:5000/api/guichets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newGuichet)
+            });
+            if (res.ok) {
+                await fetchGuichetData();
+                setIsAddGuichetModalOpen(false);
+                setNewGuichet({ nom_guichet: '', emplacement: '' });
+            } else {
+                const data = await res.json();
+                alert(data.message || "Erreur lors de la création");
+            }
+        } catch (error) {
+            alert("Erreur de connexion au serveur");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const filteredBus = assignments.filter(a =>
         a.numero_bus.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (a.receveur_nom && a.receveur_nom.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    const filteredGuichets = guichets.filter(g =>
+        g.nom_guichet.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (g.agent_nom && g.agent_nom.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
     return (
         <div className="users-container">
+            {/* TABS SELECTOR - Premium Style */}
+            <div className="flex justify-between items-center mb-8">
+                <div className="tabs-container mb-0">
+                    <button
+                        onClick={() => setActiveTab('bus')}
+                        className={`tab-button ${activeTab === 'bus' ? 'active' : ''}`}
+                    >
+                        <Bus size={20} />
+                        <span>Affectation Bus</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('guichet')}
+                        className={`tab-button ${activeTab === 'guichet' ? 'active' : ''}`}
+                    >
+                        <Store size={20} />
+                        <span>Agents Guichet</span>
+                    </button>
+                </div>
+
+                {activeTab === 'guichet' && (
+                    <button
+                        onClick={() => setIsAddGuichetModalOpen(true)}
+                        className="btn-add-user"
+                    >
+                        <Plus size={18} />
+                        <span>Ajouter un Guichet</span>
+                    </button>
+                )}
+            </div>
+
             {/* STATS CARDS */}
             <div className="stats-grid">
-                <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-slate-500 text-sm">Bus avec receveur</p>
-                            <h3 className="text-3xl font-bold text-slate-800">{stats.withReceiver}</h3>
-                        </div>
-                        <CheckCircle className="text-indigo-500" size={32} />
-                    </div>
-                </motion.div>
-
-                <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-slate-500 text-sm">Bus sans receveur</p>
-                            <h3 className="text-3xl font-bold text-slate-800">{stats.withoutReceiver}</h3>
-                        </div>
-                        <XCircle className="text-orange-500" size={32} />
-                    </div>
-                </motion.div>
-
-                <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-slate-500 text-sm">Receveurs disponibles</p>
-                            <h3 className="text-3xl font-bold text-slate-800">{stats.availableReceivers}</h3>
-                        </div>
-                        <Users className="text-emerald-500" size={32} />
-                    </div>
-                </motion.div>
+                {activeTab === 'bus' ? (
+                    <>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Bus avec receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withReceiver}</h3></div>
+                                <CheckCircle className="text-indigo-500" size={32} />
+                            </div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Bus sans receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withoutReceiver}</h3></div>
+                                <XCircle className="text-orange-500" size={32} />
+                            </div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Receveurs disponibles</p><h3 className="text-3xl font-bold text-slate-800">{stats.availableReceivers}</h3></div>
+                                <Users className="text-emerald-500" size={32} />
+                            </div>
+                        </motion.div>
+                    </>
+                ) : (
+                    <>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Guichets avec agent</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withAgent}</h3></div>
+                                <CheckCircle className="text-indigo-500" size={32} />
+                            </div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Guichets inoccupés</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withoutAgent}</h3></div>
+                                <XCircle className="text-orange-500" size={32} />
+                            </div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
+                            <div className="flex justify-between items-center">
+                                <div><p className="text-slate-500 text-sm">Agents dispos</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.availableAgents}</h3></div>
+                                <Users className="text-emerald-500" size={32} />
+                            </div>
+                        </motion.div>
+                    </>
+                )}
             </div>
 
             {/* HEADER & TABLE */}
             <div className="users-table-card">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800">Affectation Bus - Receveur</h2>
-                        <p className="text-sm text-slate-500">Gérer l'affectation des receveurs aux bus</p>
+                        <h2 className="text-xl font-bold text-slate-800">
+                            {activeTab === 'bus' ? 'Affectation Bus - Receveur' : 'Affectation Agent - Guichet'}
+                        </h2>
+                        <br></br>
                     </div>
                     <div className="search-wrapper">
                         <Search className="search-icon" size={18} />
@@ -148,36 +332,59 @@ const Assignments = () => {
                         <table className="enterprise-table">
                             <thead>
                                 <tr>
-                                    <th>Bus</th>
-                                    <th>Capacité</th>
+                                    <th>{activeTab === 'bus' ? 'Bus' : 'Guichet'}</th>
+                                    <th>{activeTab === 'bus' ? 'Capacité' : 'Emplacement'}</th>
                                     <th>État</th>
-                                    <th>Receveur Affecté</th>
+                                    <th>{activeTab === 'bus' ? 'Receveur Affecté' : 'Agent Affecté'}</th>
                                     <th className="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(bus => (
-                                    <tr key={bus.id_bus}>
+                                {(activeTab === 'bus' ? filteredBus : filteredGuichets).map(item => (
+                                    <tr key={activeTab === 'bus' ? item.id_bus : item.id_guichet}>
                                         <td className="font-bold text-slate-700">
-                                            <div className="flex items-center gap-2"><Bus size={16} className="text-indigo-500" />Bus N° {bus.numero_bus}</div>
+                                            <div className="flex items-center gap-2">
+                                                {activeTab === 'bus' ? <Bus size={16} className="text-indigo-500" /> : <Store size={16} className="text-indigo-500" />}
+                                                {activeTab === 'bus' ? `Bus N° ${item.numero_bus}` : item.nom_guichet}
+                                            </div>
                                         </td>
-                                        <td>{bus.capacite} places</td>
+                                        <td>{activeTab === 'bus' ? `${item.capacite} places` : item.emplacement}</td>
                                         <td>
-                                            <span className={`role-badge ${bus.etat === 'En service' ? 'badge-agent' : 'badge-receveur'}`}>
-                                                {bus.etat}
-                                            </span>
+                                            <button 
+                                                onClick={() => activeTab === 'guichet' && handleToggleStatus(item)}
+                                                className={`role-badge ${activeTab === 'bus' ? (item.etat === 'En service' ? 'badge-agent' : 'badge-receveur') : (item.statut === 'Actif' ? 'badge-agent' : 'badge-receveur')} ${activeTab === 'guichet' ? 'cursor-pointer hover:ring-2 hover:ring-indigo-100 transition-all' : ''}`}
+                                                title={activeTab === 'guichet' ? "Cliquer pour changer le statut" : ""}
+                                                disabled={activeTab === 'bus'}
+                                            >
+                                                {activeTab === 'bus' ? item.etat : item.statut}
+                                            </button>
                                         </td>
                                         <td>
-                                            {bus.receveur_nom ? (
+                                            {(activeTab === 'bus' ? item.receveur_nom : item.agent_nom) ? (
                                                 <div className="flex items-center justify-between gap-2 group/item">
-                                                    <span className="text-slate-700 font-medium">
-                                                        {bus.receveur_prenom} {bus.receveur_nom}
-                                                    </span>
-                                                    {/* Bouton de suppression qui apparaît au survol */}
+                                                    <div>
+                                                        <div className="text-slate-700 font-medium">
+                                                            {activeTab === 'bus' ? `${item.receveur_prenom} ${item.receveur_nom}` : `${item.agent_prenom} ${item.agent_nom}`}
+                                                        </div>
+                                                        {activeTab === 'bus' && (item.date_debut_affectation || item.date_fin_affectation) && (
+                                                            <div className="flex items-center gap-2 mt-1.5">
+                                                                {item.date_debut_affectation && (
+                                                                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200">
+                                                                        Du {new Date(item.date_debut_affectation).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
+                                                                {item.date_fin_affectation && (
+                                                                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200">
+                                                                        Au {new Date(item.date_fin_affectation).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <button
-                                                        onClick={() => handleUnassign(bus.id_bus)}
-                                                        className="p-1 rounded-md bg-red-50 text-red-500 opacity-0 group-hover/item:opacity-100 transition-all hover:bg-red-500 hover:text-white"
-                                                        title="Retirer le receveur"
+                                                        onClick={() => handleUnassign(activeTab === 'bus' ? item.id_bus : item.id_guichet)}
+                                                        className="p-1 rounded-md bg-red-50 text-red-500 opacity-0 group-hover/item:opacity-100 transition-all hover:bg-red-500 hover:text-white mt-1"
+                                                        title="Retirer l'affectation"
                                                     >
                                                         <X size={14} />
                                                     </button>
@@ -188,15 +395,18 @@ const Assignments = () => {
                                                 </span>
                                             )}
                                         </td>
-
                                         <td className="text-center">
                                             <button
-                                                className="btn-add-user h-8 py-0 px-4 text-xs"
-                                                onClick={() => handleOpenModal(bus)}
-                                                disabled={bus.etat !== 'En service'}
+                                                className={`btn-add-user h-8 py-0 px-4 text-xs ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
+                                                onClick={() => handleOpenModal(item)}
+                                                disabled={activeTab === 'bus' && item.etat !== 'En service'}
+                                                style={activeTab === 'bus' && item.etat !== 'En service' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                             >
-                                                <UserPlus size={14} />
-                                                <span>Affecter</span>
+                                                {(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? (
+                                                    <><Edit2 size={14} /><span>Modifier</span></>
+                                                ) : (
+                                                    <><UserPlus size={14} /><span>Affecter</span></>
+                                                )}
                                             </button>
                                         </td>
                                     </tr>
@@ -213,48 +423,122 @@ const Assignments = () => {
                     <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                         <motion.div className="modal-content max-w-md" initial={{ y: 50 }} animate={{ y: 0 }} exit={{ y: 50 }}>
                             <div className="modal-header">
-                                <h2>Affecter au Bus {selectedBus?.numero_bus}</h2>
+                                <h2>
+                                    {(activeTab === 'bus' ? selectedItem?.id_receveur : selectedItem?.id_agent) ? 'Modifier l\'affectation' : 'Nouvelle Affectation'}
+                                    - {activeTab === 'bus' ? `Bus ${selectedItem?.numero_bus}` : selectedItem?.nom_guichet}
+                                </h2>
                                 <button className="btn-close" onClick={() => setIsModalOpen(false)}><X size={20} /></button>
                             </div>
                             <div className="modal-body">
-                                <p className="text-sm text-slate-500 mb-6">Choisissez un receveur disponible dans la liste :</p>
-
-                                {availableReceivers.length > 0 ? (
+                                <p className="text-sm text-slate-500 mb-6">Choisissez un personnel disponible dans la liste :</p>
+                                {availableStaff.length > 0 ? (
                                     <div className="space-y-6">
                                         <div className="form-group">
                                             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
-                                                Choisir un receveur
+                                                Choisir {activeTab === 'bus' ? 'un receveur' : 'un agent'}
                                             </label>
-
                                             <select
                                                 className="form-select w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
-                                                value={selectedReceiverId}
-                                                onChange={(e) => setSelectedReceiverId(e.target.value)}
+                                                value={selectedStaffId}
+                                                onChange={(e) => setSelectedStaffId(e.target.value)}
                                             >
-                                                <option value="">Sélectionner un receveur...</option>
-                                                {availableReceivers.map(rec => (
-                                                    <option key={rec.id_utilisateur} value={rec.id_utilisateur}>
-                                                        {rec.prenom} {rec.nom}
+                                                <option value="">Sélectionner...</option>
+                                                {availableStaff.map(s => (
+                                                    <option key={s.id_utilisateur} value={s.id_utilisateur}>
+                                                        {s.prenom} {s.nom}
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
 
+                                        {activeTab === 'bus' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="form-group mb-0">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Date de début *</label>
+                                                    <input
+                                                        type="date"
+                                                        className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                                                        value={dateDebut}
+                                                        onChange={(e) => setDateDebut(e.target.value)}
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="form-group mb-0">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Date de fin (Optionnel)</label>
+                                                    <input
+                                                        type="date"
+                                                        className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                                                        value={dateFin}
+                                                        onChange={(e) => setDateFin(e.target.value)}
+                                                        min={dateDebut || new Date().toISOString().split('T')[0]}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <button
                                             className="btn-submit w-full py-4 justify-center"
-                                            onClick={() => handleAssign(selectedReceiverId)}
-                                            disabled={!selectedReceiverId || isSubmitting}
+                                            onClick={handleAssign}
+                                            disabled={!selectedStaffId || (activeTab === 'bus' && !dateDebut) || isSubmitting}
                                         >
-                                            {isSubmitting ? "Affectation en cours..." : "Confirmer l'affectation"}
+                                            {isSubmitting ? "Enregistrement..." : "Confirmer l'affectation"}
                                         </button>
                                     </div>
                                 ) : (
                                     <div className="text-center py-10 bg-slate-50 rounded-xl">
                                         <XCircle className="mx-auto text-slate-300 mb-2" size={32} />
-                                        <p className="text-slate-500">Aucun receveur disponible.</p>
+                                        <p className="text-slate-500">Aucun personnel disponible.</p>
                                     </div>
                                 )}
                             </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* CREATE GUICHET MODAL */}
+            <AnimatePresence>
+                {isAddGuichetModalOpen && (
+                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="modal-content max-w-md" initial={{ y: 50 }} animate={{ y: 0 }} exit={{ y: 50 }}>
+                            <div className="modal-header">
+                                <h2>Ajouter un nouveau Guichet</h2>
+                                <button className="btn-close" onClick={() => setIsAddGuichetModalOpen(false)}><X size={20} /></button>
+                            </div>
+                            <form onSubmit={handleCreateGuichet}>
+                                <div className="modal-body">
+                                    <div className="form-group">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Nom du Guichet *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Guichet Ariana"
+                                            className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                                            value={newGuichet.nom_guichet}
+                                            onChange={(e) => setNewGuichet({ ...newGuichet, nom_guichet: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Emplacement</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Station Métro 2"
+                                            className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                                            value={newGuichet.emplacement}
+                                            onChange={(e) => setNewGuichet({ ...newGuichet, emplacement: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        className="btn-submit w-full py-4 justify-center"
+                                        disabled={isSubmitting}
+                                    >
+                                        {isSubmitting ? "Création..." : "Créer le Guichet"}
+                                    </button>
+                                </div>
+                            </form>
                         </motion.div>
                     </motion.div>
                 )}
@@ -264,4 +548,3 @@ const Assignments = () => {
 };
 
 export default Assignments;
-

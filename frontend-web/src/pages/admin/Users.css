@@ -8,6 +8,52 @@
 }
 
 /* Stats Grid System */
+/* Tabs System */
+.tabs-container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    background: #f1f5f9;
+    padding: 0.5rem;
+    border-radius: 16px;
+    width: fit-content;
+}
+
+.tab-button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    color: #64748b;
+    background: transparent;
+}
+
+.tab-button.active {
+    background: #ffffff;
+    color: #4f46e5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.tab-button:not(.active):hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: #1e293b;
+}
+
+.tab-button svg {
+    transition: transform 0.3s ease;
+}
+
+.tab-button.active svg {
+    transform: scale(1.1);
+    color: #4f46e5;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -973,4 +1019,51 @@ tr:hover .row-actions {
     border-radius: 12px;
     font-size: 0.875rem;
     font-weight: 600;
+}
+/* Stations Select Dropdown */
+.stations-select {
+    width: 100%;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+}
+
+.stations-select:hover {
+    border-color: #cbd5e1;
+    background: #ffffff;
+}
+
+.stations-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: #ffffff;
+}
+
+.stations-select option {
+    font-weight: 500;
+    color: #1e293b;
+    padding: 8px;
+}
+
+/* Modifiers Action Button */
+.btn-modifier {
+    background: #f59e0b;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.btn-modifier:hover {
+    background: #d97706;
+    box-shadow: 0 6px 15px rgba(245, 158, 11, 0.2);
 }

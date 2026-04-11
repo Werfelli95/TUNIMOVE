@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import AgentLogin from './pages/AgentLogin';
 import AdminLogin from './pages/AdminLogin';
 import AdminLayout from './layout/AdminLayout';
+import AgentLayout from './layout/AgentLayout';
 import PublicLayout from './layout/PublicLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/admin/Dashboard';
@@ -13,6 +14,9 @@ import Network from './pages/admin/Network';
 import Tarifs from './pages/admin/Tarifs';
 import Audit from './pages/admin/Audit';
 import SalesHistory from './pages/admin/SalesHistory';
+import PasswordResets from './pages/admin/PasswordResets';
+import Guichet from './pages/agent/Guichet';
+
 function App() {
     return (
         <Router>
@@ -33,8 +37,12 @@ function App() {
                         <Route path="tarifs" element={<Tarifs />} />
                         <Route path="audit" element={<Audit />} />
                         <Route path="sales-history" element={<SalesHistory />} />
-
+                        <Route path="password-resets" element={<PasswordResets />} />
                     </Route>
+                </Route>
+
+                <Route path="/agent-dashboard" element={<AgentLayout />}>
+                    <Route index element={<Guichet />} />
                 </Route>
 
 

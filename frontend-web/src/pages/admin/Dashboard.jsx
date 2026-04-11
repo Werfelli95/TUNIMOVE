@@ -20,7 +20,8 @@ import {
   TrendingUp,
   MapPin,
   Clock,
-  Zap
+  Zap,
+  Store
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -61,62 +62,66 @@ const dataBar = [
 ];
 
 const Dashboard = () => {
-  const [personnelCount, setPersonnelCount] = useState(0);
-  const [activeBusCount, setActiveBusCount] = useState(0);
-  const [activeLineCount, setActiveLineCount] = useState(0);
+    const [personnelCount, setPersonnelCount] = useState(0);
+    const [activeBusCount, setActiveBusCount] = useState(0);
+    const [activeLineCount, setActiveLineCount] = useState(0);
+    const [activeGuichetCount, setActiveGuichetCount] = useState(0);
 
-  useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        const [userRes, busRes, lineRes] = await Promise.all([
-          fetch('http://localhost:5000/api/users/count'),
-          fetch('http://localhost:5000/api/buses/active-count'),
-          fetch('http://localhost:5000/api/network/count')
-        ]);
+    useEffect(() => {
+        const fetchCounts = async () => {
+            try {
+                const [userRes, busRes, lineRes, guichetRes] = await Promise.all([
+                    fetch('http://localhost:5000/api/users/count'),
+                    fetch('http://localhost:5000/api/buses/active-count'),
+                    fetch('http://localhost:5000/api/network/count'),
+                    fetch('http://localhost:5000/api/guichets/stats')
+                ]);
 
-        const userData = await userRes.json();
-        const busData = await busRes.json();
-        const lineData = await lineRes.json();
+                const userData = await userRes.json();
+                const busData = await busRes.json();
+                const lineData = await lineRes.json();
+                const guichetData = await guichetRes.json();
 
-        setPersonnelCount(userData.count);
-        setActiveBusCount(busData.count);
-        setActiveLineCount(lineData.count);
-      } catch (error) {
-        console.error("Erreur stats dashboard:", error);
-      }
-    };
-    fetchCounts();
-  }, []);
-  return (
-    <div className="animate-in fade-in duration-700">
+                setPersonnelCount(userData.count);
+                setActiveBusCount(busData.count);
+                setActiveLineCount(lineData.count);
+                setActiveGuichetCount(guichetData.activeCount);
+            } catch (error) {
+                console.error("Erreur stats dashboard:", error);
+            }
+        };
+        fetchCounts();
+    }, []);
 
-      <div className="dashboard-grid">
-        <StatCard
-          title="Recette Totale"
-          value="0.000 TND"
-          icon={<CircleDollarSign size={24} />}
-          color="indigo"
-          trend="0%"
-        />
-        <StatCard
-          title="Bus Actifs"
-          value={activeBusCount}
-          icon={<Bus size={24} />}
-          color="green"
-        />
-        <StatCard
-          title="Lignes Actives"
-          value={activeLineCount}
-          icon={<Network size={24} />}
-          color="blue"
-        />
-        <StatCard
-          title="Personnel"
-          value={personnelCount - 1}
-          icon={<Users size={24} />}
-          color="purple"
-        />
-      </div>
+    return (
+        <div className="animate-in fade-in duration-700">
+
+            <div className="dashboard-grid">
+                <StatCard
+                    title="Guichets actifs"
+                    value={activeGuichetCount}
+                    icon={<Store size={24} />}
+                    color="indigo"
+                />
+                <StatCard
+                    title="Bus Actifs"
+                    value={activeBusCount}
+                    icon={<Bus size={24} />}
+                    color="green"
+                />
+                <StatCard
+                    title="Lignes Actives"
+                    value={activeLineCount}
+                    icon={<Network size={24} />}
+                    color="blue"
+                />
+                <StatCard
+                    title="Personnel"
+                    value={personnelCount - 1}
+                    icon={<Users size={24} />}
+                    color="purple"
+                />
+            </div>
 
       <div className="grid grid-cols-3 gap-6 mb-8">
         <div className="col-span-2 chart-container">

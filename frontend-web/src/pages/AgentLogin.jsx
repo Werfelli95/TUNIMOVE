@@ -8,6 +8,12 @@ const AgentLogin = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetMatricule, setResetMatricule] = useState('');
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
+    const [isSubmittingReset, setIsSubmittingReset] = useState(false);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
@@ -15,12 +21,40 @@ const AgentLogin = () => {
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('role', 'agent');
             localStorage.setItem('user', JSON.stringify({
+                id: res.data.user.id,
                 nom: res.data.user.nom,
-                prenom: res.data.user.prenom
+                prenom: res.data.user.prenom,
+                matricule: matricule
             }));
             window.location.href = '/agent-dashboard';
         } catch (err) {
             setError(err.response?.data?.message || 'Erreur lors de la connexion');
+        }
+    };
+
+    const handleRequestReset = async (e) => {
+        e.preventDefault();
+        setIsSubmittingReset(true);
+        setResetMessage({ type: '', text: '' });
+        try {
+            const res = await axios.post('http://localhost:5000/api/password-reset/request', {
+                matricule: resetMatricule,
+                email: resetEmail
+            });
+            setResetMessage({ type: 'success', text: res.data.message });
+            setTimeout(() => {
+                setShowResetModal(false);
+                setResetMatricule('');
+                setResetEmail('');
+                setResetMessage({ type: '', text: '' });
+            }, 3000);
+        } catch (err) {
+            setResetMessage({ 
+                type: 'error', 
+                text: err.response?.data?.message || "Erreur lors de l'envoi de la demande." 
+            });
+        } finally {
+            setIsSubmittingReset(false);
         }
     };
 
@@ -32,7 +66,6 @@ const AgentLogin = () => {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="glass-card"
             >
-                {/* ... existing content ... */}
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -119,6 +152,16 @@ const AgentLogin = () => {
                         />
                     </motion.div>
 
+                    <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
+                        <button 
+                            type="button"
+                            onClick={() => setShowResetModal(true)}
+                            style={{ background: 'none', border: 'none', color: '#4f46e5', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}
+                        >
+                            Mot de passe oublié ?
+                        </button>
+                    </div>
+
                     <motion.button
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -132,6 +175,69 @@ const AgentLogin = () => {
                     </motion.button>
                 </form>
             </motion.div>
+
+            {/* Modal de réinitialisation */}
+            {showResetModal && (
+                <div className="modal-overlay">
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="modal-content"
+                    >
+                        <h2 className="modal-title">Réinitialisation</h2>
+                        <p className="modal-description">
+                            Une demande sera envoyée à l'administrateur qui vous enverra un nouveau mot de passe par e-mail.
+                        </p>
+
+                        {resetMessage.text && (
+                            <div className={resetMessage.type === 'success' ? 'success-alert' : 'error-alert'}>
+                                {resetMessage.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleRequestReset}>
+                            <div className="input-group">
+                                <label>Votre Matricule</label>
+                                <input 
+                                    type="text"
+                                    placeholder="AG-..."
+                                    value={resetMatricule}
+                                    onChange={(e) => setResetMatricule(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label>Votre Adresse Email</label>
+                                <input 
+                                    type="email"
+                                    placeholder="exemple@email.com"
+                                    value={resetEmail}
+                                    onChange={(e) => setResetEmail(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="modal-btns">
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowResetModal(false)}
+                                    className="btn-secondary"
+                                >
+                                    Annuler
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={isSubmittingReset}
+                                    className="btn-primary"
+                                    style={{ marginTop: 0 }}
+                                >
+                                    {isSubmittingReset ? 'Envoi...' : 'Envoyer'}
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };

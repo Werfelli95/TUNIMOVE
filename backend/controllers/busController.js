@@ -1,11 +1,14 @@
 const db = require('../config/db');
 
-// Récupérer tous les bus de la table 'bus'
 exports.getBuses = async (req, res) => {
     try {
-        const result = await db.query(
-            'SELECT id_bus, numero_bus, capacite, etat FROM bus ORDER BY numero_bus ASC'
-        );
+        const query = `
+            SELECT b.*, l.ville_depart, l.ville_arrivee 
+            FROM bus b 
+            LEFT JOIN ligne l ON b.num_ligne = l.num_ligne 
+            ORDER BY b.numero_bus ASC
+        `;
+        const result = await db.query(query);
         res.json(result.rows);
     } catch (err) {
         console.error('Erreur getBuses:', err);
@@ -17,14 +20,14 @@ exports.getBuses = async (req, res) => {
 // Ajouter un nouveau bus
 exports.createBus = async (req, res) => {
     try {
-        const { numero_bus, capacite, etat } = req.body;
+        const { numero_bus, capacite, etat, num_ligne } = req.body;
         const checkBus = await db.query('SELECT * FROM bus WHERE numero_bus = $1', [numero_bus]);
         if (checkBus.rows.length > 0) {
             return res.status(400).json({ message: "Ce numéro de bus existe déjà." });
         }
         const result = await db.query(
-            'INSERT INTO bus (numero_bus, capacite, etat) VALUES ($1, $2, $3) RETURNING *',
-            [numero_bus, capacite, etat]
+            'INSERT INTO bus (numero_bus, capacite, etat, num_ligne) VALUES ($1, $2, $3, $4) RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -36,11 +39,11 @@ exports.createBus = async (req, res) => {
 exports.updateBus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { numero_bus, capacite, etat } = req.body;
+        const { numero_bus, capacite, etat, num_ligne } = req.body;
 
         const result = await db.query(
-            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3 WHERE id_bus = $4 RETURNING *',
-            [numero_bus, capacite, etat, id]
+            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3, num_ligne = $4 WHERE id_bus = $5 RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null, id]
         );
 
         if (result.rows.length === 0) {

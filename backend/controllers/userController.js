@@ -132,4 +132,30 @@ exports.getUserById = async (req, res) => {
     }
 };
 
+// Mettre à jour un utilisateur (Profil)
+exports.updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nom, prenom, email, num_tel } = req.body;
+
+        // Mise à jour de l'utilisateur
+        const query = `
+            UPDATE utilisateur 
+            SET nom = $1, prenom = $2, email = $3, num_tel = $4 
+            WHERE id_utilisateur = $5 
+            RETURNING id_utilisateur, nom, prenom, email, num_tel, role, matricule;
+        `;
+
+        const result = await db.query(query, [nom, prenom, email, num_tel, id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Utilisateur introuvable" });
+        }
+
+        res.json({ message: "Profil mis à jour avec succès", user: result.rows[0] });
+    } catch (error) {
+        console.error('Erreur updateUser:', error);
+        res.status(500).json({ message: "Erreur lors de la mise à jour du profil" });
+    }
+};
 

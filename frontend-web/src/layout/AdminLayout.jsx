@@ -17,6 +17,25 @@ const AdminLayout = () => {
     return savedUser ? JSON.parse(savedUser) : { nom: 'Admin', prenom: 'TuniMove' };
   });
 
+  const [pendingResets, setPendingResets] = useState(0);
+
+  // Charger le nombre de demandes en attente
+  React.useEffect(() => {
+    const fetchPendingCount = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/password-reset/pending');
+        const data = await res.json();
+        setPendingResets(data.length);
+      } catch (error) {
+        console.error("Erreur notifications:", error);
+      }
+    };
+    fetchPendingCount();
+    // Rafraîchir toutes les 5 minutes
+    const interval = setInterval(fetchPendingCount, 300000);
+    return () => clearInterval(interval);
+  }, []);
+
   // État pour la modal de profil
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -28,12 +47,23 @@ const AdminLayout = () => {
     { icon: <LayoutDashboard />, label: 'Tableau de bord', path: '/admin-dashboard' },
     { icon: <Users />, label: 'Utilisateurs', path: '/admin-dashboard/users' },
     { icon: <Bus />, label: 'Flotte', path: '/admin-dashboard/fleet' },
+    { 
+      icon: (
+        <div className="relative">
+          <Shield />
+          {pendingResets > 0 && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse"></span>
+          )}
+        </div>
+      ), 
+      label: 'Réinitialisations', 
+      path: '/admin-dashboard/password-resets' 
+    },
     { icon: <GitPullRequest />, label: 'Affectations', path: '/admin-dashboard/assignments' },
     { icon: <Network />, label: 'Réseau', path: '/admin-dashboard/network' },
     { icon: <CircleDollarSign />, label: 'Tarifs', path: '/admin-dashboard/tarifs' },
     { icon: <History />, label: 'Audit', path: '/admin-dashboard/audit' },
     { icon: <ShoppingCart />, label: 'Historique des Ventes', path: '/admin-dashboard/sales-history' },
-
   ];
 
   const handleLogout = () => {

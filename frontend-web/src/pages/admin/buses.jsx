@@ -11,14 +11,26 @@ const Fleet = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingBus, setEditingBus] = useState(null);
+    const [lines, setLines] = useState([]); // Pour stocker la liste des lignes
 
     const [formData, setFormData] = useState({
         numero_bus: '',
         capacite: '',
-        etat: 'En service'
+        etat: 'En service',
+        num_ligne: '' // Nouvelle colonne
     });
 
     // --- CHARGEMENT DES DONNÉES ---
+    const fetchLines = async () => {
+        try {
+            const response = await fetch('http://localhost:5000/api/network');
+            const data = await response.json();
+            setLines(data);
+        } catch (error) {
+            console.error("Erreur chargement lignes:", error);
+        }
+    };
+
     const fetchBuses = async () => {
         try {
             setLoading(true);
@@ -34,6 +46,7 @@ const Fleet = () => {
 
     useEffect(() => {
         fetchBuses();
+        fetchLines(); // Chargement initial des lignes
     }, []);
 
     // --- LOGIQUE DE RECHERCHE ---
@@ -45,7 +58,7 @@ const Fleet = () => {
     // --- GESTION DU MODAL ---
     const handleOpenAddModal = () => {
         setEditingBus(null);
-        setFormData({ numero_bus: '', capacite: '', etat: 'En service' });
+        setFormData({ numero_bus: '', capacite: '', etat: 'En service', num_ligne: '' });
         setIsModalOpen(true);
     };
 
@@ -54,7 +67,8 @@ const Fleet = () => {
         setFormData({
             numero_bus: bus.numero_bus,
             capacite: bus.capacite,
-            etat: bus.etat
+            etat: bus.etat,
+            num_ligne: bus.num_ligne || ''
         });
         setIsModalOpen(true);
     };
@@ -155,9 +169,9 @@ const Fleet = () => {
                         <table className="enterprise-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Numéro</th>
                                     <th>Capacité</th>
+                                    <th>Ligne Assignée</th>
                                     <th>État</th>
                                     <th style={{ textAlign: 'center' }}>Actions</th>
                                 </tr>
@@ -172,7 +186,6 @@ const Fleet = () => {
                                                 animate={{ opacity: 1 }}
                                                 exit={{ opacity: 0 }}
                                             >
-                                                <td><span style={{ fontWeight: 600, color: '#64748b' }}>#{bus.id_bus}</span></td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', fontWeight: 600 }}>
                                                         <Bus size={19} color="#4f46e5" />
@@ -180,6 +193,15 @@ const Fleet = () => {
                                                     </div>
                                                 </td>
                                                 <td><span style={{ color: '#64748b' }}>{bus.capacite} places</span></td>
+                                                <td>
+                                                    {bus.ville_depart ? (
+                                                        <div style={{ fontSize: '0.85rem', color: '#475569' }}>
+                                                            <span style={{ fontWeight: 600, color: '#4f46e5' }}>L{bus.num_ligne}</span> : {bus.ville_depart} ➔ {bus.ville_arrivee}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>Non assigné</span>
+                                                    )}
+                                                </td>
                                                 <td>{getStatusBadge(bus.etat)}</td>
                                                 <td>
                                                     <div className="row-actions">
@@ -195,7 +217,7 @@ const Fleet = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="5" className="empty-state">
+                                            <td colSpan="6" className="empty-state">
                                                 <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                                                     <Search size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
                                                     <p>Aucun bus trouvé pour "{searchQuery}"</p>
@@ -236,6 +258,21 @@ const Fleet = () => {
                                             value={formData.capacite}
                                             onChange={(e) => setFormData({ ...formData, capacite: e.target.value })}
                                         />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Ligne Assignée</label>
+                                        <select
+                                            className="form-select"
+                                            value={formData.num_ligne}
+                                            onChange={(e) => setFormData({ ...formData, num_ligne: e.target.value })}
+                                        >
+                                            <option value="">-- Aucune ligne --</option>
+                                            {lines.map((line) => (
+                                                <option key={line.num_ligne} value={line.num_ligne}>
+                                                    Ligne {line.num_ligne} : {line.ville_depart} ➔ {line.ville_arrivee}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="form-group">
                                         <label>État</label>

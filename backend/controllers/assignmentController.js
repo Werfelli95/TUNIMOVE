@@ -28,7 +28,7 @@ exports.getAssignmentStats = async (req, res) => {
 exports.getAssignments = async (req, res) => {
     try {
         const query = `
-            SELECT b.id_bus, b.numero_bus, b.capacite, b.etat, 
+            SELECT b.id_bus, b.numero_bus, b.capacite, b.etat, b.date_debut_affectation, b.date_fin_affectation,
                    u.nom as receveur_nom, u.prenom as receveur_prenom, u.id_utilisateur as id_receveur
             FROM bus b
             LEFT JOIN utilisateur u ON b.id_receveur = u.id_utilisateur
@@ -60,11 +60,19 @@ exports.getAvailableReceivers = async (req, res) => {
 
 // 4. Mettre à jour (Ne change pas)
 exports.updateAssignment = async (req, res) => {
-    const { id_bus, id_receveur } = req.body;
+    const { id_bus, id_receveur, date_debut, date_fin } = req.body;
     try {
-        await db.query('UPDATE bus SET id_receveur = $1 WHERE id_bus = $2', [id_receveur, id_bus]);
+        if (id_receveur === null) {
+            await db.query('UPDATE bus SET id_receveur = NULL, date_debut_affectation = NULL, date_fin_affectation = NULL WHERE id_bus = $1', [id_bus]);
+        } else {
+            await db.query(
+                'UPDATE bus SET id_receveur = $1, date_debut_affectation = $2, date_fin_affectation = $3 WHERE id_bus = $4', 
+                [id_receveur, date_debut || null, date_fin || null, id_bus]
+            );
+        }
         res.json({ message: "Affectation réussie" });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ message: "Erreur SQL" });
     }
 };

@@ -4,7 +4,7 @@ import {
     ChevronRight, Search, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import './Users.css'; // On utilise votre CSS centralisé
+import './Users.css';
 
 const Network = () => {
     const [lines, setLines] = useState([]);
@@ -13,7 +13,7 @@ const Network = () => {
     const [editingId, setEditingId] = useState(null);
 
     const [formData, setFormData] = useState({
-        ville_depart: '', ville_arrivee: '', horaire: '', statut_ligne: 'Active',
+        ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active',
         stations: [{ arret: '', distance_km: '' }]
     });
 
@@ -32,16 +32,14 @@ const Network = () => {
     const handleOpenModal = (line = null) => {
         if (line) {
             setEditingId(line.num_ligne);
-            // Formatage de l'heure pour le input type="time"
-            const time = new Date(line.horaire).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
             setFormData({
                 ville_depart: line.ville_depart, ville_arrivee: line.ville_arrivee,
-                horaire: time, statut_ligne: line.statut_ligne,
+                horaires: (line.horaires && line.horaires.length > 0) ? line.horaires : [''], statut_ligne: line.statut_ligne,
                 stations: line.stations
             });
         } else {
             setEditingId(null);
-            setFormData({ ville_depart: '', ville_arrivee: '', horaire: '', statut_ligne: 'Active', stations: [{ arret: '', distance_km: '' }] });
+            setFormData({ ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active', stations: [{ arret: '', distance_km: '' }] });
         }
         setIsModalOpen(true);
     };
@@ -75,6 +73,15 @@ const Network = () => {
         const newSt = [...formData.stations];
         newSt[idx][field] = val;
         setFormData({ ...formData, stations: newSt });
+    };
+
+    // Fonctions horaires
+    const addHoraire = () => setFormData({ ...formData, horaires: [...(formData.horaires || []), ''] });
+    const removeHoraire = (idx) => setFormData({ ...formData, horaires: (formData.horaires || []).filter((_, i) => i !== idx) });
+    const updateHoraire = (idx, val) => {
+        const newH = [...(formData.horaires || [])];
+        newH[idx] = val;
+        setFormData({ ...formData, horaires: newH });
     };
 
     return (
@@ -115,18 +122,34 @@ const Network = () => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td><div className="user-matricule"><Clock size={14} style={{ marginRight: '5px' }} /> {new Date(line.horaire).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></td>
                                     <td>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '300px' }}>
+                                        <div style={{ maxWidth: '150px' }}>
+                                            {(line.horaires && line.horaires.length > 0 && line.horaires[0] !== null) ? (
+                                                <select className="stations-select" defaultValue="">
+                                                    <option value="" disabled>🕒 {line.horaires.length} Horaires</option>
+                                                    {line.horaires.map((h, i) => (
+                                                        <option key={i} value={h}>{h}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <div className="user-matricule" style={{ textAlign: 'center' }}>-</div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ maxWidth: '300px' }}>
                                             {line.stations.length > 0 ? (
-                                                line.stations.map((st, idx) => (
-                                                    <span key={idx} style={{
-                                                        fontSize: '0.7rem', background: '#f8fafc', padding: '2px 8px',
-                                                        borderRadius: '6px', border: '1px solid #e2e8f0', color: '#64748b'
-                                                    }}>
-                                                        {st.arret}
-                                                    </span>
-                                                ))
+                                                <select
+                                                    className="stations-select"
+                                                    defaultValue=""
+                                                >
+                                                    <option value="" disabled> {line.stations.length} Stations</option>
+                                                    {line.stations.map((st, idx) => (
+                                                        <option key={idx} value={st.arret}>
+                                                            {idx + 1}. {st.arret} {st.distance_km ? `- ${st.distance_km} km` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             ) : (
                                                 <span className="user-email" style={{ fontStyle: 'italic' }}>Aucun arrêt intermédiaire</span>
                                             )}
@@ -159,8 +182,20 @@ const Network = () => {
                                 <div className="p-grid">
                                     <div className="p-field"><label>DÉPART</label><div className="p-input"><MapPin size={16} /><input type="text" value={formData.ville_depart} onChange={e => setFormData({ ...formData, ville_depart: e.target.value })} required /></div></div>
                                     <div className="p-field"><label>ARRIVÉE</label><div className="p-input"><ChevronRight size={16} /><input type="text" value={formData.ville_arrivee} onChange={e => setFormData({ ...formData, ville_arrivee: e.target.value })} required /></div></div>
-                                    <div className="p-field"><label>HORAIRE</label><div className="p-input"><Clock size={16} /><input type="time" value={formData.horaire} onChange={e => setFormData({ ...formData, horaire: e.target.value })} required /></div></div>
-                                    <div className="p-field"><label>STATUT</label><select className="p-input" value={formData.statut_ligne} onChange={e => setFormData({ ...formData, statut_ligne: e.target.value })}><option value="Active">Active</option><option value="Ligne Fermé">Ligne Fermé</option></select></div>
+                                    <div className="p-field" style={{ gridColumn: '1 / -1' }}><label>STATUT</label><select className="p-input" value={formData.statut_ligne} onChange={e => setFormData({ ...formData, statut_ligne: e.target.value })}><option value="Active">Active</option><option value="Ligne Fermé">Ligne Fermé</option></select></div>
+                                </div>
+                                <div className="st-passage">
+                                    <h3>Horaires de Départ <span className="st-count">{formData.horaires?.length || 0}</span></h3>
+                                    <div className="st-list">
+                                        {(formData.horaires || []).map((h, i) => (
+                                            <div key={i} className="st-item">
+                                                <span className="st-number">{i + 1}</span>
+                                                <div className="st-km" style={{flex: 1}}><Clock size={16} /><input type="time" style={{border: 'none', background: 'transparent', outline: 'none', width: '100%', marginLeft: '10px'}} value={h} onChange={e => updateHoraire(i, e.target.value)} required /></div>
+                                                <button type="button" className="st-remove" onClick={() => removeHoraire(i)}><Trash2 size={16} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button type="button" className="st-add-btn" onClick={addHoraire}><Plus size={16} /> Ajouter horaire</button>
                                 </div>
                                 <div className="st-passage">
                                     <h3>Stations de passage <span className="st-count">{formData.stations.length}</span></h3>
