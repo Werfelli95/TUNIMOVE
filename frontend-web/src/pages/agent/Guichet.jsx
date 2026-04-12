@@ -70,36 +70,41 @@ const Guichet = () => {
                         const guichetRes = await fetch(`http://localhost:5000/api/guichets/agent/${userId}`);
                         if (guichetRes.ok) {
                             const guichetData = await guichetRes.json();
-                            setMyGuichet(guichetData);
+                            if (guichetData) {
+                                setMyGuichet(guichetData);
 
-                            // FILTRAGE : On ne garde que les lignes ACTIVES qui partent de la station du guichet
-                            const filteredLignes = lignesData.filter(ligne => {
-                                // 1. Vérifier si la ligne est active
-                                if (ligne.statut_ligne !== 'Active') return false;
-                                
-                                // 2. Vérifier si elle correspond à l'emplacement du guichet
-                                const loc = guichetData.emplacement.toLowerCase();
-                                const dep = ligne.ville_depart.toLowerCase();
-                                return loc.includes(dep) || dep.includes(loc);
-                            });
-                            setLignes(filteredLignes);
+                                // FILTRAGE : On ne garde que les lignes ACTIVES qui partent de la station du guichet
+                                const filteredLignes = lignesData.filter(ligne => {
+                                    // 1. Vérifier si la ligne est active
+                                    if (ligne.statut_ligne !== 'Active') return false;
+                                    
+                                    // 2. Vérifier si elle correspond à l'emplacement du guichet
+                                    const loc = guichetData.emplacement.toLowerCase();
+                                    const dep = ligne.ville_depart.toLowerCase();
+                                    return loc.includes(dep) || dep.includes(loc);
+                                });
+                                setLignes(filteredLignes);
 
-                            // AUTO-SÉLECTION : Si une seule ligne correspond, on l'active tout de suite
-                            if (filteredLignes.length === 1) {
-                                const l = filteredLignes[0];
-                                setSelectedLigne(l.num_ligne);
+                                // AUTO-SÉLECTION : Si une seule ligne correspond, on l'active tout de suite
+                                if (filteredLignes.length === 1) {
+                                    const l = filteredLignes[0];
+                                    setSelectedLigne(l.num_ligne);
 
-                                // On fixe le départ de manière robuste
-                                const loc = guichetData.emplacement.toLowerCase();
-                                const match = l.stations.find(s =>
-                                    loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
-                                );
-                                if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
-                                else setArretDepart(l.ville_depart);
+                                    // On fixe le départ de manière robuste
+                                    const loc = guichetData.emplacement.toLowerCase();
+                                    const match = l.stations.find(s =>
+                                        loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
+                                    );
+                                    if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
+                                    else setArretDepart(l.ville_depart);
 
-                                // Auto-assign bus
-                                const assignedBus = busData.find(b => String(b.num_ligne) === String(l.num_ligne));
-                                if (assignedBus) setSelectedBus(assignedBus.numero_bus);
+                                    // Auto-assign bus
+                                    const assignedBus = busData.find(b => String(b.num_ligne) === String(l.num_ligne));
+                                    if (assignedBus) setSelectedBus(assignedBus.numero_bus);
+                                }
+                            } else {
+                                // Fallback: L'agent n'a pas de guichet assigné
+                                setLignes(lignesData.filter(l => l.statut_ligne === 'Active'));
                             }
                         } else {
                             // Fallback : On ne garde quand même que les actives
@@ -151,13 +156,10 @@ const Guichet = () => {
         return stations.sort((a, b) => a.distance_km - b.distance_km);
     }, [activeLigne]);
 
-    const hasHoraires = activeLigne ? (
-        (activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null) ||
-        (activeLigne.horaire)
-    ) : false;
-
+    // On considère qu'on a toujours des horaires car on permet la saisie manuelle s'il n'y en a pas en base
+    const hasHoraires = true;
     const hasBus = selectedLigne ? buses.some(b => String(b.num_ligne) === String(selectedLigne)) : false;
-    const canProceed = hasHoraires && hasBus;
+    const canProceed = hasBus;
 
     // Recherche robuste des stations pour le calcul de distance
     const departStation = activeStations.find(s =>
@@ -285,6 +287,9 @@ const Guichet = () => {
                                     );
                                     if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
                                     else setArretDepart(foundLigne.ville_depart); // Fallback
+                                } else if (foundLigne) {
+                                    // Si pas de guichet spécifique, le point de départ est tout simplement la ville de départ de la ligne
+                                    setArretDepart(foundLigne.ville_depart);
                                 }
 
                                 setArretArrivee('');
@@ -328,16 +333,21 @@ const Guichet = () => {
                         <div className="flex-row">
                             <div className="flex-1">
                                 <label>Horaire de Départ *</label>
-                                <select className="g-select" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed}>
-                                    <option value="">--:--</option>
-                                    {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ?
-                                        activeLigne.horaires.map((h, i) => (
+                                {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ? (
+                                    <select className="g-select" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed}>
+                                        <option value="">--:--</option>
+                                        {activeLigne.horaires.map((h, i) => (
                                             <option key={i} value={h}>{h}</option>
-                                        ))
-                                        :
-                                        activeLigne && activeLigne.horaire ? <option value={activeLigne.horaire}>{activeLigne.horaire}</option> : null
-                                    }
-                                </select>
+                                        ))}
+                                    </select>
+                                ) : activeLigne && activeLigne.horaire ? (
+                                    <select className="g-select" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed}>
+                                        <option value="">--:--</option>
+                                        <option value={activeLigne.horaire}>{activeLigne.horaire}</option>
+                                    </select>
+                                ) : (
+                                    <input type="time" className="g-input" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed} />
+                                )}
                             </div>
                             <div className="flex-1">
                                 <label>Bus *</label>

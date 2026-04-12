@@ -122,7 +122,7 @@ exports.getGuichetByAgent = async (req, res) => {
             [id]
         );
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Aucun guichet affecté" });
+            return res.status(200).json(null); // Return 200 with null to avoid 404 console errors
         }
         res.json(result.rows[0]);
     } catch (err) {
