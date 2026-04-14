@@ -1,0 +1,152 @@
+/* Premium History Table Modern Styles */
+.history-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px;
+  margin-top: -12px;
+}
+
+.history-table th {
+  text-align: left;
+  padding: 12px 20px;
+  color: #707ebe;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.history-table tbody tr {
+  background: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.history-table tbody tr:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(112, 144, 176, 0.1);
+  background: #f8faff;
+}
+
+.history-table td {
+  padding: 18px 20px;
+  font-size: 14px;
+}
+
+.history-table td:first-child {
+  border-radius: 12px 0 0 12px;
+  border-left: 1px solid rgba(112, 144, 176, 0.1);
+}
+
+.history-table td:last-child {
+  border-radius: 0 12px 12px 0;
+  border-right: 1px solid rgba(112, 144, 176, 0.1);
+}
+
+.history-table td {
+  border-top: 1px solid rgba(112, 144, 176, 0.1);
+  border-bottom: 1px solid rgba(112, 144, 176, 0.1);
+}
+
+/* Badges for History */
+.time-badge {
+  background: #f0f3ff;
+  color: #4318FF;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.bus-badge {
+  background: #f7fafc;
+  color: #4a5568;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #edf2f7;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.seat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #fdf2f2;
+  color: #e53e3e;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.badge-tarif {
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.badge-tarif.normal { background: #e0e7ff; color: #4338ca; }
+.badge-tarif.etudiant { background: #dcfce7; color: #15803d; }
+.badge-tarif.militaire { background: #fef3c7; color: #92400e; }
+.badge-tarif.handicape { background: #fae8ff; color: #86198f; }
+
+.historique-container {
+  padding: 10px;
+}
+
+/* Search Bar Styles */
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  color: #a0aec0;
+  pointer-events: none;
+  transition: color 0.3s ease;
+}
+
+.search-input {
+  width: 320px;
+  padding: 10px 16px 10px 48px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(112, 144, 176, 0.15);
+  border-radius: 12px;
+  font-size: 14px;
+  color: #1b2559;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px -1px rgba(112, 144, 176, 0.05);
+}
+
+.search-input:focus {
+  outline: none;
+  width: 380px;
+  background: #ffffff;
+  border-color: #4318FF;
+  box-shadow: 0 10px 20px -5px rgba(67, 24, 255, 0.15);
+}
+
+.search-input:focus + .search-icon {
+  color: #4318FF;
+}
+
+.search-input::placeholder {
+  color: #a0aec0;
+  font-weight: 400;
+}
+
+.animate-in {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

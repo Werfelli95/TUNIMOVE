@@ -19,7 +19,7 @@ const Guichet = () => {
     const [lignes, setLignes] = useState([]);
     const [buses, setBuses] = useState([]);
     const [tarifConfig, setTarifConfig] = useState(null);
-    const [agentInfo, setAgentInfo] = useState({ nom: 'Guichetier', prenom: '', matricule: '-' });
+    const [agentInfo, setAgentInfo] = useState({ id: null, nom: 'Guichetier', prenom: '', matricule: '-' });
 
     // Form state
     const [selectedLigne, setSelectedLigne] = useState('');
@@ -34,6 +34,8 @@ const Guichet = () => {
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [myGuichet, setMyGuichet] = useState(null);
+    const [dailySales, setDailySales] = useState([]);
+    const [reprintTicket, setReprintTicket] = useState(null);
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -43,6 +45,7 @@ const Guichet = () => {
                 try {
                     currentUser = JSON.parse(storedUser);
                     setAgentInfo({
+                        id: currentUser.id || currentUser.id_utilisateur,
                         nom: currentUser.nom,
                         prenom: currentUser.prenom || '',
                         matricule: currentUser.matricule || '-'
@@ -78,16 +81,15 @@ const Guichet = () => {
                                 const filteredLignes = lignesData.filter(ligne => {
                                     // 1. Vérifier si la ligne est active
                                     if (ligne.statut_ligne?.toLowerCase() !== 'active') return false;
-                                    
+
                                     // 2. Vérifier si elle correspond à l'emplacement du guichet
-                                    const loc = guichetData.emplacement ? guichetData.emplacement.toLowerCase() : '';
+                                    const loc = guichetData.emplacement?.toLowerCase() || '';
                                     if (!loc) return true; // Si pas d'emplacement, on montre tout par sécurité
-                                    const dep = ligne.ville_depart.toLowerCase();
-                                    const hasStationMatch = ligne.stations && ligne.stations.some(s => 
-                                        s.arret.toLowerCase().includes(loc) || loc.includes(s.arret.toLowerCase())
-                                    );
-                                    
-                                    return loc.includes(dep) || dep.includes(loc) || hasStationMatch;
+
+                                    const dep = ligne.ville_depart?.toLowerCase() || '';
+
+                                    // STREICT FILTER: Only show lines starting EXACTLY from this station/city
+                                    return loc.includes(dep) || dep.includes(loc);
                                 });
                                 setLignes(filteredLignes);
 
@@ -136,6 +138,29 @@ const Guichet = () => {
 
         fetchInitialData();
     }, []);
+
+    const fetchDailySales = async () => {
+        const userId = agentInfo.id || agentInfo.id_utilisateur;
+        console.log("Fetching daily sales for agent:", userId);
+        if (!userId) return;
+        try {
+            console.log("Fetching from URL:", `http://localhost:5000/api/Sales/agent/${userId}/daily`);
+            const res = await fetch(`http://localhost:5000/api/Sales/agent/${userId}/daily`);
+            if (res.ok) {
+                const data = await res.json();
+                console.log("Daily sales data received:", data.length, "items");
+                setDailySales(data);
+            }
+        } catch (err) {
+            console.error("Erreur fetchDailySales:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (mode === 'Historique') {
+            fetchDailySales();
+        }
+    }, [mode]);
 
     // Derived states
     const activeLigne = lignes.find(l => String(l.num_ligne) === String(selectedLigne));
@@ -294,6 +319,15 @@ const Guichet = () => {
             setIsPrinting(false);
         }
     };
+
+    const handleReprint = (ticket) => {
+        setReprintTicket(ticket);
+        setTimeout(() => {
+            window.print();
+            setReprintTicket(null);
+        }, 100);
+    };
+
     const qrDataObj = {
         ligne: selectedLigne,
         ville_depart: departStation?.arret || "Non spécifié",
@@ -315,299 +349,393 @@ const Guichet = () => {
                 </div>
             </div>
 
-            <div className="guichet-content">
-                {/* Left Forms */}
-                <div className="guichet-forms">
+            {mode !== 'Historique' ? (
+                <div className="guichet-content">
+                    {/* Left Forms */}
+                    <div className="guichet-forms">
 
-                    {/* SECTION 1: Ligne */}
-                    <div className="form-section">
-                        <h3><MapPin size={20} /> Sélection de la Ligne</h3>
-                        <select
-                            className="g-select"
-                            value={selectedLigne}
-                            onChange={(e) => {
-                                const newLigneId = e.target.value;
-                                setSelectedLigne(newLigneId);
-
-                                // On cherche la ligne correspondante
-                                const foundLigne = lignes.find(l => String(l.num_ligne) === String(newLigneId));
-                                if (foundLigne && myGuichet) {
-                                    // On cherche la station qui correspond à l'emplacement du guichet
-                                    const loc = myGuichet.emplacement.toLowerCase();
-                                    const match = foundLigne.stations.find(s =>
-                                        loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
-                                    );
-                                    if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
-                                    else setArretDepart(foundLigne.ville_depart); // Fallback
-                                } else if (foundLigne) {
-                                    // Si pas de guichet spécifique, le point de départ est tout simplement la ville de départ de la ligne
-                                    setArretDepart(foundLigne.ville_depart);
-                                }
-
-                                setArretArrivee('');
-                                setSelectedSeat(null);
-                                setHoraire(''); // Réinitialiser l'horaire pour forcer un nouveau choix
-                                setSelectedBus(''); // Réinitialiser le bus
-                            }}
-                        >
-                            <option value="">Sélectionnez une ligne...</option>
-                            {lignes.map(l => (
-                                <option key={l.num_ligne} value={l.num_ligne}>
-                                    ligne {l.num_ligne} : {l.ville_depart} → {l.ville_arrivee}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* SECTION: Date (Only for Reservation) */}
-                    {mode === 'Réservations' && (
+                        {/* SECTION 1: Ligne */}
                         <div className="form-section">
-                            <h3><Calendar size={20} /> Date du Voyage </h3>
-                            <input
-                                type="date"
-                                className="g-input"
-                                value={dateVoyage}
-                                onChange={(e) => setDateVoyage(e.target.value)}
-                                disabled={activeLigne && !canProceed}
-                            />
-                        </div>
-                    )}
+                            <h3><MapPin size={20} /> Sélection de la Ligne</h3>
+                            <select
+                                className="g-select"
+                                value={selectedLigne}
+                                onChange={(e) => {
+                                    const newLigneId = e.target.value;
+                                    setSelectedLigne(newLigneId);
 
-                    {/* SECTION 2: Horaire et Bus */}
-                    <div className="form-section">
-                        <h3><Clock size={20} /> {mode === 'Réservations' ? 'Horaire et Bus *' : 'Horaire de Départ et Bus'}</h3>
-                        <div className="flex-row">
-                            <div className="flex-1">
-                                <label>Horaire de Départ *</label>
-                                {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ? (
-                                    <select className="g-select" value={horaire} onChange={e => {
-                                        const h = e.target.value;
-                                        setHoraire(h);
-                                        // Auto-affecter le bus selon ligne + horaire (config Admin)
-                                        const matchingBus = buses.find(b =>
-                                            String(b.num_ligne) === String(selectedLigne) &&
-                                            b.horaire_affecte === h
+                                    // On cherche la ligne correspondante
+                                    const foundLigne = lignes.find(l => String(l.num_ligne) === String(newLigneId));
+                                    if (foundLigne && myGuichet) {
+                                        // On cherche la station qui correspond à l'emplacement du guichet
+                                        const loc = myGuichet.emplacement.toLowerCase();
+                                        const match = foundLigne.stations.find(s =>
+                                            loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
                                         );
-                                        setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
-                                        setSelectedSeat(null);
-                                    }}>
-                                        <option value="">--:--</option>
-                                        {activeLigne.horaires.map((h, i) => (
-                                            <option key={i} value={h}>{h}</option>
-                                        ))}
-                                    </select>
-                                ) : activeLigne && activeLigne.horaire ? (
-                                    <select className="g-select" value={horaire} onChange={e => {
-                                        const h = e.target.value;
-                                        setHoraire(h);
-                                        const matchingBus = buses.find(b =>
-                                            String(b.num_ligne) === String(selectedLigne) &&
-                                            b.horaire_affecte === h
-                                        );
-                                        setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
-                                        setSelectedSeat(null);
-                                    }}>
-                                        <option value="">--:--</option>
-                                        <option value={activeLigne.horaire}>{activeLigne.horaire}</option>
-                                    </select>
-                                ) : (
-                                    <select className="g-select" value="" disabled>
-                                        <option value="">Aucun horaire défini</option>
-                                    </select>
-                                )}
-                            </div>
-                            <div className="flex-1">
-                                <label>Bus *</label>
-                                {selectedBus ? (
-                                    <div className="g-input-fixed" style={{ color: '#4f46e5', fontWeight: 700 }}>
-                                        🚌 Bus {selectedBus} — {buses.find(b => String(b.numero_bus) === String(selectedBus))?.capacite || '?'} places
-                                    </div>
-                                ) : (
-                                    <div className="g-input-fixed" style={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                        {horaire ? '⚠️ Aucun bus affecté à cet horaire' : 'Choisissez un horaire'}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="info-bar bg-blue-light">
-                            Sièges disponibles: <strong>{selectedBus ? Math.max(0, capaciteBus - 0) : 0} / {capaciteBus}</strong>
-                        </div>
-                    </div>
+                                        if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
+                                        else setArretDepart(foundLigne.ville_depart); // Fallback
+                                    } else if (foundLigne) {
+                                        // Si pas de guichet spécifique, le point de départ est tout simplement la ville de départ de la ligne
+                                        setArretDepart(foundLigne.ville_depart);
+                                    }
 
-                    {/* SECTION 3: Arrêts */}
-                    {activeLigne && (
+                                    setArretArrivee('');
+                                    setSelectedSeat(null);
+                                    setHoraire(''); // Réinitialiser l'horaire pour forcer un nouveau choix
+                                    setSelectedBus(''); // Réinitialiser le bus
+                                }}
+                            >
+                                <option value="">Sélectionnez une ligne...</option>
+                                {lignes.map(l => (
+                                    <option key={l.num_ligne} value={l.num_ligne}>
+                                        ligne {l.num_ligne} : {l.ville_depart} → {l.ville_arrivee}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* SECTION: Date (Only for Reservation) */}
+                        {mode === 'Réservations' && (
+                            <div className="form-section">
+                                <h3><Calendar size={20} /> Date du Voyage </h3>
+                                <input
+                                    type="date"
+                                    className="g-input"
+                                    value={dateVoyage}
+                                    onChange={(e) => setDateVoyage(e.target.value)}
+                                    disabled={activeLigne && !canProceed}
+                                />
+                            </div>
+                        )}
+
+                        {/* SECTION 2: Horaire et Bus */}
                         <div className="form-section">
-                            <h3>Sélection de l'Arrivée</h3>
+                            <h3><Clock size={20} /> {mode === 'Réservations' ? 'Horaire et Bus *' : 'Horaire de Départ et Bus'}</h3>
                             <div className="flex-row">
                                 <div className="flex-1">
-                                    <label>Point de Départ (Fixé)</label>
-                                    <div className="g-input-fixed">
-                                        <MapPin size={16} /> {arretDepart || 'Chargement...'}
-                                    </div>
+                                    <label>Horaire de Départ *</label>
+                                    {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ? (
+                                        <select className="g-select" value={horaire} onChange={e => {
+                                            const h = e.target.value;
+                                            setHoraire(h);
+                                            // Auto-affecter le bus selon ligne + horaire (config Admin)
+                                            const matchingBus = buses.find(b => {
+                                                if (!b.horaire_affecte || !h) return false;
+                                                // Handle both HH:mm and HH:mm:ss formats
+                                                const dbTime = b.horaire_affecte.substring(0, 5);
+                                                const selectedTime = h.substring(0, 5);
+                                                return String(b.num_ligne) === String(selectedLigne) &&
+                                                    dbTime === selectedTime;
+                                            });
+                                            setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
+                                            setSelectedSeat(null);
+                                        }}>
+                                            <option value="">--:--</option>
+                                            {activeLigne.horaires.map((h, i) => (
+                                                <option key={i} value={h}>{h}</option>
+                                            ))}
+                                        </select>
+                                    ) : activeLigne && activeLigne.horaire ? (
+                                        <select className="g-select" value={horaire} onChange={e => {
+                                            const h = e.target.value;
+                                            setHoraire(h);
+                                            const matchingBus = buses.find(b =>
+                                                String(b.num_ligne) === String(selectedLigne) &&
+                                                b.horaire_affecte === h
+                                            );
+                                            setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
+                                            setSelectedSeat(null);
+                                        }}>
+                                            <option value="">--:--</option>
+                                            <option value={activeLigne.horaire}>{activeLigne.horaire}</option>
+                                        </select>
+                                    ) : (
+                                        <select className="g-select" value="" disabled>
+                                            <option value="">Aucun horaire défini</option>
+                                        </select>
+                                    )}
                                 </div>
                                 <div className="flex-1">
-                                    <label>Destination (Arrivée) *</label>
-                                    <select className="g-select" value={arretArrivee} onChange={e => setArretArrivee(e.target.value)} disabled={activeLigne && !canProceed}>
-                                        <option value="">Choisir arrivée...</option>
-                                        {activeStations
-                                            .filter(s => s.arret !== arretDepart) // On ne peut pas arriver là où on part
-                                            .map(s => (
-                                                <option key={s.arret} value={s.arret}>{s.arret} ({s.distance_km} km)</option>
-                                            ))}
-                                    </select>
+                                    <label>Bus *</label>
+                                    {selectedBus ? (
+                                        <div className="g-input-fixed" style={{ color: '#4f46e5', fontWeight: 700 }}>
+                                            🚌 Bus {selectedBus} — {buses.find(b => String(b.numero_bus) === String(selectedBus))?.capacite || '?'} places
+                                        </div>
+                                    ) : (
+                                        <div className="g-input-fixed" style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                                            {horaire ? '⚠️ Aucun bus affecté à cet horaire' : 'Choisissez un horaire'}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+                            <div className="info-bar bg-blue-light">
+                                Sièges disponibles: <strong>{selectedBus ? Math.max(0, capaciteBus - 0) : 0} / {capaciteBus}</strong>
+                            </div>
+                        </div>
 
-                            {departStation && arriveeStation && (
-                                <div className="distance-tracker mt-3">
-                                    <div className="tracker-line"></div>
-                                    <div className="point start">
-                                        <div className="dot green"></div>
-                                        <span>{departStation.arret}</span>
+                        {/* SECTION 3: Arrêts */}
+                        {activeLigne && (
+                            <div className="form-section">
+                                <h3>Sélection de l'Arrivée</h3>
+                                <div className="flex-row">
+                                    <div className="flex-1">
+                                        <label>Point de Départ (Fixé)</label>
+                                        <div className="g-input-fixed">
+                                            <MapPin size={16} /> {arretDepart || 'Chargement...'}
+                                        </div>
                                     </div>
-                                    <div className="distance-label">Distance: {distance.toFixed(1)} km</div>
-                                    <div className="point end">
-                                        <div className="dot red"></div>
-                                        <span>{arriveeStation.arret}</span>
+                                    <div className="flex-1">
+                                        <label>Destination (Arrivée) *</label>
+                                        <select className="g-select" value={arretArrivee} onChange={e => setArretArrivee(e.target.value)} disabled={activeLigne && !canProceed}>
+                                            <option value="">Choisir arrivée...</option>
+                                            {activeStations
+                                                .filter(s => s.arret !== arretDepart) // On ne peut pas arriver là où on part
+                                                .map(s => (
+                                                    <option key={s.arret} value={s.arret}>{s.arret} ({s.distance_km} km)</option>
+                                                ))}
+                                        </select>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
 
-                    {/* SECTION 4: Sièges */}
-                    <div className="form-section">
-                        <h3>Sélection du Siège *</h3>
-                        <div className="seat-grid-container" style={{ opacity: (activeLigne && !canProceed) ? 0.5 : 1, pointerEvents: (activeLigne && !canProceed) ? 'none' : 'auto' }}>
-                            <div className="seat-grid">
-                                {renderSeats()}
+                                {departStation && arriveeStation && (
+                                    <div className="distance-tracker mt-3">
+                                        <div className="tracker-line"></div>
+                                        <div className="point start">
+                                            <div className="dot green"></div>
+                                            <span>{departStation.arret}</span>
+                                        </div>
+                                        <div className="distance-label">Distance: {distance.toFixed(1)} km</div>
+                                        <div className="point end">
+                                            <div className="dot red"></div>
+                                            <span>{arriveeStation.arret}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="seat-legend">
-                                <div><span className="box available"></span> Disponible</div>
-                                <div><span className="box occupied"></span> Occupé</div>
-                                <div><span className="box selected"></span> Sélectionné</div>
+                        )}
+
+                        {/* SECTION 4: Sièges */}
+                        <div className="form-section">
+                            <h3>Sélection du Siège *</h3>
+                            <div className="seat-grid-container" style={{ opacity: (activeLigne && !canProceed) ? 0.5 : 1, pointerEvents: (activeLigne && !canProceed) ? 'none' : 'auto' }}>
+                                <div className="seat-grid">
+                                    {renderSeats()}
+                                </div>
+                                <div className="seat-legend">
+                                    <div><span className="box available"></span> Disponible</div>
+                                    <div><span className="box occupied"></span> Occupé</div>
+                                    <div><span className="box selected"></span> Sélectionné</div>
+                                </div>
                             </div>
                         </div>
+
+                        {/* SECTION 5: Tarif */}
+                        <div className="form-section mb-5">
+                            <h3>Type de Tarif</h3>
+                            <div className="tarif-cards">
+                                <div className={`tarif-card ${typeTarif === 'Tarif Plein' ? 'active' : ''}`} onClick={() => setTypeTarif('Tarif Plein')}>
+                                    <User size={24} />
+                                    <strong>Tarif Plein</strong>
+                                    <span>0% réduction</span>
+                                </div>
+                                <div className={`tarif-card ${typeTarif === 'Étudiant' ? 'active' : ''}`} onClick={() => setTypeTarif('Étudiant')}>
+                                    <User size={24} />
+                                    <strong>Étudiant</strong>
+                                    <span>-25%</span>
+                                </div>
+                                <div className={`tarif-card ${typeTarif === 'Handicapé' ? 'active' : ''}`} onClick={() => setTypeTarif('Handicapé')}>
+                                    <User size={24} />
+                                    <strong>Handicapé</strong>
+                                    <span>-50%</span>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
-                    {/* SECTION 5: Tarif */}
-                    <div className="form-section mb-5">
-                        <h3>Type de Tarif</h3>
-                        <div className="tarif-cards">
-                            <div className={`tarif-card ${typeTarif === 'Tarif Plein' ? 'active' : ''}`} onClick={() => setTypeTarif('Tarif Plein')}>
-                                <User size={24} />
-                                <strong>Tarif Plein</strong>
-                                <span>0% réduction</span>
-                            </div>
-                            <div className={`tarif-card ${typeTarif === 'Étudiant' ? 'active' : ''}`} onClick={() => setTypeTarif('Étudiant')}>
-                                <User size={24} />
-                                <strong>Étudiant</strong>
-                                <span>-25%</span>
-                            </div>
-                            <div className={`tarif-card ${typeTarif === 'Handicapé' ? 'active' : ''}`} onClick={() => setTypeTarif('Handicapé')}>
-                                <User size={24} />
-                                <strong>Handicapé</strong>
-                                <span>-50%</span>
-                            </div>
-                        </div>
-                    </div>
+                    {/* Right Panel: Résumé */}
+                    <div className="guichet-summary-panel">
+                        <div className="summary-card">
+                            <h3><span className="dollar-icon">$</span> {mode === 'Réservations' ? 'Résumé Réservation' : 'Résumé'}</h3>
 
-                </div>
-
-                {/* Right Panel: Résumé */}
-                <div className="guichet-summary-panel">
-                    <div className="summary-card">
-                        <h3><span className="dollar-icon">$</span> {mode === 'Réservations' ? 'Résumé Réservation' : 'Résumé'}</h3>
-
-                        <div className="summary-details">
-                            <div className="row">
-                                <span>Ligne:</span>
-                                <strong>{activeLigne ? `${activeLigne.ville_depart} → ${activeLigne.ville_arrivee}` : '-'}</strong>
-                            </div>
-                            {mode === 'Réservations' && (
+                            <div className="summary-details">
                                 <div className="row">
-                                    <span>Date:</span>
-                                    <strong>{dateVoyage.split('-').reverse().join('/')}</strong>
+                                    <span>Ligne:</span>
+                                    <strong>{activeLigne ? `${activeLigne.ville_depart} → ${activeLigne.ville_arrivee}` : '-'}</strong>
                                 </div>
-                            )}
-                            <div className="row">
-                                <span>Horaire:</span>
-                                <strong>{horaire || '-'}</strong>
+                                {mode === 'Réservations' && (
+                                    <div className="row">
+                                        <span>Date:</span>
+                                        <strong>{dateVoyage.split('-').reverse().join('/')}</strong>
+                                    </div>
+                                )}
+                                <div className="row">
+                                    <span>Horaire:</span>
+                                    <strong>{horaire || '-'}</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Bus:</span>
+                                    <strong>{selectedBus || '-'}</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Siège:</span>
+                                    <strong>{selectedSeat || '-'}</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Départ:</span>
+                                    <strong>{arretDepart || '-'}</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Arrivée:</span>
+                                    <strong>{arretArrivee || '-'}</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Distance:</span>
+                                    <strong>{distance.toFixed(1)} km</strong>
+                                </div>
+                                <div className="row">
+                                    <span>Type:</span>
+                                    <strong>{typeTarif === 'Tarif Plein' ? 'Normal' : typeTarif}</strong>
+                                </div>
                             </div>
-                            <div className="row">
-                                <span>Bus:</span>
-                                <strong>{selectedBus || '-'}</strong>
-                            </div>
-                            <div className="row">
-                                <span>Siège:</span>
-                                <strong>{selectedSeat || '-'}</strong>
-                            </div>
-                            <div className="row">
-                                <span>Départ:</span>
-                                <strong>{arretDepart || '-'}</strong>
-                            </div>
-                            <div className="row">
-                                <span>Arrivée:</span>
-                                <strong>{arretArrivee || '-'}</strong>
-                            </div>
-                            <div className="row">
-                                <span>Distance:</span>
-                                <strong>{distance.toFixed(1)} km</strong>
-                            </div>
-                            <div className="row">
-                                <span>Type:</span>
-                                <strong>{typeTarif === 'Tarif Plein' ? 'Normal' : typeTarif}</strong>
-                            </div>
-                        </div>
 
-                        <div className="summary-total">
-                            <span>Total:</span>
-                            <h2>{calculatedTotal.toFixed(3)} TND</h2>
-                        </div>
+                            <div className="summary-total">
+                                <span>Total:</span>
+                                <h2>{calculatedTotal.toFixed(3)} TND</h2>
+                            </div>
 
-                        <button
-                            className="print-btn"
-                            disabled={!selectedSeat || !selectedLigne || !arretDepart || !arretArrivee || calculatedTotal <= 0}
-                            onClick={handlePrint}
-                        >
-                            <Printer size={18} /> {mode === 'Réservations' ? 'Confirmer Réservation' : 'Imprimer le Ticket'}
-                        </button>
+                            <button
+                                className="print-btn"
+                                disabled={!selectedSeat || !selectedLigne || !arretDepart || !arretArrivee || calculatedTotal <= 0}
+                                onClick={handlePrint}
+                            >
+                                <Printer size={18} /> {mode === 'Réservations' ? 'Confirmer Réservation' : 'Imprimer le Ticket'}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            ) : (
+                /* SECTION HISTORIQUE */
+                <div className="historique-container animate-in">
+                    <div className="glass-card w-full" style={{ maxWidth: 'none', padding: '2rem' }}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3><History size={24} /> Ventes d'Aujourd'hui</h3>
+                            <button className="btn-pdf" onClick={fetchDailySales}>Actualiser</button>
+                        </div>
+
+                        {dailySales.length > 0 ? (
+                            <div className="table-responsive">
+                                <table className="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Ligne & Destination</th>
+                                            <th>Heure</th>
+                                            <th>Bus</th>
+                                            <th>Siège</th>
+                                            <th>Trajet (Arrêts)</th>
+                                            <th>Tarif</th>
+                                            <th>Prix</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dailySales.map((t) => (
+                                            <tr key={t.id_ticket}>
+                                                <td><span className="badge badge-blue">T{String(t.id_ticket).padStart(3, '0')}</span></td>
+                                                <td>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-slate-800">Ligne {t.num_ligne}</span>
+                                                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                                                            {t.ligne_depart} → {t.ligne_arrivee}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td><span className="time-badge">{t.heure.substring(0, 5)}</span></td>
+                                                <td><span className="bus-badge">Bus {t.numero_bus}</span></td>
+                                                <td><span className="seat-badge">{t.siege}</span></td>
+                                                <td className="text-sm font-medium text-slate-600">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="opacity-60">{t.arret_depart}</span>
+                                                        <ArrowRight size={12} className="text-indigo-400" />
+                                                        <span>{t.arret_arrivee}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span className={`badge-tarif ${t.type_tarif.toLowerCase().replace('é', 'e')}`}>{t.type_tarif}</span></td>
+                                                <td className="font-bold text-indigo-700">{parseFloat(t.prix).toFixed(3)} TND</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="empty-state py-10 text-center text-slate-400">
+                                <Ticket size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                <p>Aucun ticket vendu aujourd'hui.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Print Layout Hidden - Activated via @media print */}
             <div className="print-only">
-                <div className="ticket-print-box">
-                    <h1 className="t-logo">TuniMove</h1>
-                    <p className="t-subtitle">Société Nationale de Transport Routier Inter-Gouvernorats</p>
+                {reprintTicket ? (
+                    /* Ticket de réimpression */
+                    <div className="ticket-print-box">
+                        <h1 className="t-logo">TuniMove</h1>
+                        <p className="t-subtitle">Société Nationale de Transport Routier Inter-Gouvernorats</p>
 
-                    <div className="t-info-grid">
-                        <span>N° Ticket:</span><strong>T003</strong>
-                        <span>Agent: </span><strong>{agentInfo.matricule}</strong>
-                        <span>Ligne:</span><strong>{activeLigne ? `${activeLigne.ville_depart} - ${activeLigne.ville_arrivee}` : ''}</strong>
-                        <span>Départ:</span><strong>{arretDepart}</strong>
-                        <span>Arrivée:</span><strong>{arretArrivee}</strong>
-                        <span>Date:</span><strong>{typeof dateVoyage === 'string' ? dateVoyage.split('-').reverse().join('/') : ''}</strong>
-                        <span>Heure:</span><strong>{horaire}</strong>
-                        <span>Siège:</span><strong>{selectedSeat}</strong>
-                        <span>Bus:</span><strong>N° {selectedBus}</strong>
-                        <span>Distance:</span><strong>{distance.toFixed(0)} km</strong>
+                        <div className="t-info-grid">
+                            <span>N° Ticket:</span><strong>T{String(reprintTicket.id_ticket).padStart(3, '0')}</strong>
+                            <span>Agent: </span><strong>{agentInfo.matricule}</strong>
+                            <span>Ligne:</span><strong>Ligne {reprintTicket.num_ligne} ({reprintTicket.ligne_depart} - {reprintTicket.ligne_arrivee})</strong>
+                            <span>Départ:</span><strong>{reprintTicket.arret_depart}</strong>
+                            <span>Arrivée:</span><strong>{reprintTicket.arret_arrivee}</strong>
+                            <span>Date:</span><strong>{new Date(reprintTicket.date_voyage).toLocaleDateString('fr-FR')}</strong>
+                            <span>Heure:</span><strong>{reprintTicket.heure.substring(0, 5)}</strong>
+                            <span>Siège:</span><strong>{reprintTicket.siege}</strong>
+                            <span>Bus:</span><strong>N° {reprintTicket.numero_bus}</strong>
+                        </div>
+
+                        <h2 className="t-price">{parseFloat(reprintTicket.prix).toFixed(3)} TND</h2>
+
+                        <div className="t-qr" style={{ margin: '20px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
+                            <QRCode value={reprintTicket.qr_code} size={120} level="H" />
+                        </div>
+                        <p className="t-footer">Agent: {agentInfo.prenom} {agentInfo.nom}<br />Réimpression - Bon voyage !</p>
                     </div>
+                ) : (
+                    /* Ticket standard après vente */
+                    <div className="ticket-print-box">
+                        <h1 className="t-logo">TuniMove</h1>
+                        <p className="t-subtitle">Société Nationale de Transport Routier Inter-Gouvernorats</p>
 
-                    <h2 className="t-price">{calculatedTotal.toFixed(3)} TND</h2>
+                        <div className="t-info-grid">
+                            <span>N° Ticket:</span><strong>T003</strong>
+                            <span>Agent: </span><strong>{agentInfo.matricule}</strong>
+                            <span>Ligne:</span><strong>{activeLigne ? `${activeLigne.ville_depart} - ${activeLigne.ville_arrivee}` : ''}</strong>
+                            <span>Départ:</span><strong>{arretDepart}</strong>
+                            <span>Arrivée:</span><strong>{arretArrivee}</strong>
+                            <span>Date:</span><strong>{typeof dateVoyage === 'string' ? dateVoyage.split('-').reverse().join('/') : ''}</strong>
+                            <span>Heure:</span><strong>{horaire}</strong>
+                            <span>Siège:</span><strong>{selectedSeat}</strong>
+                            <span>Bus:</span><strong>N° {selectedBus}</strong>
+                            <span>Distance:</span><strong>{distance.toFixed(0)} km</strong>
+                        </div>
 
-                    <div className="t-qr" style={{ margin: '20px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
-                        <QRCode
-                            value={qrDataString}
-                            size={120}
-                            level="H"
-                        />
+                        <h2 className="t-price">{calculatedTotal.toFixed(3)} TND</h2>
+
+                        <div className="t-qr" style={{ margin: '20px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
+                            <QRCode
+                                value={qrDataString}
+                                size={120}
+                                level="H"
+                            />
+                        </div>
+
+                        <p className="t-footer" style={{ textTransform: 'capitalize' }}>Agent: {agentInfo.prenom} {agentInfo.nom}<br />Bon voyage !</p>
                     </div>
-
-
-                    <p className="t-footer" style={{ textTransform: 'capitalize' }}>Agent: {agentInfo.prenom} {agentInfo.nom}<br />Bon voyage !</p>
-                </div>
+                )}
             </div>
         </div>
     );

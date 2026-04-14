@@ -43,14 +43,14 @@ exports.getSalesHistory = async (req, res) => {
 };
 
 exports.sellTicket = async (req, res) => {
-    const { 
-        num_ligne, 
-        bus, 
-        date_voyage, 
-        heure, 
-        siege, 
-        prix, 
-        arret_depart, 
+    const {
+        num_ligne,
+        bus,
+        date_voyage,
+        heure,
+        siege,
+        prix,
+        arret_depart,
         arret_arrivee,
         agent_id,
         type_tarif
@@ -80,23 +80,23 @@ exports.sellTicket = async (req, res) => {
             )
             RETURNING id_ticket
         `;
-        
+
         await db.query(query, [
-            num_ligne, 
-            String(bus), 
-            date_voyage, 
-            heure, 
-            siege, 
-            prix, 
-            arret_depart, 
-            arret_arrivee, 
-            agent_id || null, 
-            type_tarif, 
+            num_ligne,
+            String(bus),
+            date_voyage,
+            heure,
+            siege,
+            prix,
+            arret_depart,
+            arret_arrivee,
+            agent_id || null,
+            type_tarif,
             code_ticket,
             qr_code,
             id_service
         ]);
-        
+
         res.status(201).json({ message: "Billet vendu et enregistré avec succès" });
     } catch (err) {
         console.error("Erreur lors de la vente du ticket :", err);
@@ -117,5 +117,178 @@ exports.getOccupiedSeats = async (req, res) => {
     } catch (err) {
         console.error("Erreur occupied seats :", err);
         res.status(500).json({ message: "Erreur récupération sièges" });
+    }
+};
+
+// Récupérer les statistiques de revenus pour une période donnée (semaine ou mois)
+exports.getRevenueStats = async (req, res) => {
+    const { period } = req.query;
+    const daysCount = period === 'month' ? 29 : 6;
+
+    try {
+        const query = `
+            SELECT 
+                d.day::date as full_date,
+                CASE 
+                    WHEN EXTRACT(DOW FROM d.day) = 0 THEN 'Dim'
+                    WHEN EXTRACT(DOW FROM d.day) = 1 THEN 'Lun'
+                    WHEN EXTRACT(DOW FROM d.day) = 2 THEN 'Mar'
+                    WHEN EXTRACT(DOW FROM d.day) = 3 THEN 'Mer'
+                    WHEN EXTRACT(DOW FROM d.day) = 4 THEN 'Jeu'
+                    WHEN EXTRACT(DOW FROM d.day) = 5 THEN 'Ven'
+                    WHEN EXTRACT(DOW FROM d.day) = 6 THEN 'Sam'
+                END as name,
+                COALESCE(SUM(t.montant_total), 0) as value
+            FROM generate_series(CURRENT_DATE - INTERVAL '${daysCount} days', CURRENT_DATE, '1 day'::interval) as d(day)
+            LEFT JOIN ticket t ON date_trunc('day', t.date_emission) = date_trunc('day', d.day)
+            GROUP BY d.day
+            ORDER BY d.day ASC;
+        `;
+        const result = await db.query(query);
+
+        const formattedData = result.rows.map(row => ({
+            full_date: new Date(row.full_date).toLocaleDateString('fr-FR'),
+            name: row.name,
+            value: parseFloat(row.value)
+        }));
+
+        res.json(formattedData);
+    } catch (err) {
+        console.error('Erreur getRevenueStats:', err);
+        res.status(500).json({ message: 'Erreur stats revenus' });
+    }
+};
+
+// Récupérer la répartition des passagers par type de tarif
+exports.getPassengerStats = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                type_tarif as name,
+                COUNT(*) as value
+            FROM ticket
+            GROUP BY type_tarif;
+        `;
+        const result = await db.query(query);
+
+        // Formater pour correspondre au format attendu par le frontend (avec des couleurs par défaut)
+        const colors = {
+            'Normal': '#6366f1',
+            'Étudiant': '#818cf8',
+            'Militaire': '#c7d2fe'
+        };
+
+        const stats = result.rows.map(row => ({
+            name: row.name,
+            value: parseInt(row.value),
+            color: colors[row.name] || '#94a3b8'
+        }));
+
+        res.json(stats);
+    } catch (err) {
+        console.error('Erreur getPassengerStats:', err);
+        res.status(500).json({ message: 'Erreur stats passagers' });
+    }
+};
+
+// Récupérer les ventes du jour pour un agent spécifique
+exports.getAgentDailySales = async (req, res) => {
+    const { agentId } = req.params;
+    try {
+        const query = `
+            SELECT 
+                t.id_ticket,
+                t.num_ligne,
+                t.id_bus,
+                b.numero_bus,
+                t.date_voyage,
+                t.heure_depart as heure,
+                t.siege,
+                t.montant_total as prix,
+                t.station_depart as arret_depart,
+                t.station_arrivee as arret_arrivee,
+                t.type_tarif,
+                t.date_emission,
+                t.qr_code,
+                l.ville_depart as ligne_depart,
+                l.ville_arrivee as ligne_arrivee
+            FROM ticket t
+            LEFT JOIN bus b ON t.id_bus = b.id_bus
+            LEFT JOIN ligne l ON t.num_ligne = l.num_ligne
+            WHERE t.id_agent = $1 
+            AND t.date_emission::date = NOW()::date
+            ORDER BY t.date_emission DESC
+        `;
+        const result = await db.query(query, [agentId]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getAgentDailySales:', err);
+        res.status(500).json({ message: 'Erreur lors de la récupération des ventes du jour' });
+    }
+};
+// Récupérer les statistiques avancées pour le dashboard (Ligne top, occupation, heure pointe)
+exports.getAdvancedStats = async (req, res) => {
+    try {
+        console.log("Calcul des stats avancées...");
+        
+        // 1. Ligne la plus fréquentée (Géré avec CAST pour éviter les erreurs de type)
+        const topLineQuery = `
+            SELECT 
+                CAST(l.num_ligne AS VARCHAR) as num_ligne, 
+                l.ville_depart, 
+                l.ville_arrivee, 
+                COUNT(t.id_ticket) as ticket_count
+            FROM ticket t
+            JOIN ligne l ON CAST(t.num_ligne AS VARCHAR) = CAST(l.num_ligne AS VARCHAR)
+            GROUP BY l.num_ligne, l.ville_depart, l.ville_arrivee
+            ORDER BY ticket_count DESC LIMIT 1
+        `;
+        const topLineResult = await db.query(topLineQuery);
+        const topLine = topLineResult.rows[0];
+
+        // 2. Taux de remplissage moyen
+        const occupancyQuery = `
+            SELECT AVG(occ_rate) as avg_rate FROM (
+                SELECT 
+                    COUNT(t.id_ticket)::float / NULLIF(b.capacite, 0) * 100 as occ_rate
+                FROM ticket t
+                JOIN bus b ON t.id_bus = b.id_bus
+                GROUP BY t.id_bus, t.num_ligne, t.date_voyage, t.heure_depart, b.capacite
+            ) as subquery
+        `;
+        const occupancyResult = await db.query(occupancyQuery);
+        const avgOccupancy = occupancyResult.rows[0]?.avg_rate || 0;
+
+        // 3. Horaire le plus demandé
+        const peakHourQuery = `
+            SELECT 
+                heure_depart, 
+                COUNT(*) as count
+            FROM ticket
+            GROUP BY heure_depart
+            ORDER BY count DESC LIMIT 1
+        `;
+        const peakHourResult = await db.query(peakHourQuery);
+        const peakHour = peakHourResult.rows[0];
+
+        const stats = {
+            topLine: topLine ? {
+                name: `Ligne ${topLine.num_ligne}`,
+                route: `${topLine.ville_depart} → ${topLine.ville_arrivee}`,
+                count: parseInt(topLine.ticket_count),
+                distance: 0
+            } : null,
+            avgOccupancy: Math.round(parseFloat(avgOccupancy)),
+            peakHour: peakHour ? {
+                time: String(peakHour.heure_depart).substring(0, 5),
+                count: parseInt(peakHour.count)
+            } : null
+        };
+
+        console.log("Stats calculées avec succès:", stats);
+        res.json(stats);
+    } catch (err) {
+        console.error('Erreur CRITIQUE getAdvancedStats:', err);
+        res.status(500).json({ message: 'Erreur technique lors du calcul des statistiques' });
     }
 };

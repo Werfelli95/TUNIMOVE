@@ -25,7 +25,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/tarifs', tarifRoutes);
 app.use('/api/audit', auditRoutes);
-app.use('/api/Sales', saleRoutes);
+app.use('/api/sales', saleRoutes);
 app.use('/api/guichets', guichetRoutes);
 app.use('/api/password-reset', passwordResetRoutes);
 app.get('/', (req, res) => {

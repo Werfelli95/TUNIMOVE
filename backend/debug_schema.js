@@ -11,24 +11,20 @@ const pool = new Pool({
 
 async function checkSchema() {
     try {
-        const res = await pool.query(`
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'utilisateur'
-        `);
-        console.log('--- Utilisateur Columns ---');
-        console.table(res.rows);
-        
-        const tables = await pool.query(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-        `);
-        console.log('--- Public Tables ---');
-        console.log(tables.rows.map(t => t.table_name).join(', '));
+        const user = await pool.query("SELECT id_utilisateur FROM utilisateur WHERE nom = 'Ben Salah'");
+        console.table(user.rows);
+        const id = user.rows[0]?.id_utilisateur;
+        if (id) {
+            const guichet = await pool.query("SELECT * FROM guichet WHERE id_agent = $1", [id]);
+            console.table(guichet.rows);
+        }
+
+        console.log('--- LIGNE DATA ---');
+        const lignes = await pool.query('SELECT num_ligne, ville_depart, ville_arrivee FROM ligne');
+        console.table(lignes.rows);
         
     } catch (err) {
-        console.error('Error checking schema:', err);
+        console.error('Error debugging data:', err);
     } finally {
         await pool.end();
     }
