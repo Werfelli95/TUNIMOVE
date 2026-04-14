@@ -25,6 +25,9 @@ const Assignments = () => {
     const [selectedStaffId, setSelectedStaffId] = useState('');
     const [dateDebut, setDateDebut] = useState('');
     const [dateFin, setDateFin] = useState('');
+    const [selectedLigne, setSelectedLigne] = useState('');
+    const [stationDepart, setStationDepart] = useState('');
+    const [lignes, setLignes] = useState([]);
 
     // États pour l'Ajout de Guichet
     const [isAddGuichetModalOpen, setIsAddGuichetModalOpen] = useState(false);
@@ -45,12 +48,14 @@ const Assignments = () => {
 
     const fetchGuichetData = async () => {
         try {
-            const [guichetRes, statsRes] = await Promise.all([
+            const [guichetRes, statsRes, lignesRes] = await Promise.all([
                 fetch('http://localhost:5000/api/guichets'),
-                fetch('http://localhost:5000/api/guichets/stats')
+                fetch('http://localhost:5000/api/guichets/stats'),
+                fetch('http://localhost:5000/api/network')
             ]);
             setGuichets(await guichetRes.json());
             setGuichetStats(await statsRes.json());
+            setLignes(await lignesRes.json());
         } catch (error) {
             console.error("Erreur chargement guichets:", error);
         }
@@ -99,12 +104,18 @@ const Assignments = () => {
                 if (activeTab === 'bus') {
                     setDateDebut(item.date_debut_affectation ? new Date(item.date_debut_affectation).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
                     setDateFin(item.date_fin_affectation ? new Date(item.date_fin_affectation).toISOString().split('T')[0] : '');
+                } else {
+                    setSelectedLigne(item.num_ligne || '');
+                    setStationDepart(item.station_depart || '');
                 }
             } else {
                 setSelectedStaffId('');
                 if (activeTab === 'bus') {
                     setDateDebut(new Date().toISOString().split('T')[0]);
                     setDateFin('');
+                } else {
+                    setSelectedLigne('');
+                    setStationDepart(item.emplacement || '');
                 }
             }
 
@@ -380,6 +391,13 @@ const Assignments = () => {
                                                                 )}
                                                             </div>
                                                         )}
+                                                        {activeTab === 'guichet' && item.emplacement && (
+                                                            <div className="flex flex-col gap-1 mt-1.5">
+                                                                <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200 w-fit">
+                                                                    Emplacement: {item.emplacement}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <button
                                                         onClick={() => handleUnassign(activeTab === 'bus' ? item.id_bus : item.id_guichet)}
@@ -476,6 +494,8 @@ const Assignments = () => {
                                                 </div>
                                             </div>
                                         )}
+
+
 
                                         <button
                                             className="btn-submit w-full py-4 justify-center"

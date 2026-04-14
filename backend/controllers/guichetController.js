@@ -32,7 +32,7 @@ exports.getGuichetStats = async (req, res) => {
 exports.getGuichets = async (req, res) => {
     try {
         const query = `
-            SELECT g.id_guichet, g.nom_guichet, g.emplacement, g.statut,
+            SELECT g.id_guichet, g.nom_guichet, g.emplacement, g.statut, g.num_ligne, g.station_depart,
                    u.nom as agent_nom, u.prenom as agent_prenom, u.id_utilisateur as id_agent
             FROM guichet g
             LEFT JOIN utilisateur u ON g.id_agent = u.id_utilisateur
@@ -65,11 +65,11 @@ exports.getAvailableAgents = async (req, res) => {
 
 // 4. Mettre à jour l'affectation d'un guichet
 exports.updateAssignment = async (req, res) => {
-    const { id_guichet, id_agent } = req.body;
+    const { id_guichet, id_agent, num_ligne, station_depart } = req.body;
     try {
         await db.query(
-            'UPDATE guichet SET id_agent = $1 WHERE id_guichet = $2', 
-            [id_agent, id_guichet]
+            'UPDATE guichet SET id_agent = $1, num_ligne = $2, station_depart = $3 WHERE id_guichet = $4', 
+            [id_agent, num_ligne || null, station_depart || null, id_guichet]
         );
         res.json({ message: "Affectation du guichet réussie" });
     } catch (err) {
@@ -118,7 +118,7 @@ exports.getGuichetByAgent = async (req, res) => {
     const { id } = req.params;
     try {
         const result = await db.query(
-            "SELECT id_guichet, nom_guichet, emplacement FROM guichet WHERE id_agent = $1", 
+            "SELECT id_guichet, nom_guichet, emplacement, num_ligne, station_depart FROM guichet WHERE id_agent = $1", 
             [id]
         );
         if (result.rows.length === 0) {

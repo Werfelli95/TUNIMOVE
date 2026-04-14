@@ -153,6 +153,43 @@
     color: #6366f1;
 }
 
+/* Date Filters */
+.date-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.625rem 1rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.date-filter:focus-within {
+    background: #ffffff;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.06);
+}
+
+.date-filter span {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.date-filter input {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    font-size: 0.875rem;
+    color: #1e293b;
+    font-family: inherit;
+    padding: 0;
+    margin: 0;
+    box-shadow: none !important;
+}
+
 /* Action Button */
 .btn-add-user {
     display: flex;

@@ -8,7 +8,7 @@ exports.requestReset = async (req, res) => {
     try {
         // Vérifier si l'utilisateur existe avec ce matricule et cet email
         const userResult = await db.query(
-            "SELECT id_utilisateur FROM utilisateur WHERE matricule = $1 AND email = $2 AND role = 'AGENT'", 
+            "SELECT id_utilisateur FROM utilisateur WHERE matricule = $1 AND email = $2 AND role = 'AGENT'",
             [matricule, email]
         );
 
@@ -102,7 +102,7 @@ exports.approveReset = async (req, res) => {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: demande.email,
-            subject: '🔒 Votre nouveau mot de passe - TuniMove',
+            subject: 'Votre nouveau mot de passe - TuniMove',
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <h2 style="color: #4f46e5;">Réinitialisation de votre mot de passe</h2>

@@ -30,6 +30,7 @@ const Guichet = () => {
     const [arretArrivee, setArretArrivee] = useState('');
     const [selectedSeat, setSelectedSeat] = useState(null);
     const [typeTarif, setTypeTarif] = useState('Tarif Plein');
+    const [occupiedSeats, setOccupiedSeats] = useState([]);
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [myGuichet, setMyGuichet] = useState(null);
@@ -76,12 +77,17 @@ const Guichet = () => {
                                 // FILTRAGE : On ne garde que les lignes ACTIVES qui partent de la station du guichet
                                 const filteredLignes = lignesData.filter(ligne => {
                                     // 1. Vérifier si la ligne est active
-                                    if (ligne.statut_ligne !== 'Active') return false;
+                                    if (ligne.statut_ligne?.toLowerCase() !== 'active') return false;
                                     
                                     // 2. Vérifier si elle correspond à l'emplacement du guichet
-                                    const loc = guichetData.emplacement.toLowerCase();
+                                    const loc = guichetData.emplacement ? guichetData.emplacement.toLowerCase() : '';
+                                    if (!loc) return true; // Si pas d'emplacement, on montre tout par sécurité
                                     const dep = ligne.ville_depart.toLowerCase();
-                                    return loc.includes(dep) || dep.includes(loc);
+                                    const hasStationMatch = ligne.stations && ligne.stations.some(s => 
+                                        s.arret.toLowerCase().includes(loc) || loc.includes(s.arret.toLowerCase())
+                                    );
+                                    
+                                    return loc.includes(dep) || dep.includes(loc) || hasStationMatch;
                                 });
                                 setLignes(filteredLignes);
 
@@ -98,23 +104,21 @@ const Guichet = () => {
                                     if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
                                     else setArretDepart(l.ville_depart);
 
-                                    // Auto-assign bus
-                                    const assignedBus = busData.find(b => String(b.num_ligne) === String(l.num_ligne));
-                                    if (assignedBus) setSelectedBus(assignedBus.numero_bus);
+                                    // Ne PAS auto-affecter le bus ici : il sera déterminé après la sélection de l'horaire
                                 }
                             } else {
                                 // Fallback: L'agent n'a pas de guichet assigné
-                                setLignes(lignesData.filter(l => l.statut_ligne === 'Active'));
+                                setLignes(lignesData.filter(l => l.statut_ligne?.toLowerCase() === 'active'));
                             }
                         } else {
                             // Fallback : On ne garde quand même que les actives
-                            setLignes(lignesData.filter(l => l.statut_ligne === 'Active'));
+                            setLignes(lignesData.filter(l => l.statut_ligne?.toLowerCase() === 'active'));
                         }
                     } catch (e) {
-                        setLignes(lignesData.filter(l => l.statut_ligne === 'Active'));
+                        setLignes(lignesData.filter(l => l.statut_ligne?.toLowerCase() === 'active'));
                     }
                 } else {
-                    setLignes(lignesData.filter(l => l.statut_ligne === 'Active'));
+                    setLignes(lignesData.filter(l => l.statut_ligne?.toLowerCase() === 'active'));
                 }
 
                 setBuses(busData || []);
@@ -136,6 +140,25 @@ const Guichet = () => {
     // Derived states
     const activeLigne = lignes.find(l => String(l.num_ligne) === String(selectedLigne));
 
+    useEffect(() => {
+        const fetchOccupiedSeats = async () => {
+            if (activeLigne && dateVoyage && horaire) {
+                try {
+                    const res = await fetch(`http://localhost:5000/api/Sales/tickets/occupied-seats?num_ligne=${selectedLigne}&date=${dateVoyage}&heure=${horaire}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setOccupiedSeats(data);
+                    }
+                } catch (err) {
+                    console.error("Erreur récupération sièges occupés", err);
+                }
+            } else {
+                setOccupiedSeats([]);
+            }
+        };
+        fetchOccupiedSeats();
+    }, [selectedLigne, dateVoyage, horaire, activeLigne]);
+
     // On construit la liste des stations en incluant le point de départ s'il n'existe pas déjà à 0 km
     const activeStations = React.useMemo(() => {
         if (!activeLigne) return [];
@@ -156,10 +179,10 @@ const Guichet = () => {
         return stations.sort((a, b) => a.distance_km - b.distance_km);
     }, [activeLigne]);
 
-    // On considère qu'on a toujours des horaires car on permet la saisie manuelle s'il n'y en a pas en base
-    const hasHoraires = true;
-    const hasBus = selectedLigne ? buses.some(b => String(b.num_ligne) === String(selectedLigne)) : false;
-    const canProceed = hasBus;
+    // On s'assure qu'il y a un horaire pour permettre la procédure
+    const hasHoraires = activeLigne ? ((activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null) || !!activeLigne.horaire) : false;
+    // canProceed : l'agent a choisi un horaire ET le système a trouvé le bus correspondant
+    const canProceed = hasHoraires && !!selectedBus;
 
     // Recherche robuste des stations pour le calcul de distance
     const departStation = activeStations.find(s =>
@@ -192,9 +215,6 @@ const Guichet = () => {
 
         const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T'];
 
-        // In a real app, this comes from backend tickets
-        const occupied = [];
-
         const numRows = Math.ceil(capaciteBus / 5);
         const seatRows = [];
         let seatCount = 0;
@@ -211,7 +231,7 @@ const Guichet = () => {
                 <div key={rowLabel} className="seat-row">
                     {cols.map(c => {
                         const seatId = `${rowLabel}${c}`;
-                        const isOccupied = occupied.includes(seatId);
+                        const isOccupied = occupiedSeats.includes(seatId);
                         const isSelected = selectedSeat === seatId;
 
                         let className = "seat ";
@@ -235,12 +255,44 @@ const Guichet = () => {
         return seatRows;
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         setIsPrinting(true);
-        setTimeout(() => {
-            window.print();
+        try {
+            const body = {
+                num_ligne: selectedLigne,
+                bus: selectedBus,
+                date_voyage: dateVoyage,
+                heure: horaire,
+                siege: selectedSeat,
+                prix: calculatedTotal,
+                arret_depart: arretDepart,
+                arret_arrivee: arretArrivee,
+                agent_id: agentInfo.id || agentInfo.id_utilisateur || null,
+                type_tarif: typeTarif
+            };
+
+            const res = await fetch('http://localhost:5000/api/Sales/tickets/vendre', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                // Update local occupied seats instantly to prevent double click while it refreshes
+                setOccupiedSeats(prev => [...prev, selectedSeat]);
+                setTimeout(() => {
+                    window.print();
+                    setIsPrinting(false);
+                }, 500);
+            } else {
+                alert("Erreur lors de l'enregistrement de la vente.");
+                setIsPrinting(false);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Erreur réseau");
             setIsPrinting(false);
-        }, 500);
+        }
     };
     const qrDataObj = {
         ligne: selectedLigne,
@@ -294,14 +346,8 @@ const Guichet = () => {
 
                                 setArretArrivee('');
                                 setSelectedSeat(null);
-
-                                // Auto-assign bus
-                                const assignedBus = buses.find(b => String(b.num_ligne) === String(newLigneId));
-                                if (assignedBus) {
-                                    setSelectedBus(assignedBus.numero_bus);
-                                } else {
-                                    setSelectedBus('');
-                                }
+                                setHoraire(''); // Réinitialiser l'horaire pour forcer un nouveau choix
+                                setSelectedBus(''); // Réinitialiser le bus
                             }}
                         >
                             <option value="">Sélectionnez une ligne...</option>
@@ -334,31 +380,53 @@ const Guichet = () => {
                             <div className="flex-1">
                                 <label>Horaire de Départ *</label>
                                 {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ? (
-                                    <select className="g-select" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed}>
+                                    <select className="g-select" value={horaire} onChange={e => {
+                                        const h = e.target.value;
+                                        setHoraire(h);
+                                        // Auto-affecter le bus selon ligne + horaire (config Admin)
+                                        const matchingBus = buses.find(b =>
+                                            String(b.num_ligne) === String(selectedLigne) &&
+                                            b.horaire_affecte === h
+                                        );
+                                        setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
+                                        setSelectedSeat(null);
+                                    }}>
                                         <option value="">--:--</option>
                                         {activeLigne.horaires.map((h, i) => (
                                             <option key={i} value={h}>{h}</option>
                                         ))}
                                     </select>
                                 ) : activeLigne && activeLigne.horaire ? (
-                                    <select className="g-select" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed}>
+                                    <select className="g-select" value={horaire} onChange={e => {
+                                        const h = e.target.value;
+                                        setHoraire(h);
+                                        const matchingBus = buses.find(b =>
+                                            String(b.num_ligne) === String(selectedLigne) &&
+                                            b.horaire_affecte === h
+                                        );
+                                        setSelectedBus(matchingBus ? matchingBus.numero_bus : '');
+                                        setSelectedSeat(null);
+                                    }}>
                                         <option value="">--:--</option>
                                         <option value={activeLigne.horaire}>{activeLigne.horaire}</option>
                                     </select>
                                 ) : (
-                                    <input type="time" className="g-input" value={horaire} onChange={e => setHoraire(e.target.value)} required disabled={activeLigne && !canProceed} />
+                                    <select className="g-select" value="" disabled>
+                                        <option value="">Aucun horaire défini</option>
+                                    </select>
                                 )}
                             </div>
                             <div className="flex-1">
                                 <label>Bus *</label>
-                                <select className="g-select" value={selectedBus} onChange={e => setSelectedBus(e.target.value)} disabled={activeLigne && !canProceed}>
-                                    <option value="">Sélectionnez un bus</option>
-                                    {buses.map(b => (
-                                        <option key={b.id_bus} value={b.numero_bus}>
-                                            Bus {b.numero_bus} - {b.modele} ({b.capacite} places)
-                                        </option>
-                                    ))}
-                                </select>
+                                {selectedBus ? (
+                                    <div className="g-input-fixed" style={{ color: '#4f46e5', fontWeight: 700 }}>
+                                        🚌 Bus {selectedBus} — {buses.find(b => String(b.numero_bus) === String(selectedBus))?.capacite || '?'} places
+                                    </div>
+                                ) : (
+                                    <div className="g-input-fixed" style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                                        {horaire ? '⚠️ Aucun bus affecté à cet horaire' : 'Choisissez un horaire'}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="info-bar bg-blue-light">

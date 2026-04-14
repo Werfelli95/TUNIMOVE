@@ -38,7 +38,8 @@ exports.getAssignments = async (req, res) => {
         const result = await db.query(query);
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ message: "Erreur liste affectations" });
+        console.error("Error in getAssignments:", err);
+        res.status(500).json({ message: "Erreur liste affectations", error: err.message });
     }
 };
 

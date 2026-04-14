@@ -20,14 +20,26 @@ exports.getBuses = async (req, res) => {
 // Ajouter un nouveau bus
 exports.createBus = async (req, res) => {
     try {
-        const { numero_bus, capacite, etat, num_ligne } = req.body;
+        const { numero_bus, capacite, etat, num_ligne, horaire_affecte } = req.body;
         const checkBus = await db.query('SELECT * FROM bus WHERE numero_bus = $1', [numero_bus]);
         if (checkBus.rows.length > 0) {
             return res.status(400).json({ message: "Ce numéro de bus existe déjà." });
         }
+
+        if (num_ligne && horaire_affecte) {
+            const checkHoraire = await db.query(
+                'SELECT numero_bus FROM bus WHERE num_ligne = $1 AND horaire_affecte = $2',
+                [num_ligne, horaire_affecte]
+            );
+            if (checkHoraire.rows.length > 0) {
+                return res.status(400).json({ 
+                    message: `L'horaire ${horaire_affecte} sur la ligne ${num_ligne} est déjà affecté au bus ${checkHoraire.rows[0].numero_bus}.` 
+                });
+            }
+        }
         const result = await db.query(
-            'INSERT INTO bus (numero_bus, capacite, etat, num_ligne) VALUES ($1, $2, $3, $4) RETURNING *',
-            [numero_bus, capacite, etat, num_ligne || null]
+            'INSERT INTO bus (numero_bus, capacite, etat, num_ligne, horaire_affecte) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -39,11 +51,23 @@ exports.createBus = async (req, res) => {
 exports.updateBus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { numero_bus, capacite, etat, num_ligne } = req.body;
+        const { numero_bus, capacite, etat, num_ligne, horaire_affecte } = req.body;
+
+        if (num_ligne && horaire_affecte) {
+            const checkHoraire = await db.query(
+                'SELECT numero_bus FROM bus WHERE num_ligne = $1 AND horaire_affecte = $2 AND id_bus != $3',
+                [num_ligne, horaire_affecte, id]
+            );
+            if (checkHoraire.rows.length > 0) {
+                return res.status(400).json({ 
+                    message: `L'horaire ${horaire_affecte} sur la ligne ${num_ligne} est déjà affecté au bus ${checkHoraire.rows[0].numero_bus}.` 
+                });
+            }
+        }
 
         const result = await db.query(
-            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3, num_ligne = $4 WHERE id_bus = $5 RETURNING *',
-            [numero_bus, capacite, etat, num_ligne || null, id]
+            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3, num_ligne = $4, horaire_affecte = $5 WHERE id_bus = $6 RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null, id]
         );
 
         if (result.rows.length === 0) {

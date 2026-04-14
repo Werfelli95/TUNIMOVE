@@ -17,7 +17,8 @@ const Fleet = () => {
         numero_bus: '',
         capacite: '',
         etat: 'En service',
-        num_ligne: '' // Nouvelle colonne
+        num_ligne: '', // Nouvelle colonne
+        horaire_affecte: '' // L'horaire précis assigné
     });
 
     // --- CHARGEMENT DES DONNÉES ---
@@ -68,7 +69,8 @@ const Fleet = () => {
             numero_bus: bus.numero_bus,
             capacite: bus.capacite,
             etat: bus.etat,
-            num_ligne: bus.num_ligne || ''
+            num_ligne: bus.num_ligne || '',
+            horaire_affecte: bus.horaire_affecte || ''
         });
         setIsModalOpen(true);
     };
@@ -197,6 +199,7 @@ const Fleet = () => {
                                                     {bus.ville_depart ? (
                                                         <div style={{ fontSize: '0.85rem', color: '#475569' }}>
                                                             <span style={{ fontWeight: 600, color: '#4f46e5' }}>L{bus.num_ligne}</span> : {bus.ville_depart} ➔ {bus.ville_arrivee}
+                                                            {bus.horaire_affecte && <div style={{ marginTop: '4px', display: 'inline-block', marginLeft: '6px', background: '#eef2ff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, color: '#4338ca' }}>🕒 {bus.horaire_affecte}</div>}
                                                         </div>
                                                     ) : (
                                                         <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem' }}>Non assigné</span>
@@ -264,7 +267,7 @@ const Fleet = () => {
                                         <select
                                             className="form-select"
                                             value={formData.num_ligne}
-                                            onChange={(e) => setFormData({ ...formData, num_ligne: e.target.value })}
+                                            onChange={(e) => setFormData({ ...formData, num_ligne: e.target.value, horaire_affecte: '' })}
                                         >
                                             <option value="">-- Aucune ligne --</option>
                                             {lines.map((line) => (
@@ -274,6 +277,31 @@ const Fleet = () => {
                                             ))}
                                         </select>
                                     </div>
+                                    {formData.num_ligne && (
+                                        <div className="form-group">
+                                            <label>Horaire Assigné</label>
+                                            <select
+                                                className="form-select"
+                                                value={formData.horaire_affecte || ''}
+                                                onChange={(e) => setFormData({ ...formData, horaire_affecte: e.target.value })}
+                                            >
+                                                <option value="">-- Sélectionnez l'horaire du voyage --</option>
+                                                {(() => {
+                                                    const selectedLineData = lines.find(l => String(l.num_ligne) === String(formData.num_ligne));
+                                                    if (!selectedLineData) return null;
+                                                    let hList = [];
+                                                    if (selectedLineData.horaires && selectedLineData.horaires.length > 0 && selectedLineData.horaires[0] !== null) {
+                                                        hList = selectedLineData.horaires;
+                                                    } else if (selectedLineData.horaire) {
+                                                        hList = [selectedLineData.horaire];
+                                                    }
+                                                    return hList.map((h, idx) => (
+                                                        <option key={idx} value={h}>{h}</option>
+                                                    ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                    )}
                                     <div className="form-group">
                                         <label>État</label>
                                         <select
