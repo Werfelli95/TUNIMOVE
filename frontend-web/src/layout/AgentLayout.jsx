@@ -61,19 +61,17 @@ const AgentLayout = () => {
                 zIndex: 10,
                 position: 'relative'
             }}>
-                <div style={{ padding: '32px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    <h2 style={{ margin: 0, fontSize: '26px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '-0.5px' }}>
-                        <Ticket size={28} /> TuniMove
-                    </h2>
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <img src="/images/tunimovebus3.png" alt="TuniMove Logo" style={{ height: '80px', width: 'auto' }} />
                     <span style={{ 
                         fontSize: '13px', 
                         opacity: 0.8, 
-                        marginLeft: '38px',
-                        fontWeight: '500',
-                        letterSpacing: '0.5px',
+                        fontWeight: '600',
+                        letterSpacing: '1px',
                         display: 'block',
-                        marginTop: '4px'
-                    }}>GUICHET</span>
+                        marginTop: '8px',
+                        color: 'white'
+                    }}>ESPACE GUICHET</span>
                 </div>
 
                 <div 

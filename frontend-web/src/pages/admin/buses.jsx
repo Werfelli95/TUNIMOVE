@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Plus, Edit2, Trash2, Loader2, X, Search } from 'lucide-react';
+import { Bus, Plus, Edit2, Trash2, Loader2, X, Search, Eye, MapPin, Clock, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css';
 
@@ -9,9 +9,13 @@ const Fleet = () => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState(''); // État pour la recherche
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [viewingBus, setViewingBus] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingBus, setEditingBus] = useState(null);
     const [lines, setLines] = useState([]); // Pour stocker la liste des lignes
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
 
     const [formData, setFormData] = useState({
         numero_bus: '',
@@ -60,6 +64,8 @@ const Fleet = () => {
     const handleOpenAddModal = () => {
         setEditingBus(null);
         setFormData({ numero_bus: '', capacite: '', etat: 'En service', num_ligne: '' });
+        setImageFile(null);
+        setImagePreview(null);
         setIsModalOpen(true);
     };
 
@@ -72,7 +78,14 @@ const Fleet = () => {
             num_ligne: bus.num_ligne || '',
             horaire_affecte: bus.horaire_affecte || ''
         });
+        setImageFile(null);
+        setImagePreview(bus.image_url ? `http://localhost:5000/${bus.image_url}` : null);
         setIsModalOpen(true);
+    };
+
+    const handleOpenDetailsModal = (bus) => {
+        setViewingBus(bus);
+        setIsDetailsModalOpen(true);
     };
 
     // --- ACTIONS API (AJOUT / MODIF / SUPPRIMER) ---
@@ -85,10 +98,23 @@ const Fleet = () => {
         const method = editingBus ? 'PUT' : 'POST';
 
         try {
+            const data = new FormData();
+            data.append('numero_bus', formData.numero_bus);
+            data.append('capacite', formData.capacite);
+            data.append('etat', formData.etat);
+            data.append('num_ligne', formData.num_ligne);
+            data.append('horaire_affecte', formData.horaire_affecte);
+            
+            if (imageFile) {
+                data.append('image', imageFile);
+            } else if (editingBus && editingBus.image_url) {
+                data.append('image_url', editingBus.image_url);
+            }
+
             const response = await fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                // Ne pas mettre de Content-Type pour FormData, le navigateur s'en occupe
+                body: data
             });
 
             if (response.ok) {
@@ -102,6 +128,14 @@ const Fleet = () => {
             alert("Erreur de connexion");
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
         }
     };
 
@@ -208,6 +242,9 @@ const Fleet = () => {
                                                 <td>{getStatusBadge(bus.etat)}</td>
                                                 <td>
                                                     <div className="row-actions">
+                                                        <button title="Voir détails" className="action-btn btn-view" onClick={() => handleOpenDetailsModal(bus)}>
+                                                            <Eye size={16} />
+                                                        </button>
                                                         <button title="Éditer" className="action-btn btn-edit" onClick={() => handleOpenEditModal(bus)}>
                                                             <Edit2 size={16} />
                                                         </button>
@@ -314,6 +351,48 @@ const Fleet = () => {
                                             <option value="En panne">En panne</option>
                                         </select>
                                     </div>
+                                    
+                                    <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                                        <label>Photo du Bus</label>
+                                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '5px' }}>
+                                            <div style={{ width: '80px', height: '60px', borderRadius: '12px', background: '#f8fafc', border: '2px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                                                {imagePreview ? (
+                                                    <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <Plus size={20} color="#94a3b8" />
+                                                )}
+                                            </div>
+                                            <label 
+                                                htmlFor="bus-photo-upload" 
+                                                style={{ 
+                                                    padding: '10px 18px', 
+                                                    fontSize: '0.85rem', 
+                                                    cursor: 'pointer', 
+                                                    background: '#eef2ff', 
+                                                    color: '#4318FF', 
+                                                    borderRadius: '10px',
+                                                    border: '1px solid #e0e7ff',
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
+                                                }}
+                                                onMouseOver={(e) => e.target.style.background = '#e0e7ff'}
+                                                onMouseOut={(e) => e.target.style.background = '#eef2ff'}
+                                            >
+                                                <Plus size={16} />
+                                                {imagePreview ? 'Modifier la photo' : 'Choisir une photo'}
+                                            </label>
+                                            <input 
+                                                id="bus-photo-upload"
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleImageChange}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="modal-footer">
                                     <button type="button" className="btn-cancel" onClick={() => setIsModalOpen(false)}>Annuler</button>
@@ -322,6 +401,101 @@ const Fleet = () => {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* --- MODAL DE DÉTAILS --- */}
+            <AnimatePresence>
+                {isDetailsModalOpen && viewingBus && (
+                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsDetailsModalOpen(false)}>
+                        <motion.div 
+                            className="modal-content detail-modal" 
+                            initial={{ scale: 0.9, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ maxWidth: '600px' }}
+                        >
+                            <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: '0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ backgroundColor: '#eef2ff', padding: '12px', borderRadius: '15px' }}>
+                                        <Bus size={30} color="#4318FF" />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Détails du Bus {viewingBus.numero_bus}</h2>
+                                        <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>ID interne : #{viewingBus.id_bus}</p>
+                                    </div>
+                                </div>
+                                <button className="btn-close" onClick={() => setIsDetailsModalOpen(false)}><X size={20} /></button>
+                            </div>
+
+                            <div className="modal-body" style={{ marginTop: '20px' }}>
+                                {/* Image du Bus en haut */}
+                                {viewingBus.image_url && (
+                                    <div style={{ width: '100%', height: '220px', borderRadius: '20px', overflow: 'hidden', marginBottom: '20px', boxShadow: '0 8px 25px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
+                                        <img 
+                                            src={`http://localhost:5000/${viewingBus.image_url}`} 
+                                            alt="Bus" 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                        />
+                                    </div>
+                                )}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                    {/* Carte Statut */}
+                                    <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>
+                                            <ShieldCheck size={16} /> État du véhicule
+                                        </div>
+                                        {getStatusBadge(viewingBus.etat)}
+                                        <div style={{ marginTop: '15px', color: '#1e293b', fontWeight: 600 }}>
+                                            Capacité : <span style={{ color: '#4318FF' }}>{viewingBus.capacite} passagers</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Carte Horaire */}
+                                    <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>
+                                            <Clock size={16} /> Planification
+                                        </div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1b2559' }}>
+                                            {viewingBus.horaire_affecte || 'Non planifié'}
+                                        </div>
+                                        <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>Horaire de départ prévu</p>
+                                    </div>
+                                </div>
+
+                                {/* Carte Itinéraire */}
+                                <div style={{ marginTop: '20px', background: 'linear-gradient(135deg, #4318FF 0%, #1b2559 100%)', padding: '25px', borderRadius: '24px', color: 'white', position: 'relative', overflow: 'hidden' }}>
+                                    <div style={{ position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.1 }}>
+                                        <Bus size={120} color="white" />
+                                    </div>
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8, fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '15px' }}>
+                                            <MapPin size={16} /> Itinéraire Actif
+                                        </div>
+                                        {viewingBus.num_ligne ? (
+                                            <>
+                                                <div style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '5px' }}>Ligne {viewingBus.num_ligne}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{viewingBus.ville_depart}</span>
+                                                    <div style={{ height: '2px', flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', position: 'relative' }}>
+                                                        <div style={{ position: 'absolute', right: 0, top: '-4px', width: '10px', height: '10px', backgroundColor: 'white', borderRadius: '50%' }}></div>
+                                                    </div>
+                                                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{viewingBus.ville_arrivee}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div style={{ fontStyle: 'italic', opacity: 0.7 }}>Aucune ligne assignée actuellement</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-footer" style={{ borderTop: 'none' }}>
+                                <button className="btn-cancel" style={{ width: '100%' }} onClick={() => setIsDetailsModalOpen(false)}>Fermer</button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

@@ -9,7 +9,8 @@ import {
     CheckCircle,
     Bus,
     History,
-    Ticket
+    Ticket,
+    ArrowRight
 } from 'lucide-react';
 import QRCode from "react-qr-code";
 import './Guichet.css'; // We will create this

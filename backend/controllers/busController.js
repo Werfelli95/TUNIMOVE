@@ -4,7 +4,7 @@ exports.getBuses = async (req, res) => {
     try {
         const query = `
             SELECT b.id_bus, b.numero_bus, b.capacite, b.etat, b.num_ligne, b.id_receveur,
-                   b.date_debut_affectation, b.date_fin_affectation,
+                   b.date_debut_affectation, b.date_fin_affectation, b.image_url,
                    TO_CHAR(b.horaire_affecte, 'HH24:MI') as horaire_affecte,
                    l.ville_depart, l.ville_arrivee 
             FROM bus b 
@@ -40,9 +40,11 @@ exports.createBus = async (req, res) => {
                 });
             }
         }
+        const image_url = req.file ? req.file.path.replace(/\\/g, '/') : null;
+
         const result = await db.query(
-            'INSERT INTO bus (numero_bus, capacite, etat, num_ligne, horaire_affecte) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null]
+            'INSERT INTO bus (numero_bus, capacite, etat, num_ligne, horaire_affecte, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null, image_url]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -68,9 +70,14 @@ exports.updateBus = async (req, res) => {
             }
         }
 
+        let image_url = req.body.image_url; // Conserver l'ancienne si pas de nouveau fichier
+        if (req.file) {
+            image_url = req.file.path.replace(/\\/g, '/');
+        }
+
         const result = await db.query(
-            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3, num_ligne = $4, horaire_affecte = $5 WHERE id_bus = $6 RETURNING *',
-            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null, id]
+            'UPDATE bus SET numero_bus = $1, capacite = $2, etat = $3, num_ligne = $4, horaire_affecte = $5, image_url = $6 WHERE id_bus = $7 RETURNING *',
+            [numero_bus, capacite, etat, num_ligne || null, horaire_affecte || null, image_url, id]
         );
 
         if (result.rows.length === 0) {

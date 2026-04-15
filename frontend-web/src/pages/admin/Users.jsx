@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Trash2, UserPlus, Loader2, Search, Lock, Unlock, X } from 'lucide-react';
+import { Edit2, Trash2, UserPlus, Loader2, Search, Lock, Unlock, X, ShieldCheck, User, Users as UsersIcon, Store, Eye } from 'lucide-react';
 import './Users.css';
 
 const Users = () => {
@@ -8,6 +8,7 @@ const Users = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedRole, setSelectedRole] = useState('ALL');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState(null);
@@ -131,9 +132,11 @@ const Users = () => {
         );
     };
 
-    const filteredUsers = users.filter(user =>
-        `${user.nom} ${user.prenom} ${user.email} ${user.num_tel} ${user.matricule} ${user.role}`.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredUsers = users.filter(user => {
+        const matchesSearch = `${user.nom} ${user.prenom} ${user.email} ${user.num_tel} ${user.matricule} ${user.role}`.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesRole = selectedRole === 'ALL' || user.role.toUpperCase() === selectedRole.toUpperCase();
+        return matchesSearch && matchesRole;
+    });
 
     return (
         <>
@@ -163,6 +166,46 @@ const Users = () => {
                         </button>
 
                     </div>
+                </div>
+
+                {/* Filter Buttons Section */}
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                    {[
+                        { id: 'ALL', label: 'Tous', icon: <UsersIcon size={16} /> },
+                        { id: 'ADMIN', label: 'Administrateurs', icon: <ShieldCheck size={16} /> },
+                        { id: 'RECEVEUR', label: 'Receveurs', icon: <User size={16} /> },
+                        { id: 'AGENT', label: 'Agents de guichet', icon: <Store size={16} /> },
+                        { id: 'CONTROLEUR', label: 'Contrôleurs', icon: <Eye size={16} /> }
+                    ].map((btn) => (
+                        <button
+                            key={btn.id}
+                            onClick={() => setSelectedRole(btn.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 20px',
+                                borderRadius: '12px',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                border: selectedRole === btn.id ? '1px solid #4f46e5' : '1px solid #e2e8f0',
+                                background: selectedRole === btn.id ? '#4f46e5' : '#ffffff',
+                                color: selectedRole === btn.id ? '#ffffff' : '#64748b',
+                                boxShadow: selectedRole === btn.id ? '0 4px 12px rgba(79, 70, 229, 0.2)' : 'none'
+                            }}
+                            onMouseOver={(e) => {
+                                if (selectedRole !== btn.id) e.currentTarget.style.background = '#f8fafc';
+                            }}
+                            onMouseOut={(e) => {
+                                if (selectedRole !== btn.id) e.currentTarget.style.background = '#ffffff';
+                            }}
+                        >
+                            {btn.icon}
+                            {btn.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Table Section */}

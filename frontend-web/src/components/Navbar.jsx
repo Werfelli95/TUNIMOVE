@@ -23,11 +23,6 @@ const Navbar = () => {
             <nav className="navbar">
                 <div className="navbar-left">
                     <Link to="/" className="navbar-brand-wrapper">
-                        <img
-                            src="/images/bus4.jpg"
-                            alt="TuniMove Logo"
-                            className="navbar-logo"
-                        />
                         <span className="navbar-brand">TuniMove</span>
                     </Link>
                 </div>

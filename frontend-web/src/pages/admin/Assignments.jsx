@@ -401,10 +401,36 @@ const Assignments = () => {
                                                     </div>
                                                     <button
                                                         onClick={() => handleUnassign(activeTab === 'bus' ? item.id_bus : item.id_guichet)}
-                                                        className="p-1 rounded-md bg-red-50 text-red-500 opacity-0 group-hover/item:opacity-100 transition-all hover:bg-red-500 hover:text-white mt-1"
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            width: '26px',
+                                                            height: '26px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#fee2e2',
+                                                            color: '#ef4444',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            marginLeft: '10px',
+                                                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.1)'
+                                                        }}
+                                                        onMouseOver={(e) => { 
+                                                            e.currentTarget.style.backgroundColor = '#ef4444'; 
+                                                            e.currentTarget.style.color = 'white';
+                                                            e.currentTarget.style.transform = 'scale(1.1)';
+                                                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
+                                                        }}
+                                                        onMouseOut={(e) => { 
+                                                            e.currentTarget.style.backgroundColor = '#fee2e2'; 
+                                                            e.currentTarget.style.color = '#ef4444';
+                                                            e.currentTarget.style.transform = 'scale(1)';
+                                                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.1)';
+                                                        }}
                                                         title="Retirer l'affectation"
                                                     >
-                                                        <X size={14} />
+                                                        <X size={14} strokeWidth={3} />
                                                     </button>
                                                 </div>
                                             ) : (

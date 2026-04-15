@@ -65,14 +65,23 @@
 }
 
 .navbar-brand {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 10px 20px rgba(99, 102, 241, 0.1);
+  cursor: pointer;
+}
+
+.navbar-brand-wrapper:hover .navbar-brand {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  letter-spacing: -0.02em;
 }
 
 /* ===== RIGHT SECTION: Actions ===== */

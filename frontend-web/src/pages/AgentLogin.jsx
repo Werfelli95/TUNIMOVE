@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { User, Lock, Bus } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const AgentLogin = () => {
@@ -70,35 +70,10 @@ const AgentLogin = () => {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.2, duration: 0.5 }}
-                    className="flex justify-center w-full mb-4"
+                    className="flex justify-center w-full mb-6"
                 >
-                    <div className="road-container">
-                        <motion.div
-                            animate={{
-                                x: [-2, 2, -2],
-                                y: [0, -1, 0]
-                            }}
-                            transition={{
-                                repeat: Infinity,
-                                duration: 1.5,
-                                ease: "easeInOut"
-                            }}
-                            className="bus-vibration"
-                        >
-                            <Bus size={44} className="text-indigo-600" strokeWidth={1.5} />
-                        </motion.div>
-                        <div className="moving-road" />
-                    </div>
+                    <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '140px', width: 'auto' }} />
                 </motion.div>
-
-                <motion.h1
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.5 }}
-                    className="logo-text"
-                >
-                    TuniMove
-                </motion.h1>
 
                 <motion.p
                     initial={{ opacity: 0 }}

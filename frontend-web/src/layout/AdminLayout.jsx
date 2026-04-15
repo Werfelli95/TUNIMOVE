@@ -74,11 +74,8 @@ const AdminLayout = () => {
   return (
     <div className="admin-layout">
       <aside className="sidebar">
-        <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="bg-indigo-600 p-2 rounded-xl">
-            <Bus className="text-white" size={24} />
-          </div>
-          <span className="text-xl font-bold text-slate-800 tracking-tight">TuniMove</span>
+        <div className="flex items-center justify-center mb-10 px-2">
+          <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '100px', width: 'auto' }} />
         </div>
 
         <nav className="sidebar-nav">
