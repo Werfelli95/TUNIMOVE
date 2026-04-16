@@ -292,3 +292,82 @@ exports.getAdvancedStats = async (req, res) => {
         res.status(500).json({ message: 'Erreur technique lors du calcul des statistiques' });
     }
 };
+
+// Scanner et valider un ticket
+exports.scanTicket = async (req, res) => {
+    const { qr_code } = req.body;
+    if (!qr_code) {
+        return res.status(400).json({ message: "Code QR manquant" });
+    }
+    
+    try {
+        // Rechercher le ticket et extraire les informations pertinentes
+        const checkQuery = `
+            SELECT id_ticket, code_ticket, qr_code, est_scanne, date_scan, date_voyage, type_tarif 
+            FROM ticket 
+            WHERE qr_code = $1 OR code_ticket = $1
+            LIMIT 1
+        `;
+        const result = await db.query(checkQuery, [qr_code]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Ticket introuvable ou invalide" });
+        }
+
+        const ticket = result.rows[0];
+
+        if (ticket.est_scanne) {
+            return res.status(409).json({ 
+                message: "Ticket déjà scanné",
+                date_scan: ticket.date_scan 
+            });
+        }
+
+        // Marquer comme scanné
+        const updateQuery = `
+            UPDATE ticket 
+            SET est_scanne = TRUE, date_scan = NOW() 
+            WHERE id_ticket = $1
+            RETURNING id_ticket, est_scanne, date_scan
+        `;
+        const updated = await db.query(updateQuery, [ticket.id_ticket]);
+
+        res.status(200).json({ 
+            message: "Ticket validé avec succès", 
+            ticket: updated.rows[0] 
+        });
+
+    } catch (err) {
+        console.error('Erreur scanTicket:', err);
+        res.status(500).json({ message: 'Erreur lors de la vérification du ticket' });
+    }
+};
+
+// Manifeste du jour pour un bus donné (utilisé par le Receveur mobile)
+exports.getManifeste = async (req, res) => {
+    const { numero_bus } = req.params;
+    try {
+        const query = `
+            SELECT 
+                t.id_ticket,
+                t.siege,
+                t.type_tarif,
+                t.montant_total,
+                t.heure_depart,
+                t.station_depart,
+                t.station_arrivee,
+                t.date_emission,
+                t.qr_code
+            FROM ticket t
+            JOIN bus b ON t.id_bus = b.id_bus
+            WHERE b.numero_bus = $1
+              AND t.date_emission::date = NOW()::date
+            ORDER BY t.date_emission DESC
+        `;
+        const result = await db.query(query, [numero_bus]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getManifeste:', err);
+        res.status(500).json({ message: 'Erreur lors de la récupération du manifeste' });
+    }
+};

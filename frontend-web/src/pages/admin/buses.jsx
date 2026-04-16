@@ -41,7 +41,7 @@ const Fleet = () => {
             setLoading(true);
             const response = await fetch('http://localhost:5000/api/buses');
             const data = await response.json();
-            setBuses(data);
+            setBuses(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Erreur chargement bus:", error);
         } finally {

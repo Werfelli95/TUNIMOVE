@@ -124,7 +124,7 @@ const Guichet = () => {
                     setLignes(lignesData.filter(l => l.statut_ligne?.toLowerCase() === 'active'));
                 }
 
-                setBuses(busData || []);
+                setBuses(Array.isArray(busData) ? busData : []);
                 setTarifConfig(tarifData || {
                     prix_par_km: 0.1,
                     frais_fixes: 0.4,

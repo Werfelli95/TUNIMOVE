@@ -9,5 +9,7 @@ router.get('/stats/revenue', saleController.getRevenueStats);
 router.get('/stats/passengers', saleController.getPassengerStats);
 router.get('/agent/:agentId/daily', saleController.getAgentDailySales);
 router.get('/stats/advanced', saleController.getAdvancedStats);
+router.post('/tickets/scan', saleController.scanTicket);
+router.get('/bus/:numero_bus/manifeste', saleController.getManifeste);
 
 module.exports = router;

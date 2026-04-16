@@ -43,3 +43,47 @@ exports.loginAgent = async (req, res) => {
         res.status(500).json({ message: 'Erreur serveur' });
     }
 };
+
+exports.loginReceveur = async (req, res) => {
+    const { matricule, password } = req.body;
+    try {
+        const result = await db.query("SELECT * FROM utilisateur WHERE matricule = $1 AND LOWER(role) = 'receveur'", [matricule]);
+        if (result.rows.length === 0) {
+            return res.status(401).json({ message: 'Matricule invalide ou rôle non autorisé' });
+        }
+        const user = result.rows[0];
+        if (password !== user.mot_de_passe) {
+            return res.status(401).json({ message: 'Mot de passe incorrect' });
+        }
+        if (user.est_bloque) {
+            return res.status(403).json({ message: "Votre compte a été suspendu." });
+        }
+
+        // Fetch assignment (bus and line)
+        const affectationResult = await db.query(`
+            SELECT b.numero_bus, l.num_ligne, l.ville_depart, l.ville_arrivee
+            FROM bus b
+            LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
+            WHERE b.id_receveur = $1
+            LIMIT 1
+        `, [user.id_utilisateur]);
+
+        const affectation = affectationResult.rows.length > 0 ? affectationResult.rows[0] : null;
+
+        const token = jwt.sign({ id: user.id_utilisateur, role: 'RECEVEUR' }, process.env.JWT_SECRET, { expiresIn: '1d' });
+        res.json({ 
+            token, 
+            user: { 
+                id: user.id_utilisateur, 
+                matricule: user.matricule, 
+                nom: user.nom, 
+                prenom: user.prenom, 
+                role: 'RECEVEUR' 
+            },
+            affectation
+        });
+    } catch (err) {
+        console.error("Erreur loginReceveur:", err);
+        res.status(500).json({ message: 'Erreur serveur' });
+    }
+};

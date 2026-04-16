@@ -11,6 +11,8 @@ const auditRoutes = require('./routes/auditRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const guichetRoutes = require('./routes/guichetRoutes');
 const passwordResetRoutes = require('./routes/passwordResetRoutes');
+const incidentRoutes = require('./routes/incidentRoutes');
+const receveurServiceRoutes = require('./routes/receveurServiceRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -30,6 +32,8 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/guichets', guichetRoutes);
 app.use('/api/password-reset', passwordResetRoutes);
+app.use('/api/incidents', incidentRoutes);
+app.use('/api/receveur-service', receveurServiceRoutes);
 app.get('/', (req, res) => {
     res.send('TuniMove API is running...');
 });
