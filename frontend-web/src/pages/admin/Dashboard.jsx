@@ -62,6 +62,7 @@ const Dashboard = () => {
   const [revenueData, setRevenueData] = useState([]);
   const [passengerData, setPassengerData] = useState(dataBarDefault);
   const [totalTickets, setTotalTickets] = useState(0);
+  const [rolesData, setRolesData] = useState(null);
   const [avgPrice, setAvgPrice] = useState(0);
   const [advancedStats, setAdvancedStats] = useState({
     topLine: null,
@@ -73,13 +74,14 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const [userRes, busRes, lineRes, guichetRes, revenueRes, passengerRes] = await Promise.all([
+        const [userRes, busRes, lineRes, guichetRes, revenueRes, passengerRes, rolesRes] = await Promise.all([
           fetch('http://localhost:5000/api/users/count'),
           fetch('http://localhost:5000/api/buses/active-count'),
           fetch('http://localhost:5000/api/network/count'),
           fetch('http://localhost:5000/api/guichets/stats'),
           fetch(`http://localhost:5000/api/sales/stats/revenue?period=${period}`),
-          fetch('http://localhost:5000/api/sales/stats/passengers')
+          fetch('http://localhost:5000/api/sales/stats/passengers'),
+          fetch('http://localhost:5000/api/admin/roles-overview')
         ]);
 
         const userData = await userRes.json();
@@ -88,6 +90,10 @@ const Dashboard = () => {
         const guichetData = await guichetRes.json();
         const revData = await revenueRes.json();
         const passData = await passengerRes.json();
+        if (rolesRes.ok) {
+          const rData = await rolesRes.json();
+          setRolesData(rData);
+        }
 
         setPersonnelCount(userData.count);
         setActiveBusCount(busData.count);
@@ -191,6 +197,34 @@ const Dashboard = () => {
           color="purple"
         />
       </div>
+
+      {rolesData && (
+        <div className="mb-8">
+          <h4 className="text-xl font-black text-slate-800 mb-4">Vue d'ensemble Opérationnelle (Rôles)</h4>
+          <div className="grid grid-cols-4 gap-6">
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-indigo-600 font-bold mb-2">Agents de Guichet</p>
+              <h3 className="text-3xl font-black text-indigo-900">{rolesData.agents?.total || 0}</h3>
+              <p className="text-indigo-500 text-xs mt-1 font-medium">Vente en agence</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-blue-600 font-bold mb-2">Receveurs</p>
+              <h3 className="text-3xl font-black text-blue-900">{rolesData.receveurs?.total || 0}</h3>
+              <p className="text-blue-500 text-xs mt-1 font-medium">{rolesData.receveurs?.activeServices || 0} en service actuellement</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-emerald-600 font-bold mb-2">Contrôleurs</p>
+              <h3 className="text-3xl font-black text-emerald-900">{rolesData.controleurs?.total || 0}</h3>
+              <p className="text-emerald-500 text-xs mt-1 font-medium">Validation mobile</p>
+            </div>
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 shadow-sm">
+              <p className="text-rose-600 font-bold mb-2">Incidents (Dernières 24h)</p>
+              <h3 className="text-3xl font-black text-rose-900">{rolesData.incidents?.last24h || 0}</h3>
+              <p className="text-rose-500 text-xs mt-1 font-medium">Signalés terrain</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-6 mb-8">
         <div className="col-span-2 chart-container">
