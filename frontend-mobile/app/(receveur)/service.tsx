@@ -1,24 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, ScrollView, RefreshControl, Modal, TextInput
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Alert, Modal, TextInput, RefreshControl
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Play, Square, Ticket, ClipboardList, Clock, Bus, TrendingUp, MapPin, ChevronRight, AlertTriangle, X } from 'lucide-react-native';
+import {
+  Play, Square, Ticket, ClipboardList, AlertTriangle, X,
+  Clock, TrendingUp, Bus, Navigation, MapPin, ChevronRight,
+  ChevronDown, CheckCircle
+} from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
 
 const BASE = 'http://localhost:5000/api/receveur-service';
+const NET = 'http://localhost:5000/api/network';
 
 interface ActiveService {
   id_service: number;
   num_ligne: string | number;
-  date_service: string;
-  statut: string;
   date_debut: string;
   station_actuelle: string | null;
   voyage_complet: boolean;
   numero_bus: string;
-  capacite: number;
   ville_depart: string;
   ville_arrivee: string;
   nb_tickets: number;
@@ -29,288 +33,317 @@ export default function ServiceScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
 
-  const numero_bus = params.numero_bus as string;
-  const nom = params.nom as string;
-  const prenom = params.prenom as string;
-  const ville_depart = params.ville_depart as string;
-  const ville_arrivee = params.ville_arrivee as string;
+  const numero_bus  = params.numero_bus as string;
+  const nom         = params.nom as string;
+  const prenom      = params.prenom as string;
+  const ville_dep   = params.ville_depart as string;
+  const ville_arr   = params.ville_arrivee as string;
+  const num_ligne   = params.num_ligne as string;
 
-  const [activeService, setActiveService] = useState<ActiveService | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [svc, setSvc]           = useState<ActiveService | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRef]    = useState(false);
   const [starting, setStarting] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [advancing, setAdvancing] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [advancing, setAdv]     = useState(false);
+  const [closing, setClosing]   = useState(false);
   const [stations, setStations] = useState<string[]>([]);
-  const [incidentModal, setIncidentModal] = useState(false);
-  const [incidentRaison, setIncidentRaison] = useState('');
+  const [incModal, setIncModal] = useState(false);
+  const [incRaison, setIncRaison] = useState('');
 
-  const fetchActiveService = async () => {
+  const load = async () => {
+    if (!numero_bus) { setLoading(false); return; }
     try {
-      const res = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(numero_bus)}`);
-      setActiveService(res.data);
-      // Load stations from network if service is active
-      if (res.data?.num_ligne) {
+      const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(numero_bus)}`);
+      setSvc(r.data);
+      if (r.data?.num_ligne) {
         try {
-          const netRes = await axios.get<any[]>('http://localhost:5000/api/network');
-          const ligne = netRes.data.find((l: any) => String(l.num_ligne) === String(res.data!.num_ligne));
+          const net = await axios.get<any[]>(NET);
+          const ligne = net.data.find((l: any) => String(l.num_ligne) === String(r.data!.num_ligne));
           if (ligne) {
             const list = [...(ligne.stations || [])].sort((a: any, b: any) => a.distance_km - b.distance_km);
-            const hasStart = list.some((s: any) => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase());
-            if (!hasStart) list.unshift({ arret: ligne.ville_depart, distance_km: 0 });
+            if (!list.some((s: any) => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase()))
+              list.unshift({ arret: ligne.ville_depart, distance_km: 0 });
+            if (!list.some((s: any) => s.arret.toLowerCase() === ligne.ville_arrivee.toLowerCase()))
+              list.push({ arret: ligne.ville_arrivee, distance_km: 9999 });
             setStations(list.map((s: any) => s.arret));
           }
-        } catch { /* ignore */ }
+        } catch { /**/ }
       }
-    } catch {
-      setActiveService(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } catch { setSvc(null); }
+    finally { setLoading(false); setRef(false); }
   };
 
-  useFocusEffect(useCallback(() => { fetchActiveService(); }, []));
+  useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
-  const handleStart = async () => {
+  // ── Duration ──
+  const elapsedMin = svc
+    ? Math.max(0, Math.floor((Date.now() - new Date(svc.date_debut).getTime()) / 60000))
+    : 0;
+  const durLabel = elapsedMin >= 60
+    ? `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}min`
+    : `${elapsedMin}min`;
+
+  // ── Station progress ──
+  const currentIdx = stations.indexOf(svc?.station_actuelle ?? '');
+  const nextStation = !svc?.voyage_complet && currentIdx >= 0 && currentIdx < stations.length - 1
+    ? stations[currentIdx + 1]
+    : null;
+  const isLastStop = nextStation !== null && currentIdx === stations.length - 2;
+
+  // ── Handlers ──
+  const handleStart = () => Alert.alert(
+    '🚌 Démarrer le service',
+    `Démarrer un service pour le Bus N° ${numero_bus} ?`,
+    [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Démarrer', onPress: async () => {
+        setStarting(true);
+        try {
+          const r = await axios.post(`${BASE}/start`, { numero_bus });
+          const s = r.data.service as ActiveService;
+          setSvc({ ...s, nb_tickets: 0, recette: 0 });
+          Alert.alert('✅ Service démarré', `Service #${s.id_service} démarré.`);
+        } catch (e: any) {
+          Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de démarrer');
+        } finally { setStarting(false); }
+      }}
+    ]
+  );
+
+  const handleAvancer = () => {
+    if (!nextStation || !svc) return;
     Alert.alert(
-      '🚌 Démarrer le service',
-      `Démarrer un nouveau service pour le Bus Nº ${numero_bus} ?`,
+      isLastStop ? '🏁 Destination finale' : '➡️ Prochaine station',
+      `Confirmer l'arrivée à ${nextStation} ?${isLastStop ? '\nLe voyage sera marqué comme terminé.' : ''}`,
       [
         { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Démarrer', onPress: async () => {
-            setStarting(true);
-            try {
-              const res = await axios.post(`${BASE}/start`, { numero_bus });
-              const { service } = res.data as { service: ActiveService };
-              setActiveService({ ...service, nb_tickets: 0, recette: 0 });
-              Alert.alert('✅ Service démarré', `Service #${service.id_service} démarré avec succès !`);
-            } catch (err: any) {
-              Alert.alert('Erreur', err.response?.data?.message || 'Impossible de démarrer le service');
-            } finally {
-              setStarting(false);
-            }
-          }
-        }
+        { text: 'Confirmer', onPress: async () => {
+          setAdv(true);
+          try {
+            const r = await axios.post(`${BASE}/${svc.id_service}/avancer`, {
+              prochaine_station: nextStation,
+              est_derniere: isLastStop,
+            });
+            const up = r.data.service;
+            setSvc(prev => prev ? { ...prev, station_actuelle: up.station_actuelle, voyage_complet: up.voyage_complet } : null);
+            if (isLastStop) Alert.alert('🏁 Voyage terminé !', `Vous êtes à ${nextStation}. Vous pouvez clôturer le service.`);
+          } catch (e: any) {
+            Alert.alert('Erreur', e.response?.data?.message ?? 'Erreur mise à jour');
+          } finally { setAdv(false); }
+        }}
       ]
     );
   };
 
-  const handleClose = async (raison_incident?: string) => {
-    if (!activeService) return;
+  const handleClose = async (raison?: string) => {
+    if (!svc) return;
     setClosing(true);
     try {
-      const body = raison_incident ? { raison_incident } : {};
-      const res = await axios.post(`${BASE}/${activeService.id_service}/close`, body);
-      setActiveService(null);
-      setIncidentModal(false);
-      Alert.alert('✅ Service clôturé', (res.data as any).message);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || 'Impossible de clôturer';
-      Alert.alert('Erreur', msg);
-    } finally {
-      setClosing(false);
-    }
-  };
-
-  const handleAvancer = async () => {
-    if (!activeService || stations.length === 0) return;
-    const idx = stations.indexOf(activeService.station_actuelle || '');
-    const nextIdx = idx + 1;
-    if (nextIdx >= stations.length) return;
-    const prochaine = stations[nextIdx];
-    const estDerniere = nextIdx === stations.length - 1;
-
-    Alert.alert(
-      estDerniere ? '🏁 Destination finale' : '➡️ Prochaine station',
-      `Marquer l'arrivée à ${prochaine} ?${estDerniere ? '\nLe voyage sera terminé.' : ''}`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer', onPress: async () => {
-            setAdvancing(true);
-            try {
-              const res = await axios.post(`${BASE}/${activeService.id_service}/avancer`,
-                { prochaine_station: prochaine, est_derniere: estDerniere }
-              );
-              const updated = (res.data as any).service;
-              setActiveService(prev => prev ? {
-                ...prev,
-                station_actuelle: updated.station_actuelle,
-                voyage_complet: updated.voyage_complet
-              } : null);
-              if (estDerniere) {
-                Alert.alert('🏁 Voyage terminé !', `Le bus est arrivé à ${prochaine}.\nVous pouvez maintenant clôturer le service.`);
-              }
-            } catch (err: any) {
-              Alert.alert('Erreur', err.response?.data?.message || 'Erreur mise à jour station');
-            } finally {
-              setAdvancing(false);
-            }
-          }
-        }
-      ]
-    );
+      const r = await axios.post(`${BASE}/${svc.id_service}/close`, raison ? { raison_incident: raison } : {});
+      setSvc(null);
+      setIncModal(false);
+      Alert.alert('✅ Service clôturé', r.data.message);
+    } catch (e: any) {
+      Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
+    } finally { setClosing(false); }
   };
 
   const navParams = {
     nom, prenom, numero_bus,
-    ville_depart, ville_arrivee,
-    service_id: activeService ? String(activeService.id_service) : '',
-    num_ligne: activeService ? String(activeService.num_ligne) : '',
+    ville_depart: svc?.ville_depart ?? ville_dep,
+    ville_arrivee: svc?.ville_arrivee ?? ville_arr,
+    num_ligne: svc ? String(svc.num_ligne) : num_ligne,
+    service_id: svc ? String(svc.id_service) : '',
   };
 
-  const elapsed = activeService
-    ? Math.floor((Date.now() - new Date(activeService.date_debut).getTime()) / 60000)
-    : 0;
-  const hours = Math.floor(elapsed / 60);
-  const mins = elapsed % 60;
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a3a52" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
+  );
 
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
-        style={styles.container}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchActiveService(); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRef(true); load(); }} />}
+        showsVerticalScrollIndicator={false}
       >
-        {activeService ? (
-          /* ── ACTIVE SERVICE VIEW ── */
+        {svc ? (
+          /* ══════════ ACTIVE SERVICE ══════════ */
           <>
-            <View style={styles.activeBanner}>
-              <View style={styles.activeDot} />
-              <Text style={styles.activeBannerText}>Service en cours</Text>
-              <Text style={styles.serviceId}>#{activeService.id_service}</Text>
+            {/* ── Service Header ── */}
+            <View style={styles.serviceHeader}>
+              <View style={styles.serviceHeaderTop}>
+                <View style={styles.activePill}>
+                  <View style={styles.activeDot} />
+                  <Text style={styles.activePillText}>EN SERVICE</Text>
+                </View>
+                <Text style={styles.serviceNum}>#{svc.id_service}</Text>
+              </View>
+              <View style={styles.serviceHeaderInfo}>
+                <View style={styles.sInfoItem}>
+                  <Bus color={Colors.accent} size={14} />
+                  <Text style={styles.sInfoText}>Bus {svc.numero_bus}</Text>
+                </View>
+                <View style={styles.sInfoDot} />
+                <View style={styles.sInfoItem}>
+                  <Navigation color={Colors.accent} size={14} />
+                  <Text style={styles.sInfoText}>Ligne {svc.num_ligne}</Text>
+                </View>
+                <View style={styles.sInfoDot} />
+                <View style={styles.sInfoItem}>
+                  <Clock color={Colors.accent} size={14} />
+                  <Text style={styles.sInfoText}>
+                    {new Date(svc.date_debut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </View>
             </View>
 
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Clock color="#1a3a52" size={22} />
-                <Text style={styles.statValue}>{hours > 0 ? `${hours}h ` : ''}{mins}min</Text>
-                <Text style={styles.statLabel}>Durée</Text>
+            {/* ── KPI Cards ── */}
+            <View style={styles.kpiRow}>
+              <View style={styles.kpiCard}>
+                <Clock color={Colors.primary} size={18} />
+                <Text style={styles.kpiVal}>{durLabel}</Text>
+                <Text style={styles.kpiLbl}>Durée</Text>
               </View>
-              <View style={styles.statBox}>
-                <Ticket color="#d97706" size={22} />
-                <Text style={styles.statValue}>{activeService.nb_tickets}</Text>
-                <Text style={styles.statLabel}>Billets</Text>
+              <View style={styles.kpiCard}>
+                <Ticket color={Colors.warning} size={18} />
+                <Text style={styles.kpiVal}>{svc.nb_tickets}</Text>
+                <Text style={styles.kpiLbl}>Billets</Text>
               </View>
-              <View style={styles.statBox}>
-                <TrendingUp color="#16a34a" size={22} />
-                <Text style={styles.statValue}>{parseFloat(String(activeService.recette)).toFixed(0)}</Text>
-                <Text style={styles.statLabel}>TND</Text>
+              <View style={styles.kpiCard}>
+                <TrendingUp color={Colors.success} size={18} />
+                <Text style={styles.kpiVal}>{parseFloat(String(svc.recette)).toFixed(1)}</Text>
+                <Text style={styles.kpiLbl}>TND</Text>
               </View>
             </View>
 
-            {/* Station progress */}
-            <View style={styles.stationCard}>
-              <View style={styles.stationHeader}>
-                <MapPin color="#1a3a52" size={18} />
-                <Text style={styles.stationTitle}>Progression du voyage</Text>
-                {activeService.voyage_complet && (
-                  <View style={styles.voyageBadge}>
-                    <Text style={styles.voyageBadgeTxt}>✅ Terminé</Text>
+            {/* ── Route Progress ── */}
+            <View style={styles.routeCard}>
+              <View style={styles.routeHeader}>
+                <MapPin color={Colors.primary} size={16} />
+                <Text style={styles.routeTitle}>Progression du trajet</Text>
+                {svc.voyage_complet && (
+                  <View style={styles.doneBadge}>
+                    <CheckCircle color={Colors.success} size={12} />
+                    <Text style={styles.doneBadgeText}>Terminé</Text>
                   </View>
                 )}
               </View>
 
-              {/* Station list */}
-              {stations.map((st, i) => {
-                const isCurrent = st === activeService.station_actuelle;
-                const isPast = stations.indexOf(activeService.station_actuelle || '') > i || activeService.voyage_complet;
-                const isLast = i === stations.length - 1;
-                return (
-                  <View key={st} style={styles.stationItem}>
-                    <View style={styles.stationDotCol}>
-                      <View style={[styles.stationDot,
-                        isCurrent && styles.dotCurrent,
-                        isPast && !isCurrent && styles.dotPast
-                      ]} />
-                      {!isLast && <View style={[styles.stationLine, isPast && styles.linePast]} />}
-                    </View>
-                    <Text style={[styles.stationName,
-                      isCurrent && styles.stationNameCurrent,
-                      isPast && !isCurrent && styles.stationNamePast
-                    ]}>{st}{isCurrent ? ' ← (ici)' : ''}</Text>
-                  </View>
-                );
-              })}
+              <View style={styles.dirRow}>
+                <Text style={styles.dirFrom}>{svc.ville_depart || '—'}</Text>
+                <ChevronRight color={Colors.textMuted} size={14} />
+                <Text style={styles.dirTo}>{svc.ville_arrivee || '—'}</Text>
+              </View>
 
-              {/* Avancer button */}
-              {!activeService.voyage_complet && stations.length > 0 && (
+              {stations.length > 0 && (
+                <View style={styles.timeline}>
+                  {stations.map((st, i) => {
+                    const isPast = (currentIdx >= 0 && i < currentIdx) || svc.voyage_complet;
+                    const isCur = st === svc.station_actuelle && !svc.voyage_complet;
+                    const isNext = i === currentIdx + 1 && !svc.voyage_complet;
+                    const isLast = i === stations.length - 1;
+
+                    return (
+                      <View key={st} style={styles.tlItem}>
+                        <View style={styles.tlLeft}>
+                          <View style={[
+                            styles.tlDot,
+                            isPast && !isCur && styles.dotDone,
+                            isCur && styles.dotCur,
+                            isNext && styles.dotNext,
+                          ]} />
+                          {!isLast && <View style={[styles.tlLine, (isPast && !isCur) && styles.lineDone]} />}
+                        </View>
+                        <View style={styles.tlContent}>
+                          <Text style={[
+                            styles.tlStation,
+                            isCur && styles.tlCur,
+                            isPast && !isCur && styles.tlPast,
+                            isNext && styles.tlNext,
+                          ]}>
+                            {st}
+                            {isCur ? ' ← ici' : ''}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Avancer Button */}
+              {!svc.voyage_complet && nextStation && (
                 <TouchableOpacity
                   style={[styles.avancerBtn, advancing && styles.btnDisabled]}
                   onPress={handleAvancer}
                   disabled={advancing}
                 >
-                  {advancing ? <ActivityIndicator color="#fff" size="small" /> : (
-                    <>
-                      <ChevronRight color="#fff" size={20} />
-                      <Text style={styles.avancerBtnTxt}>
-                        {activeService.station_actuelle === stations[stations.length - 2]
-                          ? '🏁 Arriver à destination'
-                          : 'Prochaine station'}
-                      </Text>
-                    </>
-                  )}
+                  {advancing
+                    ? <ActivityIndicator color={Colors.white} size="small" />
+                    : <><ChevronRight color={Colors.white} size={18} /><Text style={styles.avancerBtnText}>
+                        {isLastStop ? '🏁 Arriver à destination' : `Prochaine : ${nextStation}`}
+                      </Text></>
+                  }
                 </TouchableOpacity>
               )}
             </View>
 
-            {/* Action buttons */}
+            {/* ── Action Buttons ── */}
             <TouchableOpacity
-              style={styles.sellBtn}
+              style={styles.primaryBtn}
               onPress={() => router.push({ pathname: '/(receveur)/vente', params: navParams })}
             >
-              <Ticket color="#1a3a52" size={22} />
-              <Text style={styles.sellBtnText}>Vendre un billet</Text>
+              <Ticket color={Colors.primary} size={20} />
+              <Text style={styles.primaryBtnText}>Émettre un billet</Text>
+              <ChevronRight color={Colors.primary} size={18} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.manifesteBtn}
-              onPress={() => router.push({ pathname: '/(receveur)/manifeste', params: { ...navParams, service_id: String(activeService.id_service) } })}
+              style={styles.secondaryBtn}
+              onPress={() => router.push({ pathname: '/(receveur)/manifeste', params: navParams })}
             >
-              <ClipboardList color="#0284c7" size={22} />
-              <Text style={styles.manifesteBtnText}>Voir le manifeste ({activeService.nb_tickets})</Text>
+              <ClipboardList color={Colors.info} size={20} />
+              <Text style={styles.secondaryBtnText}>Manifeste ({svc.nb_tickets} passager{svc.nb_tickets !== 1 ? 's' : ''})</Text>
+              <ChevronRight color={Colors.info} size={16} style={{ marginLeft: 'auto' }} />
             </TouchableOpacity>
 
-            {/* Close — only if voyage complete */}
-            {activeService.voyage_complet ? (
+            {/* Close / Incident */}
+            {svc.voyage_complet ? (
               <TouchableOpacity
                 style={[styles.closeBtn, closing && styles.btnDisabled]}
                 onPress={() => handleClose()}
                 disabled={closing}
               >
-                {closing ? <ActivityIndicator color="#fff" /> : (
-                  <><Square color="#fff" size={20} /><Text style={styles.closeBtnText}>Clôturer le service</Text></>
-                )}
+                {closing
+                  ? <ActivityIndicator color={Colors.white} />
+                  : <><Square color={Colors.white} size={18} /><Text style={styles.closeBtnText}>Clôturer le service</Text></>
+                }
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 style={styles.incidentBtn}
-                onPress={() => setIncidentModal(true)}
+                onPress={() => setIncModal(true)}
               >
-                <AlertTriangle color="#dc2626" size={20} />
-                <Text style={styles.incidentBtnTxt}>Terminer pour incident</Text>
+                <AlertTriangle color={Colors.danger} size={18} />
+                <Text style={styles.incidentBtnText}>Terminer pour incident</Text>
               </TouchableOpacity>
             )}
           </>
         ) : (
-          /* ── NO ACTIVE SERVICE ── */
+          /* ══════════ NO SERVICE ══════════ */
           <>
             <View style={styles.idleCard}>
-              <Bus color="#cbd5e1" size={72} />
-              <Text style={styles.idleTitle}>Aucun service en cours</Text>
-              <Text style={styles.idleSub}>Bus Nº {numero_bus} · {ville_depart} → {ville_arrivee}</Text>
-              <Text style={styles.idleHint}>Démarrez un service pour commencer la vente de billets.</Text>
+              <View style={styles.idleIconWrap}>
+                <Bus color={Colors.textLight} size={48} />
+              </View>
+              <Text style={styles.idleTitle}>Aucun service actif</Text>
+              <Text style={styles.idleSub}>Bus N° {numero_bus}</Text>
+              <Text style={styles.idleRoute}>{ville_dep} → {ville_arr}</Text>
+              <Text style={styles.idleHint}>
+                Démarrez un service pour commencer à vendre des billets et suivre les passagers.
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -318,174 +351,202 @@ export default function ServiceScreen() {
               onPress={handleStart}
               disabled={starting}
             >
-              {starting ? <ActivityIndicator color="#1a3a52" /> : (
-                <>
-                  <Play color="#1a3a52" size={24} />
-                  <Text style={styles.startBtnText}>Démarrer le service</Text>
-                </>
-              )}
+              {starting
+                ? <ActivityIndicator color={Colors.primary} />
+                : <><Play color={Colors.primary} size={22} /><Text style={styles.startBtnText}>Démarrer le service</Text></>
+              }
             </TouchableOpacity>
           </>
         )}
       </ScrollView>
 
-      {/* ── Incident Modal ── */}
-      <Modal visible={incidentModal} animationType="slide" transparent>
+      {/* ── Incident Close Modal ── */}
+      <Modal visible={incModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <AlertTriangle color="#dc2626" size={26} />
-              <Text style={styles.modalTitle}>Signaler un incident</Text>
-              <TouchableOpacity onPress={() => setIncidentModal(false)} style={{ marginLeft: 'auto' }}>
-                <X color="#64748b" size={22} />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.modalHeaderRow}>
+              <AlertTriangle color={Colors.danger} size={22} />
+              <Text style={styles.modalTitle}>Clôture pour incident</Text>
+              <TouchableOpacity onPress={() => setIncModal(false)} style={styles.modalClose}>
+                <X color={Colors.textMuted} size={20} />
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.modalSubtext}>Décrivez l'incident pour autoriser la clôture anticipée du service :</Text>
-
+            <Text style={styles.modalSub}>
+              Décrivez l'incident pour autoriser la clôture anticipée du service :
+            </Text>
             <TextInput
               style={styles.incidentInput}
-              placeholder="Ex: panne moteur, accident, passager malaise..."
-              placeholderTextColor="#94a3b8"
-              value={incidentRaison}
-              onChangeText={setIncidentRaison}
+              placeholder="Ex: panne moteur, accident, malaise passager..."
+              value={incRaison}
+              onChangeText={setIncRaison}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              placeholderTextColor={Colors.textLight}
             />
-
             <TouchableOpacity
-              style={[styles.modalConfirmBtn, (!incidentRaison.trim() || closing) && styles.btnDisabled]}
-              disabled={!incidentRaison.trim() || closing}
-              onPress={() => handleClose(incidentRaison.trim())}
+              style={[styles.modalConfirm, (!incRaison.trim() || closing) && styles.btnDisabled]}
+              onPress={() => handleClose(incRaison.trim())}
+              disabled={!incRaison.trim() || closing}
             >
-              {closing ? <ActivityIndicator color="#fff" /> : (
-                <Text style={styles.modalConfirmTxt}>Clôturer pour incident</Text>
-              )}
+              {closing
+                ? <ActivityIndicator color={Colors.white} />
+                : <Text style={styles.modalConfirmText}>Clôturer pour incident</Text>
+              }
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 20, paddingBottom: 40 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: Colors.bgLight },
+  content: { padding: Spacing.base, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
 
-  activeBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#dcfce7', borderRadius: 16,
-    padding: 14, marginBottom: 16,
+  // Service Header
+  serviceHeader: {
+    backgroundColor: Colors.primary, borderRadius: Radius.xl,
+    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.strong,
   },
-  activeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#16a34a', marginRight: 10 },
-  activeBannerText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#15803d' },
-  serviceId: { fontSize: 18, fontWeight: '900', color: '#166534' },
+  serviceHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm },
+  activePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.success + '30', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill,
+  },
+  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success },
+  activePillText: { fontSize: 10, fontWeight: '800', color: Colors.success, letterSpacing: 1 },
+  serviceNum: { fontSize: 22, fontWeight: '900', color: Colors.white },
+  serviceHeaderInfo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm },
+  sInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sInfoText: { fontSize: 12, color: Colors.white + 'CC', fontWeight: '600' },
+  sInfoDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: Colors.white + '50' },
 
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  statBox: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center',
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+  // KPI
+  kpiRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  kpiCard: {
+    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.lg,
+    padding: Spacing.md, alignItems: 'center', gap: 4, ...Shadow.card,
   },
-  statValue: { fontSize: 22, fontWeight: '800', color: '#1e293b', marginTop: 6 },
-  statLabel: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  kpiVal: { fontSize: 18, fontWeight: '900', color: Colors.textDark },
+  kpiLbl: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // Station tracker
-  stationCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16,
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+  // Route
+  routeCard: {
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
+    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
   },
-  stationHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  stationTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: '#334155' },
-  voyageBadge: { backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  voyageBadgeTxt: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
-  stationItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
-  stationDotCol: { alignItems: 'center', width: 20 },
-  stationDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#e2e8f0', borderWidth: 2, borderColor: '#cbd5e1' },
-  dotCurrent: { backgroundColor: '#1a3a52', borderColor: '#1a3a52', width: 18, height: 18, borderRadius: 9 },
-  dotPast: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
-  stationLine: { width: 2, height: 22, backgroundColor: '#e2e8f0', marginTop: 2 },
-  linePast: { backgroundColor: '#16a34a' },
-  stationName: { fontSize: 13, color: '#94a3b8', paddingTop: 1, paddingBottom: 22 },
-  stationNameCurrent: { color: '#1a3a52', fontWeight: '800', fontSize: 14 },
-  stationNamePast: { color: '#16a34a', fontWeight: '600' },
+  routeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm },
+  routeTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textDark },
+  doneBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.successLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
+  },
+  doneBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.success },
+  dirRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
+  dirFrom: { fontSize: 13, fontWeight: '700', color: Colors.primary },
+  dirTo: { fontSize: 13, fontWeight: '700', color: Colors.danger },
+
+  // Timeline
+  timeline: { gap: 0 },
+  tlItem: { flexDirection: 'row', gap: 10 },
+  tlLeft: { alignItems: 'center', width: 18 },
+  tlDot: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: Colors.bgMid, borderWidth: 2, borderColor: Colors.border, marginTop: 2,
+  },
+  dotDone: { backgroundColor: Colors.success, borderColor: Colors.success },
+  dotCur: { backgroundColor: Colors.primary, borderColor: Colors.primary, width: 18, height: 18, borderRadius: 9, marginTop: 0 },
+  dotNext: { borderColor: Colors.primary, borderStyle: 'dashed' },
+  tlLine: { width: 2, flex: 1, backgroundColor: Colors.border, marginTop: 2, marginBottom: 2 },
+  lineDone: { backgroundColor: Colors.success },
+  tlContent: { flex: 1, paddingBottom: 16, paddingTop: 0 },
+  tlStation: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
+  tlCur: { color: Colors.primary, fontWeight: '800', fontSize: 14 },
+  tlPast: { color: Colors.success, fontWeight: '600' },
+  tlNext: { color: Colors.primary, fontWeight: '600' },
 
   avancerBtn: {
-    backgroundColor: '#1a3a52', height: 46, borderRadius: 12, marginTop: 12,
+    backgroundColor: Colors.primary, height: 44, borderRadius: Radius.md, marginTop: Spacing.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  avancerBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  avancerBtnText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
 
-  infoCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16,
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+  // Action Buttons
+  primaryBtn: {
+    backgroundColor: Colors.accent, height: 56, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base,
+    gap: 10, marginBottom: Spacing.sm, ...Shadow.accent,
   },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  infoText: { fontSize: 14, color: '#475569', marginLeft: 10 },
-  infoBold: { fontWeight: '700', color: '#1e293b' },
+  primaryBtnText: { fontSize: 15, fontWeight: '800', color: Colors.primary, flex: 1 },
 
-  sellBtn: {
-    backgroundColor: '#fbbf24', height: 60, borderRadius: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12,
-    shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  secondaryBtn: {
+    backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base,
+    gap: 10, marginBottom: Spacing.md, ...Shadow.card,
+    borderWidth: 1.5, borderColor: Colors.infoLight,
   },
-  sellBtnText: { fontSize: 17, fontWeight: '800', color: '#1a3a52' },
-
-  manifesteBtn: {
-    backgroundColor: '#e0f2fe', height: 52, borderRadius: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16,
-    borderWidth: 1, borderColor: '#bae6fd',
-  },
-  manifesteBtnText: { fontSize: 15, fontWeight: '700', color: '#0284c7' },
+  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: Colors.info, flex: 1 },
 
   closeBtn: {
-    backgroundColor: '#16a34a', height: 52, borderRadius: 16,
+    backgroundColor: Colors.success, height: 50, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    marginBottom: Spacing.sm,
   },
-  closeBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  closeBtnText: { fontSize: 15, fontWeight: '800', color: Colors.white },
 
   incidentBtn: {
-    height: 48, borderRadius: 16, borderWidth: 2, borderColor: '#fca5a5',
+    height: 48, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#fff5f5',
+    borderWidth: 1.5, borderColor: Colors.danger + '50',
+    backgroundColor: Colors.dangerLight,
   },
-  incidentBtnTxt: { fontSize: 14, fontWeight: '700', color: '#dc2626' },
+  incidentBtnText: { fontSize: 13, fontWeight: '700', color: Colors.danger },
 
-  btnDisabled: { opacity: 0.6 },
+  btnDisabled: { opacity: 0.5 },
 
+  // Idle
   idleCard: {
-    alignItems: 'center', backgroundColor: '#fff', borderRadius: 24,
-    padding: 40, marginBottom: 24,
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    backgroundColor: Colors.white, borderRadius: Radius.xxl,
+    padding: Spacing.xl, alignItems: 'center', marginBottom: Spacing.lg, ...Shadow.card,
   },
-  idleTitle: { fontSize: 20, fontWeight: '700', color: '#334155', marginTop: 20 },
-  idleSub: { fontSize: 14, color: '#64748b', marginTop: 6 },
-  idleHint: { fontSize: 13, color: '#94a3b8', marginTop: 12, textAlign: 'center', lineHeight: 20 },
+  idleIconWrap: {
+    width: 80, height: 80, borderRadius: 20,
+    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
+  },
+  idleTitle: { fontSize: 20, fontWeight: '800', color: Colors.textMid, marginBottom: 4 },
+  idleSub: { fontSize: 14, fontWeight: '700', color: Colors.primary, marginBottom: 4 },
+  idleRoute: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.md },
+  idleHint: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
 
   startBtn: {
-    backgroundColor: '#fbbf24', height: 64, borderRadius: 20,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14,
-    shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+    backgroundColor: Colors.accent, height: 60, borderRadius: Radius.xl,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadow.accent,
   },
-  startBtnText: { fontSize: 18, fontWeight: '800', color: '#1a3a52' },
+  startBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalBox: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24,
+  modalSheet: {
+    backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: Spacing.xl, paddingBottom: 40,
   },
-  modalTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: '#1e293b', marginLeft: 10 },
-  modalSubtext: { fontSize: 14, color: '#64748b', marginBottom: 12, lineHeight: 20 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
+  modalHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
+  modalTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.textDark },
+  modalClose: { padding: 4 },
+  modalSub: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.md, lineHeight: 20 },
   incidentInput: {
-    borderWidth: 1, borderColor: '#fca5a5', borderRadius: 12, padding: 14,
-    fontSize: 14, color: '#1e293b', backgroundColor: '#fff5f5',
-    minHeight: 100, marginBottom: 16,
+    borderWidth: 1.5, borderColor: Colors.danger + '50', borderRadius: Radius.md,
+    padding: Spacing.md, fontSize: 14, color: Colors.textDark,
+    backgroundColor: Colors.dangerLight + '30', minHeight: 90, marginBottom: Spacing.base,
   },
-  modalConfirmBtn: {
-    backgroundColor: '#dc2626', height: 52, borderRadius: 14,
+  modalConfirm: {
+    backgroundColor: Colors.danger, height: 52, borderRadius: Radius.lg,
     alignItems: 'center', justifyContent: 'center',
   },
-  modalConfirmTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  modalConfirmText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
 });

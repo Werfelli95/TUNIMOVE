@@ -1,53 +1,87 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
+// ─── TuniMove Design System ────────────────────────────────────────────────
 export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  // Brand
+  primary: '#163A59',
+  primaryLight: '#1F4B6E',
+  accent: '#F5B700',
+  accentDark: '#D4A000',
+
+  // Semantic
+  success: '#16A34A',
+  successLight: '#DCFCE7',
+  warning: '#F59E0B',
+  warningLight: '#FEF3C7',
+  danger: '#DC2626',
+  dangerLight: '#FEE2E2',
+  info: '#0284C7',
+  infoLight: '#E0F2FE',
+
+  // Neutrals
+  bgLight: '#F4F6F8',
+  bgMid: '#EDF0F3',
+  white: '#FFFFFF',
+  divider: '#E2E8F0',
+  border: '#CBD5E1',
+
+  // Text
+  textDark: '#0F172A',
+  textMid: '#334155',
+  textMuted: '#64748B',
+  textLight: '#94A3B8',
+  textWhite: '#FFFFFF',
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+export const Typography = {
+  pageTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.textDark, letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 18, fontWeight: '700' as const, color: Colors.textDark },
+  cardTitle: { fontSize: 15, fontWeight: '700' as const, color: Colors.textDark },
+  body: { fontSize: 14, fontWeight: '400' as const, color: Colors.textMid },
+  bodyMedium: { fontSize: 14, fontWeight: '600' as const, color: Colors.textMid },
+  label: { fontSize: 12, fontWeight: '500' as const, color: Colors.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  caption: { fontSize: 12, fontWeight: '400' as const, color: Colors.textMuted },
+  smallBold: { fontSize: 11, fontWeight: '700' as const, color: Colors.textMuted },
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  base: 16,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
+  xxxl: 40,
+};
+
+export const Radius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  pill: 100,
+};
+
+export const Shadow = {
+  card: {
+    shadowColor: '#1E3A5F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+  strong: {
+    shadowColor: '#163A59',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  accent: {
+    shadowColor: '#F5B700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
   },
-});
+};

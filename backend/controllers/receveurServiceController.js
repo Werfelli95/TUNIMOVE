@@ -97,7 +97,7 @@ exports.closeService = async (req, res) => {
         const svc = check.rows[0];
         if (!svc.voyage_complet && !raison_incident) {
             return res.status(403).json({
-                message: 'Le service ne peut être clôturé que si le voyage est terminé ou en cas d'incident.'
+                message: `Le service ne peut être clôturé que si le voyage est terminé ou en cas d'incident.`
             });
         }
 

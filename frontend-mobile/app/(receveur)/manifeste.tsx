@@ -1,184 +1,312 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
-  ActivityIndicator, TouchableOpacity, RefreshControl
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, TextInput, RefreshControl
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Users, RefreshCw, Ticket } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import {
+  Users, Ticket, MapPin, Clock, Search, RefreshCw,
+  TrendingUp, ArrowRight, AlertCircle, Plus
+} from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api/sales/bus';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 
 interface TicketItem {
   id_ticket: number;
+  code_ticket: string;
   siege: string;
   type_tarif: string;
-  montant_total: string;
+  montant_total: number;
   heure_depart: string;
   station_depart: string;
   station_arrivee: string;
   date_emission: string;
 }
 
+const TARIF_COLOR: Record<string, string> = {
+  'Tarif Plein': Colors.primary,
+  'Étudiant': Colors.success,
+  'Handicapé': Colors.warning,
+};
+
 export default function ManifesteScreen() {
   const params = useLocalSearchParams();
+  const router = useRouter();
+
   const numero_bus = params.numero_bus as string;
   const ville_depart = params.ville_depart as string;
   const ville_arrivee = params.ville_arrivee as string;
   const service_id = params.service_id as string;
+  const num_ligne = params.num_ligne as string;
+  const nom = params.nom as string;
+  const prenom = params.prenom as string;
 
   const [tickets, setTickets] = useState<TicketItem[]>([]);
+  const [filtered, setFiltered] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
   const fetchManifeste = async () => {
     try {
-      let url: string;
-      if (service_id) {
-        // Fetch tickets for the specific service (more accurate)
-        url = `http://localhost:5000/api/receveur-service/${service_id}/tickets`;
-      } else {
-        // Fallback: all tickets for this bus today
-        url = `http://localhost:5000/api/sales/bus/${encodeURIComponent(numero_bus)}/manifeste`;
-      }
+      let url = service_id
+        ? `http://localhost:5000/api/receveur-service/${service_id}/tickets`
+        : `http://localhost:5000/api/sales/bus/${encodeURIComponent(numero_bus)}/manifeste`;
       const res = await axios.get<TicketItem[]>(url);
       setTickets(res.data);
-    } catch (err) {
+      setFiltered(res.data);
+    } catch {
       setTickets([]);
+      setFiltered([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { fetchManifeste(); }, []);
+  useFocusEffect(useCallback(() => { fetchManifeste(); }, []));
 
-  const onRefresh = () => { setRefreshing(true); fetchManifeste(); };
-
-  const TARIF_COLORS: Record<string, string> = {
-    'Normal': '#6366f1',
-    'Étudiant': '#059669',
-    'Militaire': '#d97706',
+  const handleSearch = (q: string) => {
+    setSearch(q);
+    if (!q.trim()) { setFiltered(tickets); return; }
+    const lower = q.toLowerCase();
+    setFiltered(tickets.filter(t =>
+      t.siege?.toLowerCase().includes(lower) ||
+      t.station_depart?.toLowerCase().includes(lower) ||
+      t.station_arrivee?.toLowerCase().includes(lower) ||
+      t.type_tarif?.toLowerCase().includes(lower) ||
+      t.code_ticket?.toLowerCase().includes(lower)
+    ));
   };
 
-  const renderItem = ({ item, index }: { item: TicketItem; index: number }) => (
-    <View style={styles.ticketCard}>
-      <View style={styles.ticketLeft}>
-        <Text style={styles.ticketNum}>#{index + 1}</Text>
-        <View style={[styles.tarifBadge, { backgroundColor: TARIF_COLORS[item.type_tarif] || '#94a3b8' }]}>
-          <Text style={styles.tarifText}>{item.type_tarif}</Text>
+  const totalRevenue = tickets.reduce((s, t) => s + parseFloat(String(t.montant_total || 0)), 0);
+
+  const renderTicket = ({ item, index }: { item: TicketItem; index: number }) => {
+    const tarifColor = TARIF_COLOR[item.type_tarif] || Colors.primaryLight;
+    const emissionTime = item.date_emission
+      ? new Date(item.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : '—';
+    return (
+      <View style={styles.ticketCard}>
+        <View style={styles.ticketTop}>
+          <View style={[styles.ticketIndex, { backgroundColor: Colors.primary + '12' }]}>
+            <Text style={styles.ticketIndexTxt}>{index + 1}</Text>
+          </View>
+          <View style={styles.ticketRoute}>
+            <Text style={styles.ticketStation}>{item.station_depart || '—'}</Text>
+            <View style={styles.ticketArrow}>
+              <View style={styles.ticketLine} />
+              <ArrowRight color={Colors.textMuted} size={12} />
+            </View>
+            <Text style={styles.ticketStation}>{item.station_arrivee || '—'}</Text>
+          </View>
+          <Text style={styles.ticketPrice}>{parseFloat(String(item.montant_total || 0)).toFixed(3)} TND</Text>
+        </View>
+
+        <View style={styles.ticketMeta}>
+          <View style={styles.ticketBadge}>
+            <Text style={styles.ticketSiege}>Siège {item.siege || '—'}</Text>
+          </View>
+          <View style={[styles.ticketTarifBadge, { backgroundColor: tarifColor + '18' }]}>
+            <Text style={[styles.ticketTarifText, { color: tarifColor }]}>{item.type_tarif}</Text>
+          </View>
+          <View style={styles.ticketTimeBadge}>
+            <Clock color={Colors.textMuted} size={11} />
+            <Text style={styles.ticketTime}>{item.heure_depart || emissionTime}</Text>
+          </View>
         </View>
       </View>
-      <View style={styles.ticketInfo}>
-        <Text style={styles.ticketSiege}>Siège {item.siege || '—'}</Text>
-        <Text style={styles.ticketHeure}>{item.heure_depart ? String(item.heure_depart).substring(0, 5) : '—'}</Text>
-        <Text style={styles.ticketDate}>
-          {new Date(item.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={Colors.primary} size="large" />
       </View>
-      <Text style={styles.ticketPrix}>{parseFloat(item.montant_total || '0').toFixed(3)} TND</Text>
-    </View>
-  );
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Users color="#fbbf24" size={22} />
-          <Text style={styles.headerTitle}>Bus Nº {numero_bus}</Text>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <View style={styles.container}>
+        {/* ── Summary Card ── */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}>
+            <View>
+              <Text style={styles.summaryTitle}>Manifeste du service</Text>
+              {service_id
+                ? <Text style={styles.summarySubtitle}>Service #{service_id} · Bus {numero_bus}</Text>
+                : <Text style={styles.summarySubtitle}>Bus {numero_bus} · Aujourd'hui</Text>
+              }
+              {ville_depart && (
+                <Text style={styles.summaryRoute}>{ville_depart} → {ville_arrivee}</Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.summaryStats}>
+            <View style={styles.summaryStat}>
+              <Users color={Colors.primary} size={18} />
+              <Text style={styles.summaryStatVal}>{tickets.length}</Text>
+              <Text style={styles.summaryStatLabel}>Passagers</Text>
+            </View>
+            <View style={styles.summaryStatDiv} />
+            <View style={styles.summaryStat}>
+              <TrendingUp color={Colors.success} size={18} />
+              <Text style={styles.summaryStatVal}>{totalRevenue.toFixed(2)}</Text>
+              <Text style={styles.summaryStatLabel}>TND</Text>
+            </View>
+            <View style={styles.summaryStatDiv} />
+            <View style={styles.summaryStat}>
+              <Ticket color={Colors.warning} size={18} />
+              <Text style={styles.summaryStatVal}>{num_ligne || '—'}</Text>
+              <Text style={styles.summaryStatLabel}>Ligne</Text>
+            </View>
+          </View>
         </View>
-        {ville_depart && ville_arrivee && (
-          <Text style={styles.headerRoute}>{ville_depart} → {ville_arrivee}</Text>
+
+        {/* ── Search + Refresh ── */}
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Search color={Colors.textMuted} size={16} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Siège, station, tarif..."
+              value={search}
+              onChangeText={handleSearch}
+              placeholderTextColor={Colors.textLight}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={() => { setRefreshing(true); fetchManifeste(); }}
+          >
+            <RefreshCw color={Colors.primary} size={18} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── List ── */}
+        {filtered.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={styles.emptyIcon}>
+              <Users color={Colors.textLight} size={40} />
+            </View>
+            <Text style={styles.emptyTitle}>Aucun passager</Text>
+            <Text style={styles.emptySub}>
+              {search
+                ? 'Aucun résultat pour cette recherche.'
+                : 'Le manifeste est vide. Émettez le premier billet.'}
+            </Text>
+            {!search && service_id && (
+              <TouchableOpacity
+                style={styles.emptyBtn}
+                onPress={() => router.push({
+                  pathname: '/(receveur)/vente',
+                  params: { nom, prenom, numero_bus, ville_depart, ville_arrivee, num_ligne, service_id }
+                })}
+              >
+                <Plus color={Colors.white} size={16} />
+                <Text style={styles.emptyBtnText}>Émettre un premier billet</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            renderItem={renderTicket}
+            keyExtractor={t => String(t.id_ticket)}
+            contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: 40 }}
+            ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchManifeste(); }} />
+            }
+            showsVerticalScrollIndicator={false}
+          />
         )}
-        <Text style={styles.headerDate}>
-          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </Text>
       </View>
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>{tickets.length}</Text>
-          <Text style={styles.statLabel}>Passagers</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>
-            {tickets.reduce((sum, t) => sum + parseFloat(t.montant_total || '0'), 0).toFixed(3)}
-          </Text>
-          <Text style={styles.statLabel}>TND encaissés</Text>
-        </View>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#1a3a52" style={{ marginTop: 40 }} />
-      ) : tickets.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ticket color="#cbd5e1" size={64} />
-          <Text style={styles.emptyText}>Aucun passager enregistré aujourd'hui</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={tickets}
-          keyExtractor={(item) => String(item.id_ticket)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        />
-      )}
-
-      <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
-        <RefreshCw color="#fff" size={18} />
-        <Text style={styles.refreshText}>Actualiser</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: {
-    backgroundColor: '#1a3a52', padding: 20, paddingTop: 24,
-    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+  safe: { flex: 1, backgroundColor: Colors.bgLight },
+  container: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
+
+  // Summary Card
+  summaryCard: {
+    backgroundColor: Colors.primary, margin: Spacing.base,
+    borderRadius: Radius.xl, padding: Spacing.base, ...Shadow.strong,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginLeft: 8 },
-  headerRoute: { fontSize: 14, color: '#94a3b8', marginTop: 4 },
-  headerDate: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  statsRow: {
-    flexDirection: 'row', padding: 16, gap: 12,
+  summaryTop: { marginBottom: Spacing.md },
+  summaryTitle: { fontSize: 16, fontWeight: '800', color: Colors.white },
+  summarySubtitle: { fontSize: 12, color: Colors.white + '80', marginTop: 2 },
+  summaryRoute: { fontSize: 12, color: Colors.accent, fontWeight: '600', marginTop: 4 },
+  summaryStats: {
+    flexDirection: 'row', backgroundColor: Colors.white + '12',
+    borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center',
   },
-  statBox: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    alignItems: 'center',
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  summaryStat: { flex: 1, alignItems: 'center', gap: 3 },
+  summaryStatVal: { fontSize: 18, fontWeight: '900', color: Colors.white },
+  summaryStatLabel: { fontSize: 10, color: Colors.white + '70', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  summaryStatDiv: { width: 1, height: 32, backgroundColor: Colors.white + '25', marginHorizontal: Spacing.md },
+
+  // Search
+  searchRow: {
+    flexDirection: 'row', gap: Spacing.sm,
+    paddingHorizontal: Spacing.base, marginBottom: Spacing.sm,
   },
-  statValue: { fontSize: 26, fontWeight: 'bold', color: '#1a3a52' },
-  statLabel: { fontSize: 12, color: '#64748b', marginTop: 4 },
-  list: { padding: 16, paddingBottom: 80 },
-  ticketCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  searchBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.white, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md, height: 44, ...Shadow.card,
   },
-  ticketLeft: { alignItems: 'center', width: 56 },
-  ticketNum: { fontSize: 13, fontWeight: '700', color: '#94a3b8' },
-  tarifBadge: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3, marginTop: 6 },
-  tarifText: { fontSize: 9, color: '#fff', fontWeight: '700' },
-  ticketInfo: { flex: 1, marginLeft: 12 },
-  ticketSiege: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
-  ticketHeure: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  ticketDate: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
-  ticketPrix: { fontSize: 14, fontWeight: '700', color: '#1a3a52' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 15, color: '#94a3b8', marginTop: 16, textAlign: 'center' },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textDark },
   refreshBtn: {
-    position: 'absolute', bottom: 20, alignSelf: 'center',
-    backgroundColor: '#1a3a52', flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30,
-    gap: 8, elevation: 4,
+    width: 44, height: 44, borderRadius: Radius.md,
+    backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', ...Shadow.card,
   },
-  refreshText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  // Ticket Card
+  ticketCard: {
+    backgroundColor: Colors.white, borderRadius: Radius.lg,
+    padding: Spacing.base, ...Shadow.card,
+  },
+  ticketTop: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm,
+  },
+  ticketIndex: {
+    width: 28, height: 28, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ticketIndexTxt: { fontSize: 12, fontWeight: '800', color: Colors.primary },
+  ticketRoute: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ticketStation: { fontSize: 13, fontWeight: '700', color: Colors.textDark, flexShrink: 1 },
+  ticketArrow: { flexDirection: 'row', alignItems: 'center' },
+  ticketLine: { width: 16, height: 1.5, backgroundColor: Colors.border },
+  ticketPrice: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  ticketMeta: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', alignItems: 'center' },
+  ticketBadge: {
+    backgroundColor: Colors.bgMid, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
+  },
+  ticketSiege: { fontSize: 11, fontWeight: '700', color: Colors.textMid },
+  ticketTarifBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
+  ticketTarifText: { fontSize: 11, fontWeight: '700' },
+  ticketTimeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  ticketTime: { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+
+  // Empty
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyIcon: {
+    width: 80, height: 80, borderRadius: 20,
+    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textMid, marginBottom: 8 },
+  emptySub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
+  emptyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: Radius.lg,
+  },
+  emptyBtnText: { color: Colors.white, fontWeight: '800', fontSize: 14 },
 });

@@ -1,162 +1,234 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  Animated
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bus, ScanLine, User, KeyRound } from 'lucide-react-native';
+import { Bus, ScanLine, User, Lock, Eye, EyeOff, ChevronRight, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../constants/theme';
 
-interface LoginUser {
-  nom: string;
-  prenom: string;
-}
-
-interface LoginAffectation {
-  numero_bus: string;
-  ville_depart: string;
-  ville_arrivee: string;
-}
-
-interface LoginResponse {
-  user: LoginUser;
-  affectation: LoginAffectation | null;
-}
-
-// IMPORTANT: Puisque nous sommes sur le web localhost:8081, l'URL est localhost. 
-// Pour android emulator on utiliserait 10.0.2.2.
-const API_URL = 'http://localhost:5000/api/auth/login/receveur';
+const API_BASE = 'http://localhost:5000/api/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [role, setRole] = useState<'receveur' | 'controleur' | null>(null);
   const [matricule, setMatricule] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'receveur' | 'controleur' | null>(null);
+  const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [matriculeError, setMatriculeError] = useState('');
+
+  const isMatriculeValid = matricule.trim().length >= 3;
+  const isPasswordValid = password.length >= 1;
+  const canSubmit = role !== null && (role === 'controleur' || (isMatriculeValid && isPasswordValid));
+
+  const handleMatriculeChange = (val: string) => {
+    setMatricule(val);
+    setError('');
+    if (val && val.length < 3) {
+      setMatriculeError('Le matricule doit comporter au moins 3 caractères');
+    } else {
+      setMatriculeError('');
+    }
+  };
 
   const handleLogin = async () => {
-    if (!role) return;
-    
-    if (role === 'receveur') {
-      if (!matricule || !password) {
-        Alert.alert("Erreur", "Veuillez entrer votre matricule et mot de passe");
-        return;
-      }
-      
-      setLoading(true);
-      try {
-        const response = await axios.post<LoginResponse>(API_URL, {
-          matricule,
-          password
-        });
-        
-        const { user, affectation } = response.data;
-        
-        // On passe les données utilisateur via Expo Router context/params
-        // Comme objet simple
+    if (!canSubmit) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      if (role === 'receveur') {
+        const res = await axios.post(`${API_BASE}/login/receveur`, { matricule: matricule.trim(), password });
+        const { user, affectation } = res.data;
         router.replace({
           pathname: '/(receveur)/dashboard',
           params: {
             nom: user.nom,
             prenom: user.prenom,
-            numero_bus: affectation ? affectation.numero_bus : '',
-            ville_depart: affectation ? affectation.ville_depart : '',
-            ville_arrivee: affectation ? affectation.ville_arrivee : ''
+            numero_bus: affectation?.numero_bus ?? '',
+            ville_depart: affectation?.ville_depart ?? '',
+            ville_arrivee: affectation?.ville_arrivee ?? '',
+            num_ligne: affectation?.num_ligne ?? '',
           }
         });
-      } catch (err: any) {
-        setLoading(false);
-        const msg = err.response?.data?.message || "Erreur de connexion serveur";
-        Alert.alert("Échec de connexion", msg);
+      } else {
+        // Contrôleur
+        const res = await axios.post(`${API_BASE}/login/controleur`, { matricule: matricule.trim(), password });
+        const { user, affectation } = res.data;
+        router.replace({
+          pathname: '/(controleur)/scanner',
+          params: {
+            nom: user.nom,
+            prenom: user.prenom,
+            numero_bus: affectation?.numero_bus ?? '',
+          }
+        });
       }
-    } else {
-      router.replace('/(controleur)/scanner');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Identifiants incorrects. Veuillez réessayer.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Bus color="#fbbf24" size={40} />
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Logo + Brand ── */}
+          <View style={styles.brand}>
+            <View style={styles.logoWrap}>
+              <Bus color={Colors.accent} size={36} strokeWidth={2.5} />
             </View>
-            <Text style={styles.title}>TuniMove</Text>
-            <Text style={styles.subtitle}>Transport Interurbain</Text>
+            <Text style={styles.brandName}>TuniMove</Text>
+            <Text style={styles.brandTagline}>Opérations Transport Interurbain</Text>
           </View>
 
+          {/* ── Login Card ── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Sélectionnez votre rôle</Text>
-            
-            <View style={styles.rolesContainer}>
-              <TouchableOpacity 
-                style={[styles.roleCard, role === 'receveur' && styles.roleCardActive]} 
-                onPress={() => setRole('receveur')}
+            <Text style={styles.cardHeading}>Connexion agent</Text>
+            <Text style={styles.cardSub}>Sélectionnez votre rôle pour continuer</Text>
+
+            {/* ── Role Selector ── */}
+            <View style={styles.roleGrid}>
+              {/* Receveur */}
+              <TouchableOpacity
+                style={[styles.roleCard, role === 'receveur' && styles.roleCardActive]}
+                onPress={() => { setRole('receveur'); setError(''); }}
+                activeOpacity={0.75}
               >
-                <User color={role === 'receveur' ? "#fff" : "#1a3a52"} size={32} />
-                <Text style={[styles.roleText, role === 'receveur' && styles.roleTextActive]}>Receveur</Text>
+                <View style={[styles.roleIcon, role === 'receveur' && styles.roleIconActive]}>
+                  <User color={role === 'receveur' ? Colors.white : Colors.primary} size={28} strokeWidth={2} />
+                </View>
+                <Text style={[styles.roleTitle, role === 'receveur' && styles.roleTitleActive]}>Receveur</Text>
+                <Text style={[styles.roleHelper, role === 'receveur' && { color: Colors.accent }]}>
+                  Vente billets · Service bus
+                </Text>
+                {role === 'receveur' && (
+                  <View style={styles.roleCheck}>
+                    <ChevronRight color={Colors.accent} size={14} />
+                  </View>
+                )}
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.roleCard, role === 'controleur' && styles.roleCardActive]} 
-                onPress={() => setRole('controleur')}
+              {/* Contrôleur */}
+              <TouchableOpacity
+                style={[styles.roleCard, role === 'controleur' && styles.roleCardActive]}
+                onPress={() => { setRole('controleur'); setError(''); }}
+                activeOpacity={0.75}
               >
-                <ScanLine color={role === 'controleur' ? "#fff" : "#1a3a52"} size={32} />
-                <Text style={[styles.roleText, role === 'controleur' && styles.roleTextActive]}>Contrôleur</Text>
+                <View style={[styles.roleIcon, role === 'controleur' && styles.roleIconActive]}>
+                  <ScanLine color={role === 'controleur' ? Colors.white : Colors.primary} size={28} strokeWidth={2} />
+                </View>
+                <Text style={[styles.roleTitle, role === 'controleur' && styles.roleTitleActive]}>Contrôleur</Text>
+                <Text style={[styles.roleHelper, role === 'controleur' && { color: Colors.accent }]}>
+                  Scan QR · Validation billets
+                </Text>
+                {role === 'controleur' && (
+                  <View style={styles.roleCheck}>
+                    <ChevronRight color={Colors.accent} size={14} />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
-            {role === 'receveur' && (
-              <View style={styles.inputsSection}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Matricule</Text>
-                  <View style={styles.inputWrapper}>
-                    <User color="#94a3b8" size={20} style={styles.inputIcon} />
+            {/* ── Credentials ── */}
+            {role !== null && (
+              <View style={styles.fields}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>Identifiants</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                {/* Matricule */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Matricule</Text>
+                  <View style={[styles.fieldWrap, matriculeError ? styles.fieldError : null]}>
+                    <User color={matriculeError ? Colors.danger : Colors.textMuted} size={18} />
                     <TextInput
-                      style={styles.input}
-                      placeholder="Entrez votre matricule"
+                      style={styles.fieldInput}
+                      placeholder="Ex: REC001"
                       value={matricule}
-                      onChangeText={setMatricule}
-                      placeholderTextColor="#94a3b8"
-                      autoCapitalize="none"
+                      onChangeText={handleMatriculeChange}
+                      placeholderTextColor={Colors.textLight}
+                      autoCapitalize="characters"
+                      returnKeyType="next"
                     />
+                  </View>
+                  {matriculeError ? (
+                    <View style={styles.errRow}>
+                      <AlertCircle color={Colors.danger} size={12} />
+                      <Text style={styles.errText}>{matriculeError}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Password */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Mot de passe</Text>
+                  <View style={styles.fieldWrap}>
+                    <Lock color={Colors.textMuted} size={18} />
+                    <TextInput
+                      style={styles.fieldInput}
+                      placeholder="••••••••"
+                      value={password}
+                      onChangeText={(v) => { setPassword(v); setError(''); }}
+                      placeholderTextColor={Colors.textLight}
+                      secureTextEntry={!showPwd}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity onPress={() => setShowPwd(p => !p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      {showPwd
+                        ? <EyeOff color={Colors.textMuted} size={18} />
+                        : <Eye color={Colors.textMuted} size={18} />
+                      }
+                    </TouchableOpacity>
                   </View>
                 </View>
 
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Mot de passe</Text>
-                  <View style={styles.inputWrapper}>
-                    <KeyRound color="#94a3b8" size={20} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Entrez votre mot de passe"
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholderTextColor="#94a3b8"
-                      secureTextEntry
-                    />
+                {/* Global Error */}
+                {error ? (
+                  <View style={styles.globalErr}>
+                    <AlertCircle color={Colors.danger} size={14} />
+                    <Text style={styles.globalErrText}>{error}</Text>
                   </View>
-                </View>
+                ) : null}
               </View>
             )}
 
-            <TouchableOpacity 
-              style={[
-                styles.button, 
-                (!role || (role === 'receveur' && (!matricule || !password))) && styles.buttonDisabled
-              ]} 
+            {/* ── Login Button ── */}
+            <TouchableOpacity
+              style={[styles.loginBtn, !canSubmit && styles.loginBtnDisabled]}
               onPress={handleLogin}
-              disabled={(!role || (role === 'receveur' && (!matricule || !password))) || loading}
+              disabled={!canSubmit || loading}
+              activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="#1a3a52" />
+                <ActivityIndicator color={Colors.primary} size="small" />
               ) : (
-                <Text style={styles.buttonText}>Se Connecter</Text>
+                <>
+                  <Text style={[styles.loginBtnText, !canSubmit && styles.loginBtnTextDisabled]}>
+                    Se connecter
+                  </Text>
+                  {canSubmit && <ChevronRight color={Colors.primary} size={20} strokeWidth={3} />}
+                </>
               )}
             </TouchableOpacity>
           </View>
+
+          {/* ── Footer ── */}
+          <Text style={styles.version}>TuniMove Field v2.0 · SNTRI</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -164,147 +236,85 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
+  safe: { flex: 1, backgroundColor: Colors.bgLight },
+  scroll: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
+
+  // Brand
+  brand: { alignItems: 'center', marginBottom: Spacing.xl },
+  logoWrap: {
+    width: 72, height: 72, borderRadius: 20,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12, ...Shadow.strong,
   },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#1a3a52',
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#1a3a52',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a3a52',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    marginTop: 4,
-  },
+  brandName: { fontSize: 28, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
+  brandTagline: { fontSize: 13, color: Colors.textMuted, marginTop: 4, fontWeight: '500' },
+
+  // Card
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    backgroundColor: Colors.white, borderRadius: Radius.xxl,
+    padding: Spacing.xl, ...Shadow.card,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#334155',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  rolesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
+  cardHeading: { fontSize: 20, fontWeight: '800', color: Colors.textDark, marginBottom: 4 },
+  cardSub: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.xl },
+
+  // Roles
+  roleGrid: { flexDirection: 'row', gap: 10, marginBottom: 4 },
   roleCard: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 16,
-    marginHorizontal: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    flex: 1, borderRadius: Radius.lg, padding: Spacing.md,
+    backgroundColor: Colors.bgMid, borderWidth: 2, borderColor: 'transparent',
+    alignItems: 'center', minHeight: 120, justifyContent: 'center', gap: 6,
   },
   roleCardActive: {
-    backgroundColor: '#1a3a52',
-    borderColor: '#1a3a52',
-    shadowColor: '#1a3a52',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: Colors.primary, borderColor: Colors.accent,
+    ...Shadow.strong,
   },
-  roleText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a3a52',
+  roleIcon: {
+    width: 50, height: 50, borderRadius: 14,
+    backgroundColor: Colors.white + '25', alignItems: 'center', justifyContent: 'center',
   },
-  roleTextActive: {
-    color: '#ffffff',
-  },
-  inputsSection: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    height: 56,
-    paddingHorizontal: 16,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  button: {
-    backgroundColor: '#fbbf24',
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#fbbf24',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: '#cbd5e1',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a3a52',
-  },
-});
+  roleIconActive: { backgroundColor: Colors.white + '25' },
+  roleTitle: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  roleTitleActive: { color: Colors.white },
+  roleHelper: { fontSize: 11, color: Colors.textMuted, textAlign: 'center', fontWeight: '500' },
+  roleCheck: { position: 'absolute', top: 8, right: 8 },
 
+  // Divider
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.lg, gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
+  dividerText: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+
+  // Fields
+  fields: {},
+  fieldGroup: { marginBottom: Spacing.base },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMid, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.bgLight, borderRadius: Radius.md,
+    borderWidth: 1.5, borderColor: Colors.border,
+    height: 52, paddingHorizontal: 14,
+  },
+  fieldError: { borderColor: Colors.danger, backgroundColor: Colors.dangerLight + '40' },
+  fieldInput: { flex: 1, fontSize: 15, color: Colors.textDark, fontWeight: '500' },
+  errRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  errText: { fontSize: 11, color: Colors.danger, fontWeight: '500' },
+  globalErr: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.dangerLight, borderRadius: Radius.md,
+    padding: Spacing.md, marginTop: 4, marginBottom: 4,
+    borderWidth: 1, borderColor: Colors.danger + '30',
+  },
+  globalErrText: { flex: 1, fontSize: 13, color: Colors.danger, fontWeight: '600' },
+
+  // Button
+  loginBtn: {
+    backgroundColor: Colors.accent, height: 56, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, marginTop: Spacing.lg, ...Shadow.accent,
+  },
+  loginBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  loginBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  loginBtnTextDisabled: { color: Colors.textMuted },
+
+  // Footer
+  version: { textAlign: 'center', fontSize: 11, color: Colors.textLight, marginTop: Spacing.lg, fontWeight: '500' },
+});

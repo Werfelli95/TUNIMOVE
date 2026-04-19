@@ -5,43 +5,34 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  MapPin, Clock, Ticket, Printer, User, X, CheckCircle, ChevronDown
+  MapPin, Clock, Ticket, User, X, CheckCircle,
+  ChevronDown, ChevronRight, ChevronLeft, Printer
 } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
 
 const BASE = 'http://localhost:5000/api';
 const { width } = Dimensions.get('window');
 
-// ── Types ────────────────────────────────────────────────────────────────────
 interface Station { arret: string; distance_km: number; }
-interface Ligne {
-  num_ligne: number | string;
-  ville_depart: string; ville_arrivee: string;
-  horaires: string[]; horaire?: string;
-  stations: Station[];
-}
-interface TarifConfig {
-  prix_par_km: number; frais_fixes: number;
-  red_etudiant: number; red_handicape: number;
-}
-interface TicketData {
-  id_ticket?: number; code_ticket: string;
-  siege: string; type_tarif: string; montant_total: number;
-  station_depart: string; station_arrivee: string;
-  heure_depart: string; date_emission: string;
-  numero_bus: string; num_ligne: string | number;
-}
+interface Ligne { num_ligne: number | string; ville_depart: string; ville_arrivee: string; horaires: string[]; horaire?: string; stations: Station[]; }
+interface TarifCfg { prix_par_km: number; frais_fixes: number; red_etudiant: number; red_handicape: number; }
 
-const SEAT_ROWS = ['A','B','C','D','E','F','G','H','I','J','K','L','M'];
+const SEAT_ROWS = 'ABCDEFGHIJKLM'.split('');
 const TARIFS = [
-  { key: 'Tarif Plein', label: 'Plein', reduc: 0, color: '#1a3a52' },
-  { key: 'Étudiant',    label: 'Étudiant', reduc: 25, color: '#059669' },
-  { key: 'Handicapé',   label: 'Handicapé', reduc: 50, color: '#d97706' },
+  { key: 'Tarif Plein', label: 'Plein tarif',    reduc: 0,  color: Colors.primary },
+  { key: 'Étudiant',   label: 'Étudiant',        reduc: 25, color: Colors.success },
+  { key: 'Handicapé',  label: 'Handicapé(e)',     reduc: 50, color: Colors.warning },
+  { key: 'Militaire',  label: 'Militaire',        reduc: 30, color: '#7C3AED'      },
 ];
+
+// ── Steps ──────────────────────────────────────────────────────────────────
+const STEPS = ['Trajet', 'Tarif & Siège', 'Récapitulatif'];
 
 export default function VenteScreen() {
   const params = useLocalSearchParams();
-  const router  = useRouter();
+  const router = useRouter();
 
   const numero_bus  = params.numero_bus as string;
   const service_id  = params.service_id as string;
@@ -51,545 +42,655 @@ export default function VenteScreen() {
   const nom         = params.nom as string;
   const prenom      = params.prenom as string;
 
-  // Data
-  const [ligne, setLigne] = useState<Ligne | null>(null);
-  const [tarifCfg, setTarifCfg] = useState<TarifConfig | null>(null);
-  const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  // ── Data
+  const [ligne, setLigne]         = useState<Ligne | null>(null);
+  const [tarifCfg, setTarifCfg]   = useState<TarifCfg | null>(null);
+  const [occupied, setOccupied]   = useState<string[]>([]);
+  const [loading, setLoading]     = useState(true);
 
-  // Form state
-  const [horaire, setHoraire] = useState('');
+  // ── Step state
+  const [step, setStep]           = useState(0);
+
+  // ── Step 1: Trajet
+  const [horaire, setHoraire]         = useState('');
   const [showHoraire, setShowHoraire] = useState(false);
-  const [arretDepart, setArretDepart] = useState('');
-  const [showDepart, setShowDepart] = useState(false);
-  const [arretArrivee, setArretArrivee] = useState('');
+  const [depart, setDepart]           = useState('');
+  const [showDepart, setShowDepart]   = useState(false);
+  const [arrivee, setArrivee]         = useState('');
   const [showArrivee, setShowArrivee] = useState(false);
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
-  const [typeTarif, setTypeTarif] = useState('Tarif Plein');
 
-  // Ticket modal
-  const [ticketModal, setTicketModal] = useState(false);
-  const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
-  const [selling, setSelling] = useState(false);
+  // ── Step 2: Tarif & Siège
+  const [typeTarif, setTypeTarif]   = useState('Tarif Plein');
+  const [selectedSeat, setSeat]     = useState<string | null>(null);
 
-  // ── Load line + tarif ─────────────────────────────────────────────────────
+  // ── Step 3: Result
+  const [selling, setSelling]   = useState(false);
+  const [ticketModal, setModal] = useState(false);
+  const [lastTicket, setLastTicket] = useState<any>(null);
+
+  // ── Load data ───────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
         const [netRes, tarifRes] = await Promise.all([
           axios.get<Ligne[]>(`${BASE}/network`),
-          axios.get<TarifConfig>(`${BASE}/tarifs`),
+          axios.get<TarifCfg>(`${BASE}/tarifs`),
         ]);
         const found = netRes.data.find(l => String(l.num_ligne) === String(num_ligne));
-        setLigne(found || null);
+        setLigne(found ?? null);
         setTarifCfg(tarifRes.data);
-      } catch { /* silent */ }
-      finally { setLoadingData(false); }
+      } catch { /**/ }
+      finally { setLoading(false); }
     };
-    if (num_ligne) load(); else setLoadingData(false);
-  }, [num_ligne]);
+    if (num_ligne) load(); else setLoading(false);
+  }, []);
 
-  // ── Reload occupied seats when horaire changes ────────────────────────────
   useEffect(() => {
-    const fetchOccupied = async () => {
-      if (!horaire || !num_ligne) return;
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const r = await axios.get<string[]>(
-          `${BASE}/sales/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}`
-        );
-        setOccupiedSeats(r.data);
-      } catch { setOccupiedSeats([]); }
-    };
-    fetchOccupied();
-    setSelectedSeat(null);
+    if (!horaire || !num_ligne) return;
+    const today = new Date().toISOString().split('T')[0];
+    axios.get<string[]>(`${BASE}/sales/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}`)
+      .then(r => setOccupied(r.data))
+      .catch(() => setOccupied([]));
+    setSeat(null);
   }, [horaire]);
 
-  // ── Stations list ─────────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────────────
   const stations = useMemo<Station[]>(() => {
     if (!ligne) return [];
     const list = [...(ligne.stations || [])];
-    const hasStart = list.some(s => s.distance_km === 0 || s.arret.toLowerCase() === ligne.ville_depart.toLowerCase());
-    if (!hasStart) list.push({ arret: ligne.ville_depart, distance_km: 0 });
+    if (!list.some(s => s.arret.toLowerCase() === (ligne.ville_depart ?? '').toLowerCase()))
+      list.push({ arret: ligne.ville_depart, distance_km: 0 });
+    if (!list.some(s => s.arret.toLowerCase() === (ligne.ville_arrivee ?? '').toLowerCase()))
+      list.push({ arret: ligne.ville_arrivee, distance_km: 999 });
     return list.sort((a, b) => a.distance_km - b.distance_km);
   }, [ligne]);
 
+  const deptSt  = stations.find(s => s.arret === depart);
+  const arrivSt = stations.find(s => s.arret === arrivee);
+  const distance = deptSt && arrivSt ? Math.abs(arrivSt.distance_km - deptSt.distance_km) : 0;
 
-  const deptSt  = stations.find(s => s.arret === arretDepart);
-  const arrivSt = stations.find(s => s.arret === arretArrivee);
-  const distance = (deptSt && arrivSt) ? Math.abs(arrivSt.distance_km - deptSt.distance_km) : 0;
-
-  // Stations available as arrival (must be AFTER selected departure)
-  const stationsArrivee = arretDepart
-    ? stations.filter(s => {
-        const depKm = deptSt?.distance_km ?? -1;
-        return s.arret !== arretDepart && s.distance_km > depKm;
-      })
+  const arriveeOptions = depart
+    ? stations.filter(s => s.arret !== depart && (deptSt ? s.distance_km > deptSt.distance_km : true))
     : [];
-
-  // Reset arrivee if departure changes and arrivee no longer valid
-  const handleSetDepart = (arret: string) => {
-    setArretDepart(arret);
-    setShowDepart(false);
-    setArretArrivee(''); // reset arrivée
-  };
 
   const prix = useMemo(() => {
     if (!tarifCfg || distance <= 0) return 0;
     let p = distance * tarifCfg.prix_par_km + tarifCfg.frais_fixes;
-    if (typeTarif === 'Étudiant')  p *= (1 - tarifCfg.red_etudiant / 100);
-    if (typeTarif === 'Handicapé') p *= (1 - tarifCfg.red_handicape / 100);
-    return p;
+    const t = TARIFS.find(t => t.key === typeTarif);
+    if (t && t.reduc > 0) p *= (1 - t.reduc / 100);
+    return Math.max(0, p);
   }, [tarifCfg, distance, typeTarif]);
 
-  // ── Seat grid ─────────────────────────────────────────────────────────────
-  const capacite = 50; // default; ideally from bus data
+  const horaires: string[] = ligne?.horaires?.filter(Boolean) ?? (ligne?.horaire ? [ligne.horaire] : []);
+
+  // ── Step validation
+  const step0Valid = !!horaire && !!depart && !!arrivee;
+  const step1Valid = !!selectedSeat;
+
+  // ── Seat grid ───────────────────────────────────────────────────────────
+  const capacite = 50;
   const numRows  = Math.ceil(capacite / 5);
+  const SEAT_SZ  = Math.min(40, (width - 80) / 5);
 
   const renderSeats = () => {
     const rows = [];
     for (let i = 0; i < Math.min(numRows, SEAT_ROWS.length); i++) {
-      const rowLabel = SEAT_ROWS[i];
+      const row = SEAT_ROWS[i];
       const cols = Math.min(5, capacite - i * 5);
       const cells = [];
       for (let c = 1; c <= cols; c++) {
-        const seatId = `${rowLabel}${c}`;
-        const isOcc = occupiedSeats.includes(seatId);
-        const isSel = selectedSeat === seatId;
+        const id = `${row}${c}`;
+        const occ = occupied.includes(id);
+        const sel = selectedSeat === id;
         cells.push(
           <TouchableOpacity
-            key={seatId}
-            style={[styles.seat, isOcc ? styles.seatOcc : isSel ? styles.seatSel : styles.seatFree]}
-            onPress={() => !isOcc && setSelectedSeat(isSel ? null : seatId)}
-            disabled={isOcc}
+            key={id}
+            style={[styles.seat,
+              occ ? styles.seatOcc : sel ? styles.seatSel : styles.seatFree
+            ]}
+            onPress={() => !occ && setSeat(sel ? null : id)}
+            disabled={occ}
           >
-            <Text style={[styles.seatTxt, isOcc ? styles.seatOccTxt : isSel ? styles.seatSelTxt : styles.seatFreeTxt]}>
-              {seatId}
+            <Text style={[styles.seatTxt, occ ? styles.seatTxtOcc : sel ? styles.seatTxtSel : styles.seatTxtFree]}>
+              {id}
             </Text>
           </TouchableOpacity>
         );
       }
-      rows.push(<View key={rowLabel} style={styles.seatRow}>{cells}</View>);
+      rows.push(<View key={row} style={styles.seatRow}>{cells}</View>);
     }
     return rows;
   };
 
-  // ── Horaire options ───────────────────────────────────────────────────────
-  const horaires: string[] = ligne?.horaires?.filter(Boolean) ?? (ligne?.horaire ? [ligne.horaire] : []);
-
-  // ── Sell ticket ───────────────────────────────────────────────────────────
-  const canSell = !!selectedSeat && !!arretDepart && !!arretArrivee && !!horaire && prix > 0;
-
+  // ── Sell ────────────────────────────────────────────────────────────────
   const handleSell = async () => {
-    if (!canSell) return;
+    if (!selectedSeat || !depart || !arrivee || !horaire) return;
     setSelling(true);
     const today = new Date().toISOString().split('T')[0];
     try {
-      const body = {
-        num_ligne,
-        bus: numero_bus,
-        date_voyage: today,
-        heure: horaire,
-        siege: selectedSeat,
-        prix,
-        arret_depart: arretDepart,
-        arret_arrivee: arretArrivee,
-        agent_id: null,
-        type_tarif: typeTarif,
+      const r = await axios.post(`${BASE}/sales/tickets/vendre`, {
+        num_ligne, bus: numero_bus,
+        date_voyage: today, heure: horaire, siege: selectedSeat,
+        prix, arret_depart: depart, arret_arrivee: arrivee,
+        agent_id: null, type_tarif: typeTarif,
         id_service: service_id ? parseInt(service_id) : null,
-      };
-      await axios.post(`${BASE}/sales/tickets/vendre`, body);
-
-      // Mark seat as occupied locally
-      setOccupiedSeats(prev => [...prev, selectedSeat!]);
-
-      const code = 'TKT' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-      setLastTicket({
-        code_ticket: code,
-        siege: selectedSeat!,
-        type_tarif: typeTarif,
-        montant_total: prix,
-        station_depart: arretDepart,
-        station_arrivee: arretArrivee,
-        heure_depart: horaire,
-        date_emission: new Date().toISOString(),
-        numero_bus,
-        num_ligne,
       });
-
-      setSelectedSeat(null);
-      setTicketModal(true);
+      setOccupied(prev => [...prev, selectedSeat]);
+      const code = 'TKT' + Date.now().toString().slice(-6);
+      setLastTicket({
+        code_ticket: r.data?.code_ticket || code,
+        siege: selectedSeat, type_tarif: typeTarif,
+        montant_total: prix, station_depart: depart,
+        station_arrivee: arrivee, heure_depart: horaire,
+        date_emission: new Date().toISOString(),
+        numero_bus, num_ligne,
+      });
+      setSeat(null);
+      setStep(0);
+      setDepart(''); setArrivee(''); setSeat(null);
+      setModal(true);
     } catch (err: any) {
-      Alert.alert('Erreur', err.response?.data?.message || 'Erreur lors de la vente');
-    } finally {
-      setSelling(false);
-    }
+      Alert.alert('Erreur', err.response?.data?.message || 'Impossible d\'émettre le billet');
+    } finally { setSelling(false); }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  if (loadingData) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#1a3a52" /></View>;
-  }
+  if (loading) return (
+    <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
+  );
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
-        {/* Service banner */}
-        <View style={styles.serviceBanner}>
-          <Text style={styles.serviceBannerText}>🟢 Service #{service_id} · Bus {numero_bus}</Text>
-          <Text style={styles.serviceBannerSub}>{ville_dep} → {ville_arr}</Text>
-        </View>
-
-        {/* 1. Horaire */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><Clock size={16} color="#334155" /> Horaire de départ *</Text>
-          {horaires.length > 0 ? (
-            <>
-              <TouchableOpacity style={styles.picker} onPress={() => setShowHoraire(!showHoraire)}>
-                <Text style={horaire ? styles.pickerVal : styles.pickerPlaceholder}>{horaire || 'Choisir un horaire...'}</Text>
-                <ChevronDown color="#64748b" size={18} />
-              </TouchableOpacity>
-              {showHoraire && (
-                <View style={styles.dropdown}>
-                  {horaires.map(h => (
-                    <TouchableOpacity key={h} style={[styles.dropItem, horaire === h && styles.dropItemActive]}
-                      onPress={() => { setHoraire(h); setShowHoraire(false); }}>
-                      <Text style={[styles.dropItemTxt, horaire === h && styles.dropItemActiveTxt]}>{h}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={[styles.picker, { opacity: 0.6 }]}>
-              <Text style={styles.pickerPlaceholder}>Aucun horaire défini pour cette ligne</Text>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      {/* ── Steps Bar ── */}
+      <View style={styles.stepsBar}>
+        {STEPS.map((s, i) => (
+          <View key={s} style={styles.stepItem}>
+            <View style={[styles.stepNum, i <= step && styles.stepNumActive, i < step && styles.stepNumDone]}>
+              {i < step
+                ? <CheckCircle color={Colors.white} size={14} />
+                : <Text style={[styles.stepNumText, i === step && styles.stepNumTextActive]}>{i + 1}</Text>
+              }
             </View>
-          )}
-        </View>
+            <Text style={[styles.stepLabel, i === step && styles.stepLabelActive]}>{s}</Text>
+            {i < STEPS.length - 1 && <View style={[styles.stepConnector, i < step && styles.stepConnectorDone]} />}
+          </View>
+        ))}
+      </View>
 
-        {/* 2. Arrêt de départ — sélectionnable (le receveur est dans le bus) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><MapPin size={16} color="#334155" /> Point de montée (Départ) *</Text>
-          <TouchableOpacity style={styles.picker} onPress={() => { setShowDepart(!showDepart); setShowArrivee(false); }}>
-            <Text style={arretDepart ? styles.pickerVal : styles.pickerPlaceholder}>
-              {arretDepart || 'Choisir la station de départ...'}
-            </Text>
-            <ChevronDown color="#64748b" size={18} />
-          </TouchableOpacity>
-          {showDepart && (
-            <View style={styles.dropdown}>
-              {stations.map(s => (
-                <TouchableOpacity key={s.arret}
-                  style={[styles.dropItem, arretDepart === s.arret && styles.dropItemActive]}
-                  onPress={() => handleSetDepart(s.arret)}>
-                  <Text style={[styles.dropItemTxt, arretDepart === s.arret && styles.dropItemActiveTxt]}>
-                    {s.arret} <Text style={{ color: '#94a3b8' }}>({s.distance_km} km)</Text>
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* 3. Arrêt d'arrivée */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><MapPin size={16} color="#dc2626" /> Destination (Arrivée) *</Text>
-          {!arretDepart ? (
-            <View style={[styles.picker, { opacity: 0.5 }]}>
-              <Text style={styles.pickerPlaceholder}>Choisissez d'abord le départ</Text>
-            </View>
-          ) : (
-            <>
-              <TouchableOpacity style={styles.picker} onPress={() => { setShowArrivee(!showArrivee); setShowDepart(false); }}>
-                <Text style={arretArrivee ? styles.pickerVal : styles.pickerPlaceholder}>
-                  {arretArrivee || 'Choisir la destination...'}
-                </Text>
-                <ChevronDown color="#64748b" size={18} />
-              </TouchableOpacity>
-              {showArrivee && (
-                <View style={styles.dropdown}>
-                  {stationsArrivee.length === 0 ? (
-                    <View style={styles.dropItem}><Text style={{ color: '#94a3b8', fontSize: 13 }}>Aucune station disponible après ce départ</Text></View>
-                  ) : stationsArrivee.map(s => (
-                    <TouchableOpacity key={s.arret}
-                      style={[styles.dropItem, arretArrivee === s.arret && styles.dropItemActive]}
-                      onPress={() => { setArretArrivee(s.arret); setShowArrivee(false); }}>
-                      <Text style={[styles.dropItemTxt, arretArrivee === s.arret && styles.dropItemActiveTxt]}>
-                        {s.arret} <Text style={{ color: '#94a3b8' }}>({s.distance_km} km)</Text>
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
-          )}
-          {distance > 0 && (
-            <View style={styles.distanceBadge}>
-              <Text style={styles.distanceTxt}>
-                {arretDepart} → {arretArrivee} · {distance.toFixed(1)} km
+        {/* ══ STEP 0: TRAJET ══════════════════════════════════════════ */}
+        {step === 0 && (
+          <>
+            {/* Service banner */}
+            <View style={styles.serviceBanner}>
+              <View style={styles.bannerDot} />
+              <Text style={styles.bannerText}>
+                Service #{service_id} · Bus {numero_bus} · Ligne {num_ligne}
               </Text>
             </View>
-          )}
-        </View>
 
-        {/* 3. Type de tarif */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><User size={16} color="#334155" /> Type de tarif</Text>
-          <View style={styles.tarifRow}>
-            {TARIFS.map(t => (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.tarifCard, typeTarif === t.key && { ...styles.tarifCardActive, borderColor: t.color, backgroundColor: t.color + '15' }]}
-                onPress={() => setTypeTarif(t.key)}
-              >
-                <Text style={[styles.tarifLabel, typeTarif === t.key && { color: t.color }]}>{t.label}</Text>
-                {t.reduc > 0 && <Text style={[styles.tarifReduc, { color: t.color }]}>-{t.reduc}%</Text>}
+            {/* Horaire */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}><Clock size={14} color={Colors.textMid} /> Horaire de départ</Text>
+              {horaires.length > 0 ? (
+                <>
+                  <TouchableOpacity style={styles.picker} onPress={() => { setShowHoraire(!showHoraire); setShowDepart(false); setShowArrivee(false); }}>
+                    <Text style={horaire ? styles.pickerVal : styles.pickerPh}>{horaire || 'Choisir un horaire...'}</Text>
+                    <ChevronDown color={Colors.textMuted} size={18} />
+                  </TouchableOpacity>
+                  {showHoraire && (
+                    <View style={styles.dropdown}>
+                      {horaires.map(h => (
+                        <TouchableOpacity
+                          key={h}
+                          style={[styles.ddItem, horaire === h && styles.ddItemActive]}
+                          onPress={() => { setHoraire(h); setShowHoraire(false); }}
+                        >
+                          <Clock color={horaire === h ? Colors.primary : Colors.textMuted} size={14} />
+                          <Text style={[styles.ddItemText, horaire === h && styles.ddItemTextActive]}>{h}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={[styles.picker, { opacity: 0.5 }]}>
+                  <Text style={styles.pickerPh}>Aucun horaire défini pour cette ligne</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Station départ */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}><MapPin size={14} color={Colors.success} /> Point de montée</Text>
+              <TouchableOpacity style={styles.picker} onPress={() => { setShowDepart(!showDepart); setShowHoraire(false); setShowArrivee(false); }}>
+                <Text style={depart ? styles.pickerVal : styles.pickerPh}>{depart || 'Station de départ...'}</Text>
+                <ChevronDown color={Colors.textMuted} size={18} />
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+              {showDepart && (
+                <View style={styles.dropdown}>
+                  {stations.map(s => (
+                    <TouchableOpacity
+                      key={s.arret}
+                      style={[styles.ddItem, depart === s.arret && styles.ddItemActive]}
+                      onPress={() => { setDepart(s.arret); setArrivee(''); setShowDepart(false); }}
+                    >
+                      <Text style={[styles.ddItemText, depart === s.arret && styles.ddItemTextActive]}>
+                        {s.arret}
+                      </Text>
+                      <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
 
-        {/* 4. Sièges */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><Ticket size={16} color="#334155" /> Sélection du siège *</Text>
-          <View style={styles.seatLegend}>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#e2e8f0' }]} /><Text style={styles.legendTxt}>Libre</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#1a3a52' }]} /><Text style={styles.legendTxt}>Sélectionné</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#fca5a5' }]} /><Text style={styles.legendTxt}>Occupé</Text></View>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.seatGrid}>{renderSeats()}</View>
-          </ScrollView>
-        </View>
+            {/* Station arrivée */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}><MapPin size={14} color={Colors.danger} /> Destination</Text>
+              {!depart ? (
+                <View style={[styles.picker, { opacity: 0.4 }]}>
+                  <Text style={styles.pickerPh}>Choisissez d'abord le départ</Text>
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity style={styles.picker} onPress={() => { setShowArrivee(!showArrivee); setShowHoraire(false); setShowDepart(false); }}>
+                    <Text style={arrivee ? styles.pickerVal : styles.pickerPh}>{arrivee || 'Destination...'}</Text>
+                    <ChevronDown color={Colors.textMuted} size={18} />
+                  </TouchableOpacity>
+                  {showArrivee && (
+                    <View style={styles.dropdown}>
+                      {arriveeOptions.length === 0
+                        ? <View style={styles.ddItem}><Text style={{ color: Colors.textMuted, fontSize: 13 }}>Aucune station après ce départ</Text></View>
+                        : arriveeOptions.map(s => (
+                          <TouchableOpacity
+                            key={s.arret}
+                            style={[styles.ddItem, arrivee === s.arret && styles.ddItemActive]}
+                            onPress={() => { setArrivee(s.arret); setShowArrivee(false); }}
+                          >
+                            <Text style={[styles.ddItemText, arrivee === s.arret && styles.ddItemTextActive]}>{s.arret}</Text>
+                            <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
+                          </TouchableOpacity>
+                        ))
+                      }
+                    </View>
+                  )}
+                </>
+              )}
+              {distance > 0 && (
+                <View style={styles.distBadge}>
+                  <ChevronRight color={Colors.success} size={13} />
+                  <Text style={styles.distText}>{depart} → {arrivee} · {distance.toFixed(1)} km</Text>
+                </View>
+              )}
+            </View>
 
-        {/* 5. Récapitulatif + bouton */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Siège</Text><Text style={styles.summaryVal}>{selectedSeat || '—'}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Départ</Text><Text style={styles.summaryVal}>{arretDepart || '—'}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Arrivée</Text><Text style={styles.summaryVal}>{arretArrivee || '—'}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Horaire</Text><Text style={styles.summaryVal}>{horaire || '—'}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Tarif</Text><Text style={styles.summaryVal}>{typeTarif}</Text></View>
-          <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryTotalLabel}>TOTAL</Text>
-            <Text style={styles.summaryTotalVal}>{prix.toFixed(3)} TND</Text>
-          </View>
+            <TouchableOpacity
+              style={[styles.nextBtn, !step0Valid && styles.nextBtnDisabled]}
+              onPress={() => setStep(1)}
+              disabled={!step0Valid}
+            >
+              <Text style={[styles.nextBtnText, !step0Valid && styles.nextBtnTextDis]}>Suivant — Choisir le tarif</Text>
+              <ChevronRight color={step0Valid ? Colors.primary : Colors.textMuted} size={18} />
+            </TouchableOpacity>
+          </>
+        )}
 
-          <TouchableOpacity
-            style={[styles.sellBtn, (!canSell || selling) && styles.btnDisabled]}
-            onPress={handleSell}
-            disabled={!canSell || selling}
-          >
-            {selling ? <ActivityIndicator color="#1a3a52" /> : (
-              <>
-                <Printer color="#1a3a52" size={20} />
-                <Text style={styles.sellBtnTxt}>Émettre le billet</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* ══ STEP 1: TARIF & SIÈGE ══════════════════════════════════ */}
+        {step === 1 && (
+          <>
+            {/* Route summary */}
+            <View style={styles.routeSummary}>
+              <View style={styles.routeSummaryItem}>
+                <View style={[styles.rsDot, { backgroundColor: Colors.success }]} />
+                <Text style={styles.rsTxt}>{depart}</Text>
+              </View>
+              <View style={styles.rsLine} />
+              <View style={styles.routeSummaryItem}>
+                <View style={[styles.rsDot, { backgroundColor: Colors.danger }]} />
+                <Text style={styles.rsTxt}>{arrivee}</Text>
+              </View>
+              <Text style={styles.rsDist}>{distance.toFixed(1)} km · {horaire}</Text>
+            </View>
 
+            {/* Tarif */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}><User size={14} color={Colors.textMid} /> Type de tarif</Text>
+              <View style={styles.tarifGrid}>
+                {TARIFS.map(t => (
+                  <TouchableOpacity
+                    key={t.key}
+                    style={[styles.tarifCard, typeTarif === t.key && { borderColor: t.color, backgroundColor: t.color + '12' }]}
+                    onPress={() => setTypeTarif(t.key)}
+                  >
+                    <Text style={[styles.tarifLabel, typeTarif === t.key && { color: t.color }]}>{t.label}</Text>
+                    {t.reduc > 0 && <Text style={[styles.tarifReduc, { color: t.color }]}>-{t.reduc}%</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Seat Grid */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}><Ticket size={14} color={Colors.textMid} /> Sélection du siège</Text>
+              <View style={styles.legend}>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.bgMid, borderColor: Colors.border, borderWidth: 1 }]} /><Text style={styles.legendTxt}>Libre</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.primary }]} /><Text style={styles.legendTxt}>Sélectionné</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.dangerLight }]} /><Text style={styles.legendTxt}>Occupé</Text></View>
+              </View>
+              {!horaire && (
+                <Text style={styles.seatWarn}>Choisissez un horaire pour voir les sièges disponibles</Text>
+              )}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.seatGrid}>{renderSeats()}</View>
+              </ScrollView>
+            </View>
+
+            <View style={styles.navRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setStep(0)}>
+                <ChevronLeft color={Colors.textMid} size={18} />
+                <Text style={styles.backBtnText}>Retour</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.nextBtn, { flex: 1 }, !step1Valid && styles.nextBtnDisabled]}
+                onPress={() => setStep(2)}
+                disabled={!step1Valid}
+              >
+                <Text style={[styles.nextBtnText, !step1Valid && styles.nextBtnTextDis]}>Voir le récapitulatif</Text>
+                <ChevronRight color={step1Valid ? Colors.primary : Colors.textMuted} size={18} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* ══ STEP 2: RÉCAPITULATIF ══════════════════════════════════ */}
+        {step === 2 && (
+          <>
+            <View style={styles.recap}>
+              <Text style={styles.recapTitle}>Récapitulatif du billet</Text>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Bus</Text><Text style={styles.recapVal}>N° {numero_bus}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Ligne</Text><Text style={styles.recapVal}>{num_ligne}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Horaire</Text><Text style={styles.recapVal}>{horaire}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Départ</Text><Text style={styles.recapVal}>{depart}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Arrivée</Text><Text style={styles.recapVal}>{arrivee}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Distance</Text><Text style={styles.recapVal}>{distance.toFixed(1)} km</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Siège</Text><Text style={[styles.recapVal, { color: Colors.primary, fontWeight: '900', fontSize: 18 }]}>{selectedSeat}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Tarif</Text>
+                <Text style={styles.recapVal}>
+                  {TARIFS.find(t => t.key === typeTarif)?.label}
+                  {(TARIFS.find(t => t.key === typeTarif)?.reduc ?? 0) > 0
+                    ? ` (-${TARIFS.find(t => t.key === typeTarif)?.reduc}%)`
+                    : ''}
+                </Text>
+              </View>
+              <View style={[styles.recapRow, styles.recapTotal]}>
+                <Text style={styles.recapTotalLabel}>TOTAL</Text>
+                <Text style={styles.recapTotalVal}>{prix.toFixed(3)} TND</Text>
+              </View>
+            </View>
+
+            <View style={styles.navRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
+                <ChevronLeft color={Colors.textMid} size={18} />
+                <Text style={styles.backBtnText}>Modifier</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sellBtn, selling && styles.nextBtnDisabled]}
+                onPress={handleSell}
+                disabled={selling}
+              >
+                {selling
+                  ? <ActivityIndicator color={Colors.primary} />
+                  : <><Printer color={Colors.primary} size={20} /><Text style={styles.sellBtnText}>Émettre le billet</Text></>
+                }
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* ── Ticket Modal ─────────────────────────────────────────────────── */}
-      <Modal visible={ticketModal} animationType="slide" transparent>
+      {/* ── Ticket Modal ── */}
+      <Modal visible={ticketModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.ticketModal}>
-            {/* Header */}
+          <View style={styles.ticketSheet}>
+            <View style={styles.sheetHandle} />
             <View style={styles.ticketHeader}>
-              <CheckCircle color="#16a34a" size={32} />
-              <Text style={styles.ticketHeaderTxt}>Billet émis !</Text>
-              <TouchableOpacity onPress={() => setTicketModal(false)} style={styles.closeBtn}>
-                <X color="#64748b" size={24} />
+              <CheckCircle color={Colors.success} size={32} strokeWidth={2} />
+              <Text style={styles.ticketHeaderTitle}>Billet émis avec succès !</Text>
+              <TouchableOpacity onPress={() => setModal(false)} style={styles.ticketClose}>
+                <X color={Colors.textMuted} size={22} />
               </TouchableOpacity>
             </View>
 
-            {/* Ticket body */}
             {lastTicket && (
               <View style={styles.ticketBody}>
-                {/* Logo */}
-                <Text style={styles.ticketLogo}>🚌 TuniMove</Text>
+                <Text style={styles.ticketBrand}>🚌 TuniMove</Text>
                 <Text style={styles.ticketSubtitle}>Transport Interurbain</Text>
-
-                <View style={styles.sep} />
-
+                <View style={styles.ticketDivider} />
                 <View style={styles.ticketGrid}>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Bus</Text><Text style={styles.ticketValue}>N° {lastTicket.numero_bus}</Text></View>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Siège</Text><Text style={[styles.ticketValue, { fontSize: 22, color: '#1a3a52' }]}>{lastTicket.siege}</Text></View>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Départ</Text><Text style={styles.ticketValue}>{lastTicket.station_depart}</Text></View>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Arrivée</Text><Text style={styles.ticketValue}>{lastTicket.station_arrivee}</Text></View>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Heure</Text><Text style={styles.ticketValue}>{lastTicket.heure_depart}</Text></View>
-                  <View style={styles.ticketField}><Text style={styles.ticketKey}>Tarif</Text><Text style={styles.ticketValue}>{lastTicket.type_tarif}</Text></View>
+                  {[
+                    ['Bus', `N° ${lastTicket.numero_bus}`],
+                    ['Siège', lastTicket.siege],
+                    ['Départ', lastTicket.station_depart],
+                    ['Arrivée', lastTicket.station_arrivee],
+                    ['Heure', lastTicket.heure_depart],
+                    ['Tarif', lastTicket.type_tarif],
+                  ].map(([k, v]) => (
+                    <View key={k} style={styles.ticketField}>
+                      <Text style={styles.ticketKey}>{k}</Text>
+                      <Text style={[styles.ticketVal, k === 'Siège' && { fontSize: 22, color: Colors.primary }]}>{v}</Text>
+                    </View>
+                  ))}
                 </View>
-
-                <View style={styles.sep} />
-
-                {/* Code QR / Ticket */}
-                <View style={styles.qrBox}>
-                  <Text style={styles.qrLabel}>Code de validation</Text>
+                <View style={styles.ticketDivider} />
+                <View style={styles.ticketQR}>
+                  <Text style={styles.qrLabel}>CODE DE VALIDATION</Text>
                   <Text style={styles.qrCode}>{lastTicket.code_ticket}</Text>
-                  <Text style={styles.qrHint}>À présenter au contrôleur</Text>
+                  <Text style={styles.qrHint}>À présenter au contrôleur lors du contrôle</Text>
                 </View>
-
-                <View style={styles.sep} />
-
-                <Text style={styles.ticketTotal}>{lastTicket.montant_total.toFixed(3)} TND</Text>
-                <Text style={styles.ticketFooter}>Receveur : {prenom} {nom} · {new Date(lastTicket.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                <View style={styles.ticketDivider} />
+                <Text style={styles.ticketTotal}>{(lastTicket.montant_total as number).toFixed(3)} TND</Text>
+                <Text style={styles.ticketFooter}>{prenom} {nom} · {new Date(lastTicket.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
             )}
 
-            <TouchableOpacity style={styles.newTicketBtn} onPress={() => { setTicketModal(false); }}>
-              <Ticket color="#1a3a52" size={18} />
-              <Text style={styles.newTicketBtnTxt}>Émettre un nouveau billet</Text>
+            <TouchableOpacity style={styles.newTicketBtn} onPress={() => { setModal(false); }}>
+              <Ticket color={Colors.primary} size={18} />
+              <Text style={styles.newTicketBtnText}>Émettre un autre billet</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const SEAT_SIZE = Math.min(42, (width - 80) / 5);
+const SEAT_SZ = Math.min(40, (width - 80) / 5);
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 16, paddingBottom: 40 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: Colors.bgLight },
+  content: { padding: Spacing.base, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
 
+  // Steps Bar
+  stepsBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.white, paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.divider,
+  },
+  stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  stepNum: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
+  },
+  stepNumActive: { backgroundColor: Colors.primary },
+  stepNumDone: { backgroundColor: Colors.success },
+  stepNumText: { fontSize: 12, fontWeight: '800', color: Colors.textMuted },
+  stepNumTextActive: { color: Colors.white },
+  stepLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', marginLeft: 4 },
+  stepLabelActive: { color: Colors.primary, fontWeight: '800' },
+  stepConnector: { flex: 1, height: 2, backgroundColor: Colors.border, marginHorizontal: 4 },
+  stepConnectorDone: { backgroundColor: Colors.success },
+
+  // Service Banner
   serviceBanner: {
-    backgroundColor: '#1a3a52', borderRadius: 14, padding: 14, marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.primary + '10', borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.md,
+    borderWidth: 1, borderColor: Colors.primary + '20',
   },
-  serviceBannerText: { color: '#fbbf24', fontWeight: '700', fontSize: 14 },
-  serviceBannerSub: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
+  bannerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
+  bannerText: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
 
+  // Section
   section: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14,
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    backgroundColor: Colors.white, borderRadius: Radius.lg,
+    padding: Spacing.base, marginBottom: Spacing.sm, ...Shadow.card,
   },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
 
+  // Picker
   picker: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    height: 48, paddingHorizontal: 14, backgroundColor: '#f8fafc',
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md,
+    height: 50, paddingHorizontal: 14, backgroundColor: Colors.bgLight,
   },
-  pickerVal: { fontSize: 15, color: '#0f172a' },
-  pickerPlaceholder: { fontSize: 15, color: '#94a3b8' },
+  pickerVal: { fontSize: 14, color: Colors.textDark, fontWeight: '600' },
+  pickerPh: { fontSize: 14, color: Colors.textLight },
+
+  // Dropdown
   dropdown: {
-    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10,
-    marginTop: 4, overflow: 'hidden', maxHeight: 220,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
+    marginTop: 6, overflow: 'hidden', maxHeight: 200, backgroundColor: Colors.white,
   },
-  dropItem: { padding: 13, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  dropItemActive: { backgroundColor: '#eff6ff' },
-  dropItemTxt: { fontSize: 14, color: '#334155' },
-  dropItemActiveTxt: { color: '#1a3a52', fontWeight: '700' },
-
-  routeRow: { gap: 8 },
-  routePoint: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot: { width: 12, height: 12, borderRadius: 6 },
-  routeLabel: { fontSize: 15, color: '#1e293b', fontWeight: '600' },
-  routeLine: { width: 2, height: 16, backgroundColor: '#e2e8f0', marginLeft: 5 },
-  distanceBadge: {
-    backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
-    alignSelf: 'flex-start', marginTop: 10,
+  ddItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: 13, borderBottomWidth: 1, borderBottomColor: Colors.divider, gap: 8,
   },
-  distanceTxt: { color: '#16a34a', fontWeight: '700', fontSize: 13 },
+  ddItemActive: { backgroundColor: Colors.primary + '10' },
+  ddItemText: { fontSize: 14, color: Colors.textMid, flex: 1 },
+  ddItemTextActive: { color: Colors.primary, fontWeight: '700' },
+  ddItemSub: { fontSize: 12, color: Colors.textLight },
 
-  tarifRow: { flexDirection: 'row', gap: 10 },
+  // Distance badge
+  distBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.successLight, borderRadius: Radius.pill,
+    paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginTop: 8,
+  },
+  distText: { fontSize: 12, color: Colors.success, fontWeight: '700' },
+
+  // Route Summary (step 1)
+  routeSummary: {
+    backgroundColor: Colors.primary, borderRadius: Radius.xl,
+    padding: Spacing.base, marginBottom: Spacing.md, gap: 6, ...Shadow.strong,
+  },
+  routeSummaryItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rsDot: { width: 10, height: 10, borderRadius: 5 },
+  rsTxt: { fontSize: 14, color: Colors.white, fontWeight: '700' },
+  rsLine: { width: 2, height: 14, backgroundColor: Colors.white + '40', marginLeft: 4 },
+  rsDist: { fontSize: 12, color: Colors.accent, fontWeight: '600', marginTop: 4 },
+
+  // Tarif
+  tarifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   tarifCard: {
-    flex: 1, alignItems: 'center', padding: 12,
-    borderRadius: 12, borderWidth: 2, borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    flex: 1, minWidth: '45%', alignItems: 'center', padding: 10,
+    borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.border,
+    backgroundColor: Colors.bgLight, gap: 3,
   },
-  tarifCardActive: { borderWidth: 2 },
-  tarifLabel: { fontSize: 13, fontWeight: '700', color: '#334155' },
-  tarifReduc: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  tarifLabel: { fontSize: 13, fontWeight: '700', color: Colors.textMid },
+  tarifReduc: { fontSize: 11, fontWeight: '700' },
 
-  seatLegend: { flexDirection: 'row', gap: 16, marginBottom: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 12, height: 12, borderRadius: 4 },
-  legendTxt: { fontSize: 12, color: '#64748b' },
-  seatGrid: { gap: 4 },
-  seatRow: { flexDirection: 'row', gap: 4 },
+  // Seats
+  legend: { flexDirection: 'row', gap: 12, marginBottom: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 12, height: 12, borderRadius: 3 },
+  legendTxt: { fontSize: 11, color: Colors.textMuted },
+  seatWarn: { fontSize: 12, color: Colors.warning, fontWeight: '600', marginBottom: 8 },
+  seatGrid: { gap: 5, paddingVertical: 4 },
+  seatRow: { flexDirection: 'row', gap: 5 },
   seat: {
-    width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5,
+    width: SEAT_SZ, height: SEAT_SZ, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
   },
-  seatFree: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' },
-  seatSel:  { backgroundColor: '#1a3a52', borderColor: '#1a3a52' },
-  seatOcc:  { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
-  seatTxt:  { fontSize: 10, fontWeight: '700' },
-  seatFreeTxt: { color: '#475569' },
-  seatSelTxt:  { color: '#ffffff' },
-  seatOccTxt:  { color: '#dc2626' },
+  seatFree: { backgroundColor: Colors.bgMid, borderColor: Colors.border },
+  seatSel: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  seatOcc: { backgroundColor: Colors.dangerLight, borderColor: Colors.danger + '50' },
+  seatTxt: { fontSize: 10, fontWeight: '700' },
+  seatTxtFree: { color: Colors.textMid },
+  seatTxtSel: { color: Colors.white },
+  seatTxtOcc: { color: Colors.danger },
 
-  summaryCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    shadowColor: '#64748b', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+  // Recap
+  recap: {
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
+    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  summaryLabel: { fontSize: 13, color: '#64748b' },
-  summaryVal: { fontSize: 13, fontWeight: '600', color: '#1e293b' },
-  summaryTotal: { borderBottomWidth: 0, marginTop: 8 },
-  summaryTotalLabel: { fontSize: 16, fontWeight: '800', color: '#1a3a52' },
-  summaryTotalVal: { fontSize: 22, fontWeight: '900', color: '#1a3a52' },
+  recapTitle: { fontSize: 16, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
+  recapRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.divider,
+  },
+  recapLabel: { fontSize: 13, color: Colors.textMuted },
+  recapVal: { fontSize: 13, fontWeight: '700', color: Colors.textDark },
+  recapTotal: { borderBottomWidth: 0, marginTop: 6 },
+  recapTotalLabel: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  recapTotalVal: { fontSize: 24, fontWeight: '900', color: Colors.primary },
 
+  // Nav
+  navRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'stretch' },
+  nextBtn: {
+    flex: 1, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, ...Shadow.accent,
+  },
+  nextBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  nextBtnText: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  nextBtnTextDis: { color: Colors.textMuted },
+  backBtn: {
+    backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingHorizontal: 16, borderWidth: 1.5, borderColor: Colors.border,
+  },
+  backBtnText: { fontSize: 14, fontWeight: '700', color: Colors.textMid },
   sellBtn: {
-    backgroundColor: '#fbbf24', height: 56, borderRadius: 14, marginTop: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    flex: 1, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...Shadow.accent,
   },
-  sellBtnTxt: { fontSize: 16, fontWeight: '800', color: '#1a3a52' },
-  btnDisabled: { opacity: 0.45 },
+  sellBtnText: { fontSize: 15, fontWeight: '800', color: Colors.primary },
 
-  // ── Modal ──
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  ticketSheet: {
+    backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: Spacing.xl, maxHeight: '92%',
   },
-  ticketModal: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, maxHeight: '90%',
-  },
-  ticketHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16,
-  },
-  ticketHeaderTxt: { flex: 1, fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  closeBtn: { padding: 4 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
+  ticketHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.base },
+  ticketHeaderTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: Colors.textDark },
+  ticketClose: { padding: 4 },
 
   ticketBody: { alignItems: 'center' },
-  ticketLogo: { fontSize: 22, fontWeight: '900', color: '#1a3a52' },
-  ticketSubtitle: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  sep: { width: '100%', height: 1, backgroundColor: '#f1f5f9', marginVertical: 14 },
-
+  ticketBrand: { fontSize: 20, fontWeight: '900', color: Colors.primary },
+  ticketSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  ticketDivider: { width: '100%', height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
   ticketGrid: { flexDirection: 'row', flexWrap: 'wrap', width: '100%', gap: 8 },
-  ticketField: {
-    width: '48%', backgroundColor: '#f8fafc', borderRadius: 10, padding: 10,
-  },
-  ticketKey: { fontSize: 11, color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' },
-  ticketValue: { fontSize: 15, fontWeight: '700', color: '#1e293b', marginTop: 2 },
-
-  qrBox: { alignItems: 'center', width: '100%' },
-  qrLabel: { fontSize: 12, color: '#64748b', marginBottom: 8, fontWeight: '600' },
+  ticketField: { width: '48%', backgroundColor: Colors.bgLight, borderRadius: Radius.md, padding: 10 },
+  ticketKey: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  ticketVal: { fontSize: 14, fontWeight: '700', color: Colors.textDark, marginTop: 2 },
+  ticketQR: { alignItems: 'center', width: '100%' },
+  qrLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
   qrCode: {
-    fontFamily: 'monospace', fontSize: 20, fontWeight: '900',
-    color: '#1a3a52', letterSpacing: 4,
-    backgroundColor: '#f0f9ff', paddingHorizontal: 20, paddingVertical: 12,
-    borderRadius: 12, borderWidth: 2, borderColor: '#bae6fd',
-    textAlign: 'center',
+    fontFamily: 'monospace', fontSize: 18, fontWeight: '900', color: Colors.primary,
+    letterSpacing: 3, backgroundColor: Colors.bgLight, paddingHorizontal: 20,
+    paddingVertical: 12, borderRadius: 12, borderWidth: 2, borderColor: Colors.border,
   },
-  qrHint: { fontSize: 11, color: '#94a3b8', marginTop: 6 },
-
-  ticketTotal: { fontSize: 30, fontWeight: '900', color: '#1a3a52', marginBottom: 4 },
-  ticketFooter: { fontSize: 11, color: '#94a3b8', textAlign: 'center' },
-
+  qrHint: { fontSize: 11, color: Colors.textLight, marginTop: 6 },
+  ticketTotal: { fontSize: 28, fontWeight: '900', color: Colors.primary, marginBottom: 4 },
+  ticketFooter: { fontSize: 11, color: Colors.textLight },
   newTicketBtn: {
-    backgroundColor: '#fbbf24', height: 52, borderRadius: 14, marginTop: 20,
+    backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg, marginTop: Spacing.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
   },
-  newTicketBtnTxt: { fontSize: 15, fontWeight: '800', color: '#1a3a52' },
+  newTicketBtnText: { fontSize: 14, fontWeight: '800', color: Colors.primary },
 });

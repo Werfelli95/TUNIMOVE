@@ -1,61 +1,39 @@
 import { Stack } from 'expo-router';
+import { Colors } from '../../constants/theme';
+
+const HEADER = {
+  headerStyle: { backgroundColor: Colors.primary },
+  headerTintColor: Colors.white,
+  headerTitleStyle: { fontWeight: '700' as const, fontSize: 16 },
+  headerBackTitleVisible: false,
+};
 
 export default function ReceveurLayout() {
   return (
     <Stack>
-      <Stack.Screen 
-        name="dashboard" 
-        options={{ 
-          headerShown: true, 
-          title: "Tableau de bord (Receveur)",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="dashboard"
+        options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="sell" 
-        options={{ 
-          headerShown: true, 
-          title: "Vente de billets",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="service"
+        options={{ ...HEADER, title: 'Gestion du service' }}
       />
-      <Stack.Screen 
-        name="manifeste" 
-        options={{ 
-          headerShown: true, 
-          title: "Manifeste",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="vente"
+        options={{ ...HEADER, title: 'Émettre un billet' }}
       />
-      <Stack.Screen 
-        name="incident" 
-        options={{ 
-          headerShown: true, 
-          title: "Signaler un incident",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="manifeste"
+        options={{ ...HEADER, title: 'Manifeste du service' }}
       />
-      <Stack.Screen 
-        name="service" 
-        options={{ 
-          headerShown: true, 
-          title: "Gestion du service",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="incident"
+        options={{ ...HEADER, title: 'Signaler un incident' }}
       />
-      <Stack.Screen 
-        name="vente" 
-        options={{ 
-          headerShown: true, 
-          title: "Vente de billets",
-          headerStyle: { backgroundColor: '#1a3a52' },
-          headerTintColor: '#fff'
-        }} 
+      <Stack.Screen
+        name="sell"
+        options={{ ...HEADER, title: 'Vente de billets' }}
       />
     </Stack>
   );
