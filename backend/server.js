@@ -7,6 +7,7 @@ const busRoutes = require('./routes/busRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const networkRoutes = require('./routes/networkRoutes');
 const tarifRoutes = require('./routes/tarifRoutes');
+const tarificationRoutes = require('./routes/tarificationRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const saleRoutes = require('./routes/saleRoutes');
 const guichetRoutes = require('./routes/guichetRoutes');
@@ -29,6 +30,7 @@ app.use('/api/buses', busRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/tarifs', tarifRoutes);
+app.use('/api/tarification', tarificationRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/guichets', guichetRoutes);
@@ -39,6 +41,12 @@ app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
     res.send('TuniMove API is running...');
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err.message);
+    res.status(500).json({ message: err.message });
 });
 
 app.listen(PORT, () => {

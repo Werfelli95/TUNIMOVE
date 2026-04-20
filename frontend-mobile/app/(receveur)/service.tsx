@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Modal, TextInput, RefreshControl
+  ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -84,67 +84,95 @@ export default function ServiceScreen() {
     : `${elapsedMin}min`;
 
   // ── Station progress ──
-  const currentIdx = stations.indexOf(svc?.station_actuelle ?? '');
-  const nextStation = !svc?.voyage_complet && currentIdx >= 0 && currentIdx < stations.length - 1
-    ? stations[currentIdx + 1]
-    : null;
-  const isLastStop = nextStation !== null && currentIdx === stations.length - 2;
+  const currentIdx = stations.findIndex(s => s.toLowerCase().trim() === (svc?.station_actuelle ?? '').toLowerCase().trim());
+  let nextStation: string | null = null;
+  let isLastStop = false;
+
+  if (!svc?.voyage_complet) {
+    if (currentIdx >= 0 && currentIdx < stations.length - 1) {
+      nextStation = stations[currentIdx + 1];
+      isLastStop = (currentIdx === stations.length - 2);
+    } else if (currentIdx === -1 && stations.length > 0) {
+      nextStation = stations[0];
+      isLastStop = (stations.length === 1);
+    }
+  }
 
   // ── Handlers ──
-  const handleStart = () => Alert.alert(
-    '🚌 Démarrer le service',
-    `Démarrer un service pour le Bus N° ${numero_bus} ?`,
-    [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Démarrer', onPress: async () => {
-        setStarting(true);
-        try {
-          const r = await axios.post(`${BASE}/start`, { numero_bus });
-          const s = r.data.service as ActiveService;
-          setSvc({ ...s, nb_tickets: 0, recette: 0 });
-          Alert.alert('✅ Service démarré', `Service #${s.id_service} démarré.`);
-        } catch (e: any) {
-          Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de démarrer');
-        } finally { setStarting(false); }
-      }}
-    ]
-  );
+  const handleStart = () => {
+    const msg = `Démarrer un service pour le Bus N° ${numero_bus} ?`;
+    const proceed = async () => {
+      setStarting(true);
+      try {
+        const r = await axios.post<any>(`${BASE}/start`, { numero_bus });
+        const s = r.data.service as ActiveService;
+        setSvc({ ...s, nb_tickets: 0, recette: 0 });
+        if (Platform.OS === 'web') window.alert(`✅ Service #${s.id_service} démarré.`);
+        else Alert.alert('✅ Service démarré', `Service #${s.id_service} démarré.`);
+      } catch (e: any) {
+        if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Impossible de démarrer'));
+        else Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de démarrer');
+      } finally { setStarting(false); }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) proceed();
+    } else {
+      Alert.alert('🚌 Démarrer le service', msg, [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Démarrer', onPress: proceed }
+      ]);
+    }
+  };
 
   const handleAvancer = () => {
     if (!nextStation || !svc) return;
-    Alert.alert(
-      isLastStop ? '🏁 Destination finale' : '➡️ Prochaine station',
-      `Confirmer l'arrivée à ${nextStation} ?${isLastStop ? '\nLe voyage sera marqué comme terminé.' : ''}`,
-      [
+    
+    const title = isLastStop ? '🏁 Destination finale' : '➡️ Prochaine station';
+    const msg = `Confirmer l'arrivée à ${nextStation} ?${isLastStop ? '\nLe voyage sera marqué comme terminé.' : ''}`;
+    
+    const proceed = async () => {
+      setAdv(true);
+      try {
+        const r = await axios.post<any>(`${BASE}/${svc.id_service}/avancer`, {
+          prochaine_station: nextStation,
+          est_derniere: isLastStop,
+        });
+        const up = r.data.service;
+        setSvc(prev => prev ? { ...prev, station_actuelle: up.station_actuelle, voyage_complet: up.voyage_complet } : null);
+        if (isLastStop) {
+          const m = `🏁 Voyage terminé ! Vous êtes à ${nextStation}. Vous pouvez clôturer le service.`;
+          if (Platform.OS === 'web') window.alert(m);
+          else Alert.alert('🏁 Voyage terminé !', m);
+        }
+      } catch (e: any) {
+        if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Erreur mise à jour'));
+        else Alert.alert('Erreur', e.response?.data?.message ?? 'Erreur mise à jour');
+      } finally { setAdv(false); }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(title + '\n\n' + msg)) proceed();
+    } else {
+      Alert.alert(title, msg, [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: async () => {
-          setAdv(true);
-          try {
-            const r = await axios.post(`${BASE}/${svc.id_service}/avancer`, {
-              prochaine_station: nextStation,
-              est_derniere: isLastStop,
-            });
-            const up = r.data.service;
-            setSvc(prev => prev ? { ...prev, station_actuelle: up.station_actuelle, voyage_complet: up.voyage_complet } : null);
-            if (isLastStop) Alert.alert('🏁 Voyage terminé !', `Vous êtes à ${nextStation}. Vous pouvez clôturer le service.`);
-          } catch (e: any) {
-            Alert.alert('Erreur', e.response?.data?.message ?? 'Erreur mise à jour');
-          } finally { setAdv(false); }
-        }}
-      ]
-    );
+        { text: 'Confirmer', onPress: proceed }
+      ]);
+    }
   };
 
   const handleClose = async (raison?: string) => {
     if (!svc) return;
     setClosing(true);
     try {
-      const r = await axios.post(`${BASE}/${svc.id_service}/close`, raison ? { raison_incident: raison } : {});
+      const r = await axios.post<any>(`${BASE}/${svc.id_service}/close`, raison ? { raison_incident: raison } : {});
       setSvc(null);
       setIncModal(false);
-      Alert.alert('✅ Service clôturé', r.data.message);
+      if (Platform.OS === 'web') window.alert('✅ Service clôturé: ' + r.data.message);
+      else Alert.alert('✅ Service clôturé', r.data.message);
     } catch (e: any) {
-      Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
+      if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Impossible de clôturer'));
+      else Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
     } finally { setClosing(false); }
   };
 
@@ -231,11 +259,7 @@ export default function ServiceScreen() {
                 )}
               </View>
 
-              <View style={styles.dirRow}>
-                <Text style={styles.dirFrom}>{svc.ville_depart || '—'}</Text>
-                <ChevronRight color={Colors.textMuted} size={14} />
-                <Text style={styles.dirTo}>{svc.ville_arrivee || '—'}</Text>
-              </View>
+
 
               {stations.length > 0 && (
                 <View style={styles.timeline}>
@@ -291,15 +315,6 @@ export default function ServiceScreen() {
             </View>
 
             {/* ── Action Buttons ── */}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => router.push({ pathname: '/(receveur)/vente', params: navParams })}
-            >
-              <Ticket color={Colors.primary} size={20} />
-              <Text style={styles.primaryBtnText}>Émettre un billet</Text>
-              <ChevronRight color={Colors.primary} size={18} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={() => router.push({ pathname: '/(receveur)/manifeste', params: navParams })}

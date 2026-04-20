@@ -37,15 +37,42 @@ exports.createIncident = async (req, res) => {
     }
 };
 
-// Lister tous les incidents (admin)
+// Lister tous les incidents (admin) with optional ?statut= filter
 exports.getAllIncidents = async (req, res) => {
     try {
-        const result = await db.query(
-            `SELECT * FROM incident ORDER BY date_incident DESC`
-        );
+        const { statut } = req.query;
+        let query = `SELECT * FROM incident`;
+        const params = [];
+        if (statut && statut !== 'all') {
+            params.push(statut);
+            query += ` WHERE statut = $1`;
+        }
+        query += ` ORDER BY date_incident DESC`;
+        const result = await db.query(query, params);
         res.json(result.rows);
     } catch (err) {
         console.error('Erreur getAllIncidents:', err);
         res.status(500).json({ message: 'Erreur lors de la récupération des incidents' });
+    }
+};
+
+// Update incident status (admin)
+exports.updateIncidentStatus = async (req, res) => {
+    const { id } = req.params;
+    const { statut } = req.body;
+    const allowed = ['En attente', 'En cours de traitement', 'Résolu'];
+    if (!allowed.includes(statut)) {
+        return res.status(400).json({ message: 'Statut invalide' });
+    }
+    try {
+        const result = await db.query(
+            `UPDATE incident SET statut = $1 WHERE id_incident = $2 RETURNING *`,
+            [statut, id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Incident introuvable' });
+        res.json({ message: 'Statut mis à jour', incident: result.rows[0] });
+    } catch (err) {
+        console.error('Erreur updateIncidentStatus:', err);
+        res.status(500).json({ message: 'Erreur lors de la mise à jour' });
     }
 };

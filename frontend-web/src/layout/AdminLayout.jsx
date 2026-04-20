@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Bus, GitPullRequest, Network, CircleDollarSign,
-  History, LogOut, Bell, Search, User, Mail, Phone, Hash, Shield, X, Loader2, ShoppingCart
+  PieChart, Users, Bus, Key, ClipboardList, Route, Tags, FileCheck, Receipt, Siren,
+  LogOut, Bell, Search, User, Mail, Phone, Hash, Shield, X, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProfileModal from '../components/ProfileModal';
@@ -44,13 +44,13 @@ const AdminLayout = () => {
   };
 
   const navItems = [
-    { icon: <LayoutDashboard />, label: 'Tableau de bord', path: '/admin-dashboard' },
+    { icon: <PieChart />, label: 'Tableau de bord', path: '/admin-dashboard' },
     { icon: <Users />, label: 'Utilisateurs', path: '/admin-dashboard/users' },
     { icon: <Bus />, label: 'Flotte', path: '/admin-dashboard/fleet' },
     { 
       icon: (
         <div className="relative">
-          <Shield />
+          <Key />
           {pendingResets > 0 && (
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse"></span>
           )}
@@ -59,11 +59,12 @@ const AdminLayout = () => {
       label: 'Réinitialisations', 
       path: '/admin-dashboard/password-resets' 
     },
-    { icon: <GitPullRequest />, label: 'Affectations', path: '/admin-dashboard/assignments' },
-    { icon: <Network />, label: 'Réseau', path: '/admin-dashboard/network' },
-    { icon: <CircleDollarSign />, label: 'Tarifs', path: '/admin-dashboard/tarifs' },
-    { icon: <History />, label: 'Audit', path: '/admin-dashboard/audit' },
-    { icon: <ShoppingCart />, label: 'Historique des Ventes', path: '/admin-dashboard/sales-history' },
+    { icon: <ClipboardList />, label: 'Affectations', path: '/admin-dashboard/assignments' },
+    { icon: <Route />, label: 'Réseau', path: '/admin-dashboard/network' },
+    { icon: <Tags />, label: 'Tarifs', path: '/admin-dashboard/tarifs' },
+    { icon: <FileCheck />, label: 'Audit', path: '/admin-dashboard/audit' },
+    { icon: <Receipt />, label: 'Historique des Ventes', path: '/admin-dashboard/sales-history' },
+    { icon: <Siren />, label: 'Incidents', path: '/admin-dashboard/incidents' },
   ];
 
   const handleLogout = () => {
@@ -74,8 +75,10 @@ const AdminLayout = () => {
   return (
     <div className="admin-layout">
       <aside className="sidebar">
-        <div className="flex items-center justify-center mb-10 px-2">
-          <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '100px', width: 'auto' }} />
+        <div className="flex items-center justify-center mb-10 px-2 mt-4">
+          <NavLink to="/admin-dashboard" className="cursor-pointer transition-transform hover:scale-105 inline-block">
+            <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '140px', width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
+          </NavLink>
         </div>
 
         <nav className="sidebar-nav">

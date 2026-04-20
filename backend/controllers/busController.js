@@ -40,7 +40,7 @@ exports.createBus = async (req, res) => {
                 });
             }
         }
-        const image_url = req.file ? req.file.path.replace(/\\/g, '/') : null;
+        const image_url = req.file ? `uploads/buses/${req.file.filename}` : null;
 
         const result = await db.query(
             'INSERT INTO bus (numero_bus, capacite, etat, num_ligne, horaire_affecte, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -72,7 +72,7 @@ exports.updateBus = async (req, res) => {
 
         let image_url = req.body.image_url; // Conserver l'ancienne si pas de nouveau fichier
         if (req.file) {
-            image_url = req.file.path.replace(/\\/g, '/');
+            image_url = `uploads/buses/${req.file.filename}`;
         }
 
         const result = await db.query(

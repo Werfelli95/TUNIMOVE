@@ -59,13 +59,11 @@ export default function IncidentScreen() {
     setSubmitting(true);
     try {
       await axios.post('http://localhost:5000/api/incidents', {
-        categorie: category,
-        gravite: severity,
+        type_incident: `${category} [${severity}]`,
         description: description.trim(),
         numero_bus,
-        num_ligne,
-        id_service: service_id || null,
-        signale_par: `${prenom} ${nom}`,
+        ligne: num_ligne,
+        rapporte_par: `${prenom} ${nom}`,
       });
 
       if (closeService && service_id) {
@@ -273,8 +271,8 @@ export default function IncidentScreen() {
             <Text style={styles.successSub}>
               L'incident a été signalé et transmis à votre responsable.
             </Text>
-            <TouchableOpacity style={styles.successBtn} onPress={() => { setSuccessModal(false); router.back(); }}>
-              <Text style={styles.successBtnText}>Fermer</Text>
+            <TouchableOpacity style={styles.successBtn} onPress={() => { setSuccessModal(false); router.replace('/(receveur)/dashboard'); }}>
+              <Text style={styles.successBtnText}>Retour au tableau de bord</Text>
             </TouchableOpacity>
           </View>
         </View>

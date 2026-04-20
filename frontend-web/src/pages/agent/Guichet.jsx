@@ -30,8 +30,14 @@ const Guichet = () => {
     const [arretDepart, setArretDepart] = useState('');
     const [arretArrivee, setArretArrivee] = useState('');
     const [selectedSeat, setSelectedSeat] = useState(null);
-    const [typeTarif, setTypeTarif] = useState('Tarif Plein');
     const [occupiedSeats, setOccupiedSeats] = useState([]);
+
+    // New Dynamic Pricing States
+    const [tarifsDb, setTarifsDb] = useState([]);
+    const [bagagesDb, setBagagesDb] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState('VOYAGEUR');
+    const [selectedTarifId, setSelectedTarifId] = useState('');
+    const [selectedBagageId, setSelectedBagageId] = useState('');
 
     const [isPrinting, setIsPrinting] = useState(false);
     const [myGuichet, setMyGuichet] = useState(null);
@@ -56,15 +62,26 @@ const Guichet = () => {
 
             try {
                 // 1. On récupère d'abord toutes les données nécessaires
-                const [lignesRes, busRes, tarifRes] = await Promise.all([
+                const [lignesRes, busRes, tarifRes, typeTarifRes, typeBagageRes] = await Promise.all([
                     fetch('http://localhost:5000/api/network'),
                     fetch('http://localhost:5000/api/buses'),
-                    fetch('http://localhost:5000/api/tarifs')
+                    fetch('http://localhost:5000/api/tarifs'),
+                    fetch('http://localhost:5000/api/tarification'),
+                    fetch('http://localhost:5000/api/tarification/bagages')
                 ]);
 
                 const lignesData = await lignesRes.json();
                 const busData = await busRes.json();
                 const tarifData = await tarifRes.json();
+                const tTarifData = await typeTarifRes.json();
+                const bagageData = await typeBagageRes.json();
+                
+                if(tTarifData && !tTarifData.message) {
+                    setTarifsDb(tTarifData.filter(t => t.actif));
+                    const voyageurs = tTarifData.filter(t => t.actif && t.categorie === 'VOYAGEUR');
+                    if(voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification);
+                }
+                if(bagageData && !bagageData.message) setBagagesDb(bagageData.filter(b => b.actif));
 
                 // 2. Si on a un utilisateur connecté, on récupère son guichet pour filtrer
                 // Note: AgentLogin.jsx utilise 'id' et non 'id_utilisateur'
@@ -170,7 +187,7 @@ const Guichet = () => {
         const fetchOccupiedSeats = async () => {
             if (activeLigne && dateVoyage && horaire) {
                 try {
-                    const res = await fetch(`http://localhost:5000/api/Sales/tickets/occupied-seats?num_ligne=${selectedLigne}&date=${dateVoyage}&heure=${horaire}`);
+                    const res = await fetch(`http://localhost:5000/api/Sales/tickets/occupied-seats?num_ligne=${selectedLigne}&date=${dateVoyage}&heure=${horaire}&depart=${encodeURIComponent(arretDepart)}&arrivee=${encodeURIComponent(arretArrivee)}`);
                     if (res.ok) {
                         const data = await res.json();
                         setOccupiedSeats(data);
@@ -223,12 +240,29 @@ const Guichet = () => {
         distance = Math.abs(arriveeStation.distance_km - departStation.distance_km);
     }
 
+    const currentTarif = tarifsDb.find(t => String(t.id_type_tarification) === String(selectedTarifId));
+    const currentBagage = bagagesDb.find(b => String(b.id_type_bagage) === String(selectedBagageId));
+
     let calculatedTotal = 0;
-    if (tarifConfig && distance > 0) {
-        let basePrice = (distance * tarifConfig.prix_par_km) + tarifConfig.frais_fixes;
-        if (typeTarif === 'Étudiant') basePrice *= (1 - tarifConfig.red_etudiant / 100);
-        if (typeTarif === 'Handicapé') basePrice *= (1 - tarifConfig.red_handicape / 100);
-        calculatedTotal = basePrice;
+    let basePriceBreakdown = 0;
+    let reductionBreakdown = 0;
+    let bagageBreakdown = 0;
+
+    if (tarifConfig && distance > 0 && currentTarif) {
+        let basePrice = (distance * tarifConfig.prix_par_km) + parseFloat(tarifConfig.frais_fixes || 0);
+        basePriceBreakdown = basePrice;
+        
+        if (currentTarif.mode_calcul === 'PERCENT_RESTANT') {
+            calculatedTotal = basePrice * (currentTarif.valeur / 100);
+            reductionBreakdown = basePrice - calculatedTotal;
+        } else if (currentTarif.mode_calcul === 'FIXE') {
+            calculatedTotal = parseFloat(currentTarif.valeur) / 1000;
+        }
+
+        if (currentBagage) {
+            bagageBreakdown = parseFloat(currentBagage.prix) / 1000;
+            calculatedTotal += bagageBreakdown;
+        }
     }
 
     // Derived Bus capacities
@@ -294,7 +328,10 @@ const Guichet = () => {
                 arret_depart: arretDepart,
                 arret_arrivee: arretArrivee,
                 agent_id: agentInfo.id || agentInfo.id_utilisateur || null,
-                type_tarif: typeTarif
+                type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
+                id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
+                id_type_bagage: currentBagage ? currentBagage.id_type_bagage : null,
+                prix_bagage: bagageBreakdown
             };
 
             const res = await fetch('http://localhost:5000/api/Sales/tickets/vendre', {
@@ -530,24 +567,48 @@ const Guichet = () => {
                             </div>
                         </div>
 
-                        {/* SECTION 5: Tarif */}
-                        <div className="form-section mb-5">
-                            <h3>Type de Tarif</h3>
-                            <div className="tarif-cards">
-                                <div className={`tarif-card ${typeTarif === 'Tarif Plein' ? 'active' : ''}`} onClick={() => setTypeTarif('Tarif Plein')}>
-                                    <User size={24} />
-                                    <strong>Tarif Plein</strong>
-                                    <span>0% réduction</span>
+                        {/* SECTION 5: Tarif & Bagage */}
+                        <div className="form-section mb-5 bg-indigo-50 border-indigo-100" style={{border: '1px solid #e0e7ff', padding: '15px', borderRadius: '8px'}}>
+                            <h3 style={{color: '#4f46e5'}}><User size={20} /> Tarification et Suppléments</h3>
+                            
+                            <div className="flex-row">
+                                <div className="flex-1">
+                                    <label>Catégorie *</label>
+                                    <select className="g-select" value={selectedCategory} onChange={(e) => {
+                                        setSelectedCategory(e.target.value);
+                                        const ops = tarifsDb.filter(t => t.categorie === e.target.value);
+                                        if(ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification);
+                                        else setSelectedTarifId('');
+                                    }}>
+                                        <option value="VOYAGEUR">Voyageur (Réductions & Base)</option>
+                                        <option value="CONVENTION">Conventions (Police, Armée...)</option>
+                                        <option value="EXPEDITION">Expéditions / Colis</option>
+                                    </select>
                                 </div>
-                                <div className={`tarif-card ${typeTarif === 'Étudiant' ? 'active' : ''}`} onClick={() => setTypeTarif('Étudiant')}>
-                                    <User size={24} />
-                                    <strong>Étudiant</strong>
-                                    <span>-25%</span>
+                                
+                                <div className="flex-1">
+                                    <label>Type de Tarif *</label>
+                                    <select className="g-select" value={selectedTarifId} onChange={(e) => setSelectedTarifId(e.target.value)}>
+                                        {tarifsDb.filter(t => t.categorie === selectedCategory).map(t => (
+                                            <option key={t.id_type_tarification} value={t.id_type_tarification}>
+                                                {t.libelle} ({t.mode_calcul === 'PERCENT_RESTANT' ? t.valeur + '% à payer' : (t.valeur/1000).toFixed(3) + ' TND fix'})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <div className={`tarif-card ${typeTarif === 'Handicapé' ? 'active' : ''}`} onClick={() => setTypeTarif('Handicapé')}>
-                                    <User size={24} />
-                                    <strong>Handicapé</strong>
-                                    <span>-50%</span>
+                            </div>
+                            
+                            <div className="flex-row mt-3">
+                                <div className="flex-1">
+                                    <label>Bagages supplémentaires (Optionnel)</label>
+                                    <select className="g-select" value={selectedBagageId} onChange={(e) => setSelectedBagageId(e.target.value)}>
+                                        <option value="">-- Aucun supplément bagage --</option>
+                                        {bagagesDb.map(b => (
+                                            <option key={b.id_type_bagage} value={b.id_type_bagage}>
+                                                {b.libelle} (+ {(b.prix/1000).toFixed(3)} TND)
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -596,12 +657,37 @@ const Guichet = () => {
                                 </div>
                                 <div className="row">
                                     <span>Type:</span>
-                                    <strong>{typeTarif === 'Tarif Plein' ? 'Normal' : typeTarif}</strong>
+                                    <strong>{currentTarif ? currentTarif.libelle : '-'}</strong>
                                 </div>
                             </div>
+                            
+                            <div className="summary-breakdown" style={{borderTop: '1px solid #e2e8f0', margin: '15px 0', paddingTop: '15px'}}>
+                                <div className="row text-sm text-slate-600">
+                                    <span>Prix de Base:</span>
+                                    <span>{basePriceBreakdown.toFixed(3)} TND</span>
+                                </div>
+                                {reductionBreakdown > 0 && (
+                                    <div className="row text-sm text-emerald-600 font-medium">
+                                        <span>Réduction appliquée:</span>
+                                        <span>- {reductionBreakdown.toFixed(3)} TND</span>
+                                    </div>
+                                )}
+                                {currentTarif && currentTarif.mode_calcul === 'FIXE' && (
+                                    <div className="row text-sm text-indigo-600 font-medium">
+                                        <span>Tarif Fixe appliqué:</span>
+                                        <span>{calculatedTotal.toFixed(3)} TND</span>
+                                    </div>
+                                )}
+                                {bagageBreakdown > 0 && (
+                                    <div className="row text-sm text-amber-600 font-medium">
+                                        <span>Supplément Bagage:</span>
+                                        <span>+ {bagageBreakdown.toFixed(3)} TND</span>
+                                    </div>
+                                )}
+                            </div>
 
-                            <div className="summary-total">
-                                <span>Total:</span>
+                            <div className="summary-total" style={{ borderTop: '2px dashed #cbd5e1', paddingTop: '15px' }}>
+                                <span>Total à Payer:</span>
                                 <h2>{calculatedTotal.toFixed(3)} TND</h2>
                             </div>
 
@@ -722,11 +808,36 @@ const Guichet = () => {
                             <span>Siège:</span><strong>{selectedSeat}</strong>
                             <span>Bus:</span><strong>N° {selectedBus}</strong>
                             <span>Distance:</span><strong>{distance.toFixed(0)} km</strong>
+                            <span>Type Tarif:</span><strong>{currentTarif ? currentTarif.libelle : '-'}</strong>
+                            {currentBagage && (
+                                <>
+                                    <span>Bagage:</span><strong>{currentBagage.libelle}</strong>
+                                </>
+                            )}
                         </div>
 
-                        <h2 className="t-price">{calculatedTotal.toFixed(3)} TND</h2>
+                        <div style={{borderBottom: '1px dashed #000', margin:'10px 0'}}></div>
+                        
+                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                            <span>Prix de base:</span>
+                            <span>{basePriceBreakdown.toFixed(3)} TND</span>
+                        </div>
+                        {reductionBreakdown > 0 && (
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                                <span>Réduction:</span>
+                                <span>-{reductionBreakdown.toFixed(3)} TND</span>
+                            </div>
+                        )}
+                        {bagageBreakdown > 0 && (
+                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                                <span>Bagage:</span>
+                                <span>+{bagageBreakdown.toFixed(3)} TND</span>
+                            </div>
+                        )}
 
-                        <div className="t-qr" style={{ margin: '20px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
+                        <h2 className="t-price" style={{marginTop: '5px'}}>{calculatedTotal.toFixed(3)} TND</h2>
+
+                        <div className="t-qr" style={{ margin: '15px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
                             <QRCode
                                 value={qrDataString}
                                 size={120}

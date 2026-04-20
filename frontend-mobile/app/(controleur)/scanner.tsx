@@ -71,7 +71,7 @@ export default function ScannerScreen() {
     setProcessing(true);
 
     try {
-      const res = await axios.post(`${BASE}/scan`, { code_ticket: data });
+      const res = await axios.post<any>(`${BASE}/scan`, { code_ticket: data });
       const result: ScanResult = {
         status: 'valid',
         code: data,
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   permBackBtnText: { color: Colors.textMuted, fontSize: 14 },
 
   // Overlay top
-  overlayTop: { position: 'absolute', top: 0, left: 0, right: 0 },
+  overlayTop: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   scanTopBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
@@ -426,6 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)',
     paddingBottom: 40, paddingTop: Spacing.lg,
     alignItems: 'center', gap: Spacing.base,
+    zIndex: 10,
   },
   scanInstruction: { color: Colors.white, fontSize: 14, fontWeight: '600', opacity: 0.9 },
   torchBtn: {

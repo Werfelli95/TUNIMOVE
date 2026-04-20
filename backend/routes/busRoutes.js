@@ -7,7 +7,8 @@ const path = require('path');
 // Configuration de Multer pour les images des bus
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/buses/');
+        const uploadPath = path.join(__dirname, '../uploads/buses');
+        cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

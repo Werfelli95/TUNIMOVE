@@ -7,6 +7,4 @@ const pool = new Pool({
   password: String(process.env.DB_PASSWORD),
   port: process.env.DB_PORT
 });
-pool.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'service'")
-  .then(r => { console.log(r.rows); process.exit(0); })
-  .catch(console.error);
+pool.query("SELECT id_service, station_actuelle, voyage_complet FROM service WHERE id_service=13").then(r => { console.log(r.rows); process.exit(0); }).catch(console.error);

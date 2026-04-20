@@ -53,7 +53,10 @@ exports.sellTicket = async (req, res) => {
         arret_depart,
         arret_arrivee,
         agent_id,
-        type_tarif
+        type_tarif,
+        id_type_tarification,
+        id_type_bagage,
+        prix_bagage
     } = req.body;
 
     try {
@@ -71,12 +74,14 @@ exports.sellTicket = async (req, res) => {
             INSERT INTO ticket (
                 num_ligne, id_bus, date_voyage, heure_depart, siege, montant_total,
                 station_depart, station_arrivee, id_agent, type_tarif, date_emission, 
-                code_ticket, qr_code, id_service
+                code_ticket, qr_code, id_service,
+                id_type_tarification, id_type_bagage, prix_bagage
             ) VALUES (
                 $1, 
                 (SELECT id_bus FROM bus WHERE numero_bus = $2 LIMIT 1), 
                 $3, $4, $5, $6, $7, $8, $9, $10, NOW(), 
-                $11, $12, $13
+                $11, $12, $13,
+                $14, $15, $16
             )
             RETURNING id_ticket
         `;
@@ -91,10 +96,13 @@ exports.sellTicket = async (req, res) => {
             arret_depart,
             arret_arrivee,
             agent_id || null,
-            type_tarif,
+            type_tarif, // Libellé existant pour la compatibilité
             code_ticket,
             qr_code,
-            id_service
+            id_service,
+            id_type_tarification || null,
+            id_type_bagage || null,
+            prix_bagage || 0
         ]);
 
         res.status(201).json({ message: "Billet vendu et enregistré avec succès" });
@@ -105,15 +113,60 @@ exports.sellTicket = async (req, res) => {
 };
 
 exports.getOccupiedSeats = async (req, res) => {
-    const { num_ligne, date, heure } = req.query;
+    const { num_ligne, date, heure, depart, arrivee } = req.query;
     try {
+        const ligneRes = await db.query("SELECT ville_depart, ville_arrivee FROM ligne WHERE num_ligne = $1", [num_ligne]);
+        if (ligneRes.rows.length === 0) return res.json([]);
+        const ligne = ligneRes.rows[0];
+        
+        const stationsRes = await db.query("SELECT arret, distance_km FROM trajet WHERE num_ligne = $1 ORDER BY distance_km", [num_ligne]);
+        let stationsList = stationsRes.rows;
+        
+        if (!stationsList.some(s => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase())) {
+            stationsList.unshift({ arret: ligne.ville_depart, distance_km: 0 });
+        }
+        if (!stationsList.some(s => s.arret.toLowerCase() === ligne.ville_arrivee.toLowerCase())) {
+            stationsList.push({ arret: ligne.ville_arrivee, distance_km: 9999 });
+        }
+        
+        const getDist = (arr) => {
+            const st = stationsList.find(s => s.arret.toLowerCase() === arr.toLowerCase());
+            return st ? st.distance_km : null;
+        };
+
+        const reqStart = getDist(depart || '');
+        const reqEnd = getDist(arrivee || '');
+
         const query = `
-            SELECT siege FROM ticket 
+            SELECT siege, station_depart, station_arrivee FROM ticket 
             WHERE num_ligne = $1 AND date_voyage = $2 AND heure_depart = $3
         `;
         const result = await db.query(query, [num_ligne, date, heure]);
-        const occupied = result.rows.map(r => r.siege);
-        res.json(occupied);
+        
+        const occupied = [];
+        
+        result.rows.forEach(t => {
+            if (!depart || !arrivee) {
+                // If the client didn't specify the segment, consider it occupied to be safe
+                occupied.push(t.siege);
+            } else {
+                const tStart = getDist(t.station_depart);
+                const tEnd = getDist(t.station_arrivee);
+                
+                if (tStart !== null && tEnd !== null && reqStart !== null && reqEnd !== null) {
+                    // Two segments overlap if: max(start1, start2) < min(end1, end2)
+                    const overlap = Math.max(reqStart, tStart) < Math.min(reqEnd, tEnd);
+                    if (overlap) {
+                        occupied.push(t.siege);
+                    }
+                } else {
+                    // Fallback
+                    occupied.push(t.siege);
+                }
+            }
+        });
+
+        res.json([...new Set(occupied)]);
     } catch (err) {
         console.error("Erreur occupied seats :", err);
         res.status(500).json({ message: "Erreur récupération sièges" });

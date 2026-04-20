@@ -60,7 +60,11 @@ export default function VenteScreen() {
   const [showArrivee, setShowArrivee] = useState(false);
 
   // ── Step 2: Tarif & Siège
-  const [typeTarif, setTypeTarif]   = useState('Tarif Plein');
+  const [tarifsDb, setTarifsDb] = useState<any[]>([]);
+  const [bagagesDb, setBagagesDb] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('VOYAGEUR');
+  const [selectedTarifId, setSelectedTarifId] = useState('');
+  const [selectedBagageId, setSelectedBagageId] = useState('');
   const [selectedSeat, setSeat]     = useState<string | null>(null);
 
   // ── Step 3: Result
@@ -72,13 +76,24 @@ export default function VenteScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [netRes, tarifRes] = await Promise.all([
+        const [netRes, tarifRes, tRes, bRes] = await Promise.all([
           axios.get<Ligne[]>(`${BASE}/network`),
           axios.get<TarifCfg>(`${BASE}/tarifs`),
+          axios.get<any[]>(`${BASE}/tarification`),
+          axios.get<any[]>(`${BASE}/tarification/bagages`)
         ]);
         const found = netRes.data.find(l => String(l.num_ligne) === String(num_ligne));
         setLigne(found ?? null);
         setTarifCfg(tarifRes.data);
+        
+        if (tRes.data && !tRes.data.message) {
+            setTarifsDb(tRes.data.filter((t: any) => t.actif));
+            const voyageurs = tRes.data.filter((t: any) => t.actif && t.categorie === 'VOYAGEUR');
+            if(voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification.toString());
+        }
+        if (bRes.data && !bRes.data.message) {
+            setBagagesDb(bRes.data.filter((b: any) => b.actif));
+        }
       } catch { /**/ }
       finally { setLoading(false); }
     };
@@ -86,13 +101,13 @@ export default function VenteScreen() {
   }, []);
 
   useEffect(() => {
-    if (!horaire || !num_ligne) return;
+    if (!horaire || !num_ligne || !depart || !arrivee) return;
     const today = new Date().toISOString().split('T')[0];
-    axios.get<string[]>(`${BASE}/sales/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}`)
+    axios.get<string[]>(`${BASE}/sales/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}&depart=${encodeURIComponent(depart)}&arrivee=${encodeURIComponent(arrivee)}`)
       .then(r => setOccupied(r.data))
       .catch(() => setOccupied([]));
     setSeat(null);
-  }, [horaire]);
+  }, [horaire, depart, arrivee]);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const stations = useMemo<Station[]>(() => {
@@ -113,13 +128,27 @@ export default function VenteScreen() {
     ? stations.filter(s => s.arret !== depart && (deptSt ? s.distance_km > deptSt.distance_km : true))
     : [];
 
+  const currentTarif = tarifsDb.find(t => String(t.id_type_tarification) === String(selectedTarifId));
+  const currentBagage = bagagesDb.find(b => String(b.id_type_bagage) === String(selectedBagageId));
+
   const prix = useMemo(() => {
-    if (!tarifCfg || distance <= 0) return 0;
-    let p = distance * tarifCfg.prix_par_km + tarifCfg.frais_fixes;
-    const t = TARIFS.find(t => t.key === typeTarif);
-    if (t && t.reduc > 0) p *= (1 - t.reduc / 100);
-    return Math.max(0, p);
-  }, [tarifCfg, distance, typeTarif]);
+    if (!tarifCfg || distance <= 0 || !currentTarif) return 0;
+    
+    let basePrice = distance * tarifCfg.prix_par_km + parseFloat(tarifCfg.frais_fixes.toString());
+    let total = 0;
+    
+    if (currentTarif.mode_calcul === 'PERCENT_RESTANT') {
+        total = basePrice * (currentTarif.valeur / 100);
+    } else if (currentTarif.mode_calcul === 'FIXE') {
+        total = parseFloat(currentTarif.valeur.toString()) / 1000;
+    }
+
+    if (currentBagage) {
+        total += parseFloat(currentBagage.prix.toString()) / 1000;
+    }
+    
+    return Math.max(0, total);
+  }, [tarifCfg, distance, currentTarif, currentBagage]);
 
   const horaires: string[] = ligne?.horaires?.filter(Boolean) ?? (ligne?.horaire ? [ligne.horaire] : []);
 
@@ -167,19 +196,25 @@ export default function VenteScreen() {
     if (!selectedSeat || !depart || !arrivee || !horaire) return;
     setSelling(true);
     const today = new Date().toISOString().split('T')[0];
-    try {
-      const r = await axios.post(`${BASE}/sales/tickets/vendre`, {
+      const payload = {
         num_ligne, bus: numero_bus,
         date_voyage: today, heure: horaire, siege: selectedSeat,
         prix, arret_depart: depart, arret_arrivee: arrivee,
-        agent_id: null, type_tarif: typeTarif,
+        agent_id: null, 
+        type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
+        id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
+        id_type_bagage: currentBagage ? currentBagage.id_type_bagage : null,
+        prix_bagage: currentBagage ? parseFloat(currentBagage.prix) / 1000 : 0,
         id_service: service_id ? parseInt(service_id) : null,
-      });
+      };
+
+      const r = await axios.post<any>(`${BASE}/sales/tickets/vendre`, payload);
       setOccupied(prev => [...prev, selectedSeat]);
       const code = 'TKT' + Date.now().toString().slice(-6);
       setLastTicket({
         code_ticket: r.data?.code_ticket || code,
-        siege: selectedSeat, type_tarif: typeTarif,
+        siege: selectedSeat, 
+        type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
         montant_total: prix, station_depart: depart,
         station_arrivee: arrivee, heure_depart: horaire,
         date_emission: new Date().toISOString(),
@@ -353,19 +388,65 @@ export default function VenteScreen() {
               <Text style={styles.rsDist}>{distance.toFixed(1)} km · {horaire}</Text>
             </View>
 
-            {/* Tarif */}
+            {/* Tarif & Bagages */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}><User size={14} color={Colors.textMid} /> Type de tarif</Text>
-              <View style={styles.tarifGrid}>
-                {TARIFS.map(t => (
-                  <TouchableOpacity
-                    key={t.key}
-                    style={[styles.tarifCard, typeTarif === t.key && { borderColor: t.color, backgroundColor: t.color + '12' }]}
-                    onPress={() => setTypeTarif(t.key)}
-                  >
-                    <Text style={[styles.tarifLabel, typeTarif === t.key && { color: t.color }]}>{t.label}</Text>
-                    {t.reduc > 0 && <Text style={[styles.tarifReduc, { color: t.color }]}>-{t.reduc}%</Text>}
+              
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginBottom: 5}}>1. Catégorie</Text>
+              <View style={[styles.picker, {marginBottom: 10}]}>
+                  <TouchableOpacity style={{flex: 1}} onPress={() => {}}>
+                    <Text style={styles.pickerVal}>{selectedCategory === 'VOYAGEUR' ? 'Voyageur' : selectedCategory === 'CONVENTION' ? 'Convention' : 'Expédition'}</Text>
                   </TouchableOpacity>
+                  <ChevronDown color={Colors.textMuted} size={18} />
+              </View>
+              <View style={styles.tarifGrid}>
+                  {['VOYAGEUR', 'CONVENTION', 'EXPEDITION'].map(cat => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.tarifCard, selectedCategory === cat && { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' }]}
+                        onPress={() => {
+                            setSelectedCategory(cat);
+                            const ops = tarifsDb.filter((t:any) => t.categorie === cat);
+                            if(ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification.toString());
+                            else setSelectedTarifId('');
+                        }}
+                      >
+                        <Text style={[styles.tarifLabel, selectedCategory === cat && { color: Colors.primary }]}>{cat.substring(0, 4)}.</Text>
+                      </TouchableOpacity>
+                  ))}
+              </View>
+
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginTop: 15, marginBottom: 5}}>2. Tarification</Text>
+              <View style={styles.tarifGrid}>
+                {tarifsDb.filter((t:any) => t.categorie === selectedCategory).map((t:any) => (
+                  <TouchableOpacity
+                    key={t.id_type_tarification}
+                    style={[styles.tarifCard, selectedTarifId == t.id_type_tarification && { borderColor: Colors.success, backgroundColor: Colors.success + '12' }]}
+                    onPress={() => setSelectedTarifId(t.id_type_tarification.toString())}
+                  >
+                    <Text style={[styles.tarifLabel, selectedTarifId == t.id_type_tarification && { color: Colors.success }]}>{t.libelle}</Text>
+                    <Text style={[styles.tarifReduc]}>{t.mode_calcul === 'PERCENT_RESTANT' ? t.valeur+'% R' : (parseFloat(t.valeur)/1000).toFixed(1)+' DT'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginTop: 15, marginBottom: 5}}>3. Option Bagage</Text>
+              <View style={[styles.tarifGrid, {marginBottom: 10}]}>
+                <TouchableOpacity
+                    style={[styles.tarifCard, !selectedBagageId && { borderColor: Colors.textMid, backgroundColor: Colors.bgMid }]}
+                    onPress={() => setSelectedBagageId('')}
+                >
+                    <Text style={styles.tarifLabel}>Sans bg.</Text>
+                </TouchableOpacity>
+                {bagagesDb.map((b:any) => (
+                    <TouchableOpacity
+                        key={b.id_type_bagage}
+                        style={[styles.tarifCard, selectedBagageId == b.id_type_bagage && { borderColor: Colors.warning, backgroundColor: Colors.warning + '12' }]}
+                        onPress={() => setSelectedBagageId(b.id_type_bagage.toString())}
+                    >
+                        <Text style={[styles.tarifLabel, selectedBagageId == b.id_type_bagage && { color: Colors.warning }]}>{b.libelle}</Text>
+                        <Text style={[styles.tarifReduc]}>{'+'+(parseFloat(b.prix)/1000).toFixed(1)+' DT'}</Text>
+                    </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -417,12 +498,14 @@ export default function VenteScreen() {
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Siège</Text><Text style={[styles.recapVal, { color: Colors.primary, fontWeight: '900', fontSize: 18 }]}>{selectedSeat}</Text></View>
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Tarif</Text>
                 <Text style={styles.recapVal}>
-                  {TARIFS.find(t => t.key === typeTarif)?.label}
-                  {(TARIFS.find(t => t.key === typeTarif)?.reduc ?? 0) > 0
-                    ? ` (-${TARIFS.find(t => t.key === typeTarif)?.reduc}%)`
-                    : ''}
+                  {currentTarif ? currentTarif.libelle : 'Tarif Normal'}
                 </Text>
               </View>
+              {currentBagage && (
+                <View style={styles.recapRow}><Text style={styles.recapLabel}>Bagage</Text>
+                    <Text style={styles.recapVal}>+ {(parseFloat(currentBagage.prix)/1000).toFixed(3)} TND</Text>
+                </View>
+              )}
               <View style={[styles.recapRow, styles.recapTotal]}>
                 <Text style={styles.recapTotalLabel}>TOTAL</Text>
                 <Text style={styles.recapTotalVal}>{prix.toFixed(3)} TND</Text>

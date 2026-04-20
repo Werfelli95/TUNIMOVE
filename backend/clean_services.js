@@ -7,6 +7,4 @@ const pool = new Pool({
   password: String(process.env.DB_PASSWORD),
   port: process.env.DB_PORT
 });
-pool.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'service'")
-  .then(r => { console.log(r.rows); process.exit(0); })
-  .catch(console.error);
+pool.query("UPDATE service SET statut = 'Terminé', date_fin = NOW() WHERE statut = 'En cours'").then(r => { console.log('Cleaned up zombie services'); process.exit(0); }).catch(console.error);

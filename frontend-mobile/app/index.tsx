@@ -43,7 +43,7 @@ export default function LoginScreen() {
 
     try {
       if (role === 'receveur') {
-        const res = await axios.post(`${API_BASE}/login/receveur`, { matricule: matricule.trim(), password });
+        const res = await axios.post<any>(`${API_BASE}/login/receveur`, { matricule: matricule.trim(), password });
         const { user, affectation } = res.data;
         router.replace({
           pathname: '/(receveur)/dashboard',
@@ -58,7 +58,7 @@ export default function LoginScreen() {
         });
       } else {
         // Contrôleur
-        const res = await axios.post(`${API_BASE}/login/controleur`, { matricule: matricule.trim(), password });
+        const res = await axios.post<any>(`${API_BASE}/login/controleur`, { matricule: matricule.trim(), password });
         const { user, affectation } = res.data;
         router.replace({
           pathname: '/(controleur)/scanner',

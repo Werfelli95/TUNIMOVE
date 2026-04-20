@@ -15,6 +15,7 @@ import Tarifs from './pages/admin/Tarifs';
 import Audit from './pages/admin/Audit';
 import SalesHistory from './pages/admin/SalesHistory';
 import PasswordResets from './pages/admin/PasswordResets';
+import Incidents from './pages/admin/Incidents';
 import Guichet from './pages/agent/Guichet';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
                         <Route path="audit" element={<Audit />} />
                         <Route path="sales-history" element={<SalesHistory />} />
                         <Route path="password-resets" element={<PasswordResets />} />
+                        <Route path="incidents" element={<Incidents />} />
                     </Route>
                 </Route>
 

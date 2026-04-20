@@ -35,7 +35,7 @@ exports.getRolesOverview = async (req, res) => {
         const activeServicesDetail = await db.query(`
             SELECT 
                 s.id_service,
-                s.numero_bus,
+                b.numero_bus,
                 s.station_actuelle,
                 s.voyage_complet,
                 s.date_debut,
@@ -43,17 +43,18 @@ exports.getRolesOverview = async (req, res) => {
                 COUNT(t.id_ticket) AS nb_tickets,
                 COALESCE(SUM(t.montant_total), 0) AS recette
             FROM service s
+            LEFT JOIN bus b ON b.id_bus = s.id_bus
             LEFT JOIN utilisateur u ON u.id_utilisateur = s.id_receveur
             LEFT JOIN ticket t ON t.id_service = s.id_service
             WHERE s.statut = 'En cours'
-            GROUP BY s.id_service, s.numero_bus, s.station_actuelle, s.voyage_complet, s.date_debut, u.nom, u.prenom
+            GROUP BY s.id_service, b.numero_bus, s.station_actuelle, s.voyage_complet, s.date_debut, u.nom, u.prenom
             ORDER BY s.date_debut DESC
             LIMIT 10
         `);
 
         // Recent incidents
         const recentIncidents = await db.query(`
-            SELECT id_incident, categorie, gravite, description, numero_bus, signale_par, date_incident
+            SELECT id_incident, type_incident as categorie, 'Moyenne' as gravite, description, numero_bus, rapporte_par as signale_par, date_incident
             FROM incident
             ORDER BY date_incident DESC
             LIMIT 5
