@@ -86,7 +86,7 @@ exports.sellTicket = async (req, res) => {
             RETURNING id_ticket
         `;
 
-        await db.query(query, [
+        const ticketData = await db.query(query, [
             num_ligne,
             String(bus),
             date_voyage,
@@ -105,7 +105,11 @@ exports.sellTicket = async (req, res) => {
             prix_bagage || 0
         ]);
 
-        res.status(201).json({ message: "Billet vendu et enregistré avec succès" });
+        res.status(201).json({ 
+            message: "Billet vendu et enregistré avec succès",
+            id_ticket: ticketData.rows[0].id_ticket,
+            code_ticket: code_ticket
+        });
     } catch (err) {
         console.error("Erreur lors de la vente du ticket :", err);
         res.status(500).json({ message: "Erreur lors de la vente : " + err.message });
@@ -348,51 +352,138 @@ exports.getAdvancedStats = async (req, res) => {
 
 // Scanner et valider un ticket
 exports.scanTicket = async (req, res) => {
-    const { qr_code } = req.body;
-    if (!qr_code) {
+    // Supporter à la fois qr_code et code_ticket pour la compatibilité mobile
+    const inputCode = req.body.qr_code || req.body.code_ticket;
+    
+    if (!inputCode) {
         return res.status(400).json({ message: "Code QR manquant" });
     }
     
     try {
-        // Rechercher le ticket et extraire les informations pertinentes
-        const checkQuery = `
-            SELECT id_ticket, code_ticket, qr_code, est_scanne, date_scan, date_voyage, type_tarif 
-            FROM ticket 
-            WHERE qr_code = $1 OR code_ticket = $1
-            LIMIT 1
+        let uniqueId = inputCode;
+        let searchParams = null;
+
+        // Tenter de parser si c'est du JSON (format Web Guichet)
+        if (typeof inputCode === 'string' && (inputCode.startsWith('{') || inputCode.startsWith('['))) {
+            try {
+                console.log("Tentative de parsing JSON du QR code...");
+                const parsed = JSON.parse(inputCode);
+                console.log("JSON parsé:", parsed);
+                // Si on a l'ID ou le code spécifique dans le JSON
+                if (parsed.code_ticket) uniqueId = parsed.code_ticket;
+                else if (parsed.id_ticket) uniqueId = parsed.id_ticket;
+                else {
+                    // Sinon on utilisera les champs pour une recherche combinée
+                    searchParams = parsed;
+                }
+            } catch (e) {
+                console.log("Échec du parsing JSON, traitement comme code brut");
+                // Pas du JSON valide, on traite comme un code brut
+            }
+        }
+
+        // 1. Recherche du ticket avec jointures pour avoir tous les détails
+        let query = `
+            SELECT 
+                t.*,
+                b.numero_bus,
+                l.ville_depart as ligne_depart,
+                l.ville_arrivee as ligne_arrivee
+            FROM ticket t
+            LEFT JOIN bus b ON t.id_bus = b.id_bus
+            LEFT JOIN ligne l ON t.num_ligne::text = l.num_ligne::text
+            WHERE 1=1
         `;
-        const result = await db.query(checkQuery, [qr_code]);
+        let params = [];
+
+        if (searchParams) {
+            // Recherche par critères (Ligne, Date, Heure, Siège) - Fallback pour les vieux tickets
+            // On utilise CAST en TEXT pour être sûr de la comparaison avec les strings du JSON
+            query += ` AND CAST(t.num_ligne AS TEXT) = $1 AND CAST(t.date_voyage AS TEXT) = $2 AND CAST(t.heure_depart AS TEXT) LIKE $3 AND t.siege = $4`;
+            params = [String(searchParams.ligne), String(searchParams.date), String(searchParams.heure) + '%', String(searchParams.siege)];
+        } else {
+            // Recherche par identificateur unique
+            query += ` AND (t.qr_code = $1 OR t.code_ticket = $1 OR CAST(t.id_ticket AS VARCHAR) = $1)`;
+            params = [String(uniqueId)];
+        }
+
+        console.log("Exécution de la requête de recherche avec params:", params);
+        const result = await db.query(query + " LIMIT 1", params);
+        console.log("Nombre de tickets trouvés:", result.rows.length);
 
         if (result.rows.length === 0) {
+            console.log("Aucun ticket trouvé pour ces critères");
             return res.status(404).json({ message: "Ticket introuvable ou invalide" });
         }
 
         const ticket = result.rows[0];
+        console.log("Ticket trouvé, ID:", ticket.id_ticket);
 
+        // Formatage de la réponse pour le mobile
+        const ticketInfo = {
+            id_ticket: ticket.id_ticket,
+            code_ticket: ticket.code_ticket,
+            siege: ticket.siege,
+            type_tarif: ticket.type_tarif,
+            montant_total: ticket.montant_total,
+            station_depart: ticket.station_depart,
+            station_arrivee: ticket.station_arrivee,
+            heure_depart: ticket.heure_depart ? String(ticket.heure_depart).substring(0, 5) : '',
+            date_voyage: ticket.date_voyage,
+            date_emission: ticket.date_emission,
+            date_scan: ticket.date_scan,
+            est_scanne: ticket.est_scanne,
+            num_ligne: ticket.num_ligne,
+            numero_bus: ticket.numero_bus,
+            trajet: `${ticket.station_depart} → ${ticket.station_arrivee}`
+        };
+
+        // 2. Vérification du statut
+        console.log("Vérification du statut 'est_scanne':", ticket.est_scanne);
         if (ticket.est_scanne) {
             return res.status(409).json({ 
-                message: "Ticket déjà scanné",
-                date_scan: ticket.date_scan 
+                message: "Ce ticket a déjà été validé",
+                status: 'used',
+                ticket: ticketInfo
             });
         }
 
-        // Marquer comme scanné
+        // Vérification de la date (Optionnel)
+        const voyageDate = new Date(ticket.date_voyage);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if (voyageDate < today) {
+            return res.status(410).json({ 
+                message: "Ce ticket est expiré (date passée)",
+                status: 'expired',
+                ticket: ticketInfo
+            });
+        }
+
+        // 3. Marquage comme scanné
         const updateQuery = `
             UPDATE ticket 
             SET est_scanne = TRUE, date_scan = NOW() 
             WHERE id_ticket = $1
-            RETURNING id_ticket, est_scanne, date_scan
+            RETURNING date_scan
         `;
         const updated = await db.query(updateQuery, [ticket.id_ticket]);
+        ticketInfo.est_scanne = true;
+        ticketInfo.date_scan = updated.rows[0].date_scan;
 
         res.status(200).json({ 
             message: "Ticket validé avec succès", 
-            ticket: updated.rows[0] 
+            status: 'valid',
+            ticket: ticketInfo 
         });
 
     } catch (err) {
-        console.error('Erreur scanTicket:', err);
-        res.status(500).json({ message: 'Erreur lors de la vérification du ticket' });
+        console.error('Erreur scanTicket CRITIQUE:', err);
+        res.status(500).json({ 
+            message: 'Erreur lors de la vérification du ticket',
+            error: err.message,
+            stack: err.stack
+        });
     }
 };
 

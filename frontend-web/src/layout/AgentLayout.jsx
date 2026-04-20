@@ -6,7 +6,8 @@ import ProfileModal from '../components/ProfileModal';
 const AgentLayout = () => {
     const navigate = useNavigate();
     const [mode, setMode] = useState('Vente Directe'); // Vente Directe, Réservations, Historique
-    const [agentInfo, setAgentInfo] = useState({ nom: 'Agent', prenom: '', matricule: '' });
+    const [agentInfo, setAgentInfo] = useState({ nom: 'Agent', prenom: '', matricule: '', image_url: null });
+
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     useEffect(() => {
@@ -14,12 +15,36 @@ const AgentLayout = () => {
         if (storedUser) {
             try {
                 const parsed = JSON.parse(storedUser);
-                if (parsed.nom) {
-                    setAgentInfo({
-                        nom: parsed.nom,
-                        prenom: parsed.prenom || '',
-                        matricule: parsed.matricule || 'Inconnu'
-                    });
+                const userId = parsed.id;
+                
+                // Charger les infos initiales du localStorage pour éviter le flash
+                setAgentInfo({
+                    nom: parsed.nom,
+                    prenom: parsed.prenom || '',
+                    role: parsed.role || 'AGENT',
+                    matricule: parsed.matricule || 'Inconnu',
+                    image_url: parsed.image_url || null
+                });
+
+                // Puis rafraîchir depuis l'API pour être sûr d'avoir la photo à jour
+                if (userId) {
+                    fetch(`http://localhost:5000/api/users/${userId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.id_utilisateur) {
+                                const updatedInfo = {
+                                    id: data.id_utilisateur,
+                                    nom: data.nom,
+                                    prenom: data.prenom,
+                                    role: data.role,
+                                    matricule: data.matricule,
+                                    image_url: data.image_url
+                                };
+                                setAgentInfo(updatedInfo);
+                                localStorage.setItem('user', JSON.stringify(updatedInfo));
+                            }
+                        })
+                        .catch(err => console.error("Erreur sync agent profile:", err));
                 }
             } catch(e) {}
         }
@@ -98,7 +123,15 @@ const AgentLayout = () => {
                         justifyContent: 'center',
                         flexShrink: 0
                     }}>
-                        <UserCircle size={24} />
+                        {agentInfo.image_url ? (
+                            <img 
+                                src={`http://localhost:5000/${agentInfo.image_url}`} 
+                                alt="Profil" 
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                            />
+                        ) : (
+                            <UserCircle size={24} />
+                        )}
                     </div>
                     <div style={{ overflow: 'hidden' }}>
                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Connecté en tant que</div>
@@ -167,6 +200,18 @@ const AgentLayout = () => {
                 isOpen={isProfileModalOpen} 
                 onClose={() => setIsProfileModalOpen(false)}
                 canEditNames={false}
+                onUpdate={(updatedUser) => {
+                    const newInfo = {
+                        id: updatedUser.id_utilisateur || updatedUser.id,
+                        nom: updatedUser.nom,
+                        prenom: updatedUser.prenom,
+                        role: updatedUser.role,
+                        matricule: updatedUser.matricule,
+                        image_url: updatedUser.image_url
+                    };
+                    setAgentInfo(newInfo);
+                    localStorage.setItem('user', JSON.stringify(newInfo));
+                }}
             />
         </div>
     );

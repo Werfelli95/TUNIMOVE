@@ -469,6 +469,18 @@ body::before {
   width: 2.5rem;
 }
 
+.h-12 {
+  height: 3rem;
+}
+
+.w-12 {
+  width: 3rem;
+}
+
+.h-full {
+  height: 100%;
+}
+
 .w-64 {
   width: 16rem;
 }

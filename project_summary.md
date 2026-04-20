@@ -18,7 +18,7 @@ CREATE TABLE utilisateur (
     email VARCHAR(100) UNIQUE, -- Requis pour Admin
     matricule VARCHAR(50) UNIQUE NOT NULL, -- Requis pour Agent
     mot_de_passe TEXT NOT NULL,
-    role VARCHAR(20) CHECK (role IN ('ADMIN', 'AGENT', 'RECEVEUR')) NOT NULL
+    role VARCHAR(20) CHECK (role IN ('ADMIN', 'AGENT', 'RECEVEUR', 'CONTROLEUR')) NOT NULL
 );
 
 -- Exemple d'insertion pour tester

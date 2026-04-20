@@ -11,8 +11,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { API_BASE_URL, NETWORK_API, TARIFS_API, TARIFICATION_API, SALES_API } from '../../constants/api';
 
-const BASE = 'http://localhost:5000/api';
+const BASE = API_BASE_URL;
 const { width } = Dimensions.get('window');
 
 interface Station { arret: string; distance_km: number; }
@@ -78,10 +79,10 @@ export default function VenteScreen() {
     const load = async () => {
       try {
         const [netRes, tarifRes, tRes, bRes] = await Promise.all([
-          axios.get<Ligne[]>(`${BASE}/network`),
-          axios.get<TarifCfg>(`${BASE}/tarifs`),
-          axios.get<any[]>(`${BASE}/tarification`),
-          axios.get<any[]>(`${BASE}/tarification/bagages`)
+          axios.get<Ligne[]>(NETWORK_API),
+          axios.get<TarifCfg>(TARIFS_API),
+          axios.get<any[]>(TARIFICATION_API),
+          axios.get<any[]>(`${TARIFICATION_API}/bagages`)
         ]);
         const found = netRes.data.find(l => String(l.num_ligne) === String(num_ligne));
         setLigne(found ?? null);
@@ -104,7 +105,7 @@ export default function VenteScreen() {
   useEffect(() => {
     if (!horaire || !num_ligne || !depart || !arrivee) return;
     const today = new Date().toISOString().split('T')[0];
-    axios.get<string[]>(`${BASE}/sales/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}&depart=${encodeURIComponent(depart)}&arrivee=${encodeURIComponent(arrivee)}`)
+    axios.get<string[]>(`${SALES_API}/tickets/occupied-seats?num_ligne=${num_ligne}&date=${today}&heure=${horaire}&depart=${encodeURIComponent(depart)}&arrivee=${encodeURIComponent(arrivee)}`)
       .then(r => setOccupied(r.data))
       .catch(() => setOccupied([]));
     setSeat(null);
@@ -215,7 +216,7 @@ export default function VenteScreen() {
         id_service: service_id ? parseInt(service_id) : null,
       };
 
-      const r = await axios.post<any>(`${BASE}/sales/tickets/vendre`, payload);
+      const r = await axios.post<any>(`${SALES_API}/tickets/vendre`, payload);
       setOccupied(prev => [...prev, selectedSeat]);
       const code = 'TKT' + Date.now().toString().slice(-6);
       

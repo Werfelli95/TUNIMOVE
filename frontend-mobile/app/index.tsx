@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  Animated
+  Animated, Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bus, ScanLine, User, Lock, Eye, EyeOff, ChevronRight, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import { Colors, Spacing, Radius, Shadow, Typography } from '../constants/theme';
-
-const API_BASE = 'http://localhost:5000/api/auth';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { AUTH_API } from '../constants/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -43,7 +42,7 @@ export default function LoginScreen() {
 
     try {
       if (role === 'receveur') {
-        const res = await axios.post<any>(`${API_BASE}/login/receveur`, { matricule: matricule.trim(), password });
+        const res = await axios.post<any>(`${AUTH_API}/login/receveur`, { matricule: matricule.trim(), password });
         const { user, affectation } = res.data;
         router.replace({
           pathname: '/(receveur)/dashboard',
@@ -58,7 +57,7 @@ export default function LoginScreen() {
         });
       } else {
         // Contrôleur
-        const res = await axios.post<any>(`${API_BASE}/login/controleur`, { matricule: matricule.trim(), password });
+        const res = await axios.post<any>(`${AUTH_API}/login/controleur`, { matricule: matricule.trim(), password });
         const { user, affectation } = res.data;
         router.replace({
           pathname: '/(controleur)/scanner',
@@ -87,10 +86,12 @@ export default function LoginScreen() {
           {/* ── Logo + Brand ── */}
           <View style={styles.brand}>
             <View style={styles.logoWrap}>
-              <Bus color={Colors.accent} size={36} strokeWidth={2.5} />
+              <Image 
+                source={require('../assets/images/tunimovebus.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.brandName}>TuniMove</Text>
-            <Text style={styles.brandTagline}>Opérations Transport Interurbain</Text>
           </View>
 
           {/* ── Login Card ── */}
@@ -240,14 +241,13 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: Spacing.base, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
 
   // Brand
-  brand: { alignItems: 'center', marginBottom: Spacing.xl },
+  brand: { alignItems: 'center', marginBottom: Spacing.xl, marginTop: Spacing.md },
   logoWrap: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12, ...Shadow.strong,
+    width: 120, height: 120, borderRadius: 24,
+    backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 0, ...Shadow.strong, overflow: 'hidden',
   },
-  brandName: { fontSize: 30, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
-  brandTagline: { fontSize: 15, color: Colors.textMuted, marginTop: 4, fontWeight: '600' },
+  logoImage: { width: 110, height: 110 },
 
   // Card
   card: {

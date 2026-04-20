@@ -1,0 +1,380 @@
+/* Tarifs Management - Premium Design System */
+
+.tarifs-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══ PREMIUM HEADER ════════════════════════════════════════════ */
+.tarifs-premium-header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4338ca 100%);
+    padding: 2rem 2.5rem;
+    border-radius: 24px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 20px 40px rgba(67, 56, 202, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    position: relative;
+    overflow: hidden;
+}
+
+.tarifs-premium-header::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -50px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+    pointer-events: none;
+}
+
+.tarifs-premium-header h1 {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.03em;
+    margin: 0 0 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tarifs-premium-header p {
+    font-size: 0.95rem;
+    color: rgba(196, 181, 253, 0.9);
+    font-weight: 500;
+    margin: 0;
+    max-width: 600px;
+}
+
+/* ═══ PRICING SECTION CARDS ═════════════════════════════════════ */
+.tarifs-section-card {
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tarifs-section-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.tarifs-section-title::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    width: 40px;
+    height: 3px;
+    background: #6366f1;
+    border-radius: 99px;
+}
+
+/* Base Pricing Tool */
+.base-pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.input-group-premium {
+    background: #f8fafc;
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1.5px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.input-group-premium:focus-within {
+    border-color: #6366f1;
+    background: #ffffff;
+    box-shadow: 0 8px 16px rgba(99, 102, 241, 0.08);
+}
+
+.input-group-premium label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.input-premium-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-premium-wrapper input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    width: 100%;
+}
+
+.unit-tag-premium {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #6366f1;
+    padding: 0.4rem 0.75rem;
+    background: #eef2ff;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+/* Formula Display */
+.formula-premium-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    margin: 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.formula-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #0c4a6e;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.formula-body {
+    background: #ffffff;
+    padding: 1.25rem;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.formula-highlight {
+    color: #6366f1;
+    font-weight: 800;
+}
+
+.formula-example {
+    font-size: 0.9rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* ═══ PREMIUM TABLES ════════════════════════════════════════════ */
+.tarifs-table-container {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.tarifs-premium-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 0.75rem;
+    margin-top: -0.75rem;
+}
+
+.tarifs-premium-table th {
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.tarifs-premium-table td {
+    background: #ffffff;
+    padding: 1.25rem 1.5rem;
+    vertical-align: middle;
+    transition: all 0.2s ease;
+    border-top: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.tarifs-premium-table td:first-child {
+    border-left: 1px solid #f1f5f9;
+    border-radius: 16px 0 0 16px;
+}
+
+.tarifs-premium-table td:last-child {
+    border-right: 1px solid #f1f5f9;
+    border-radius: 0 16px 16px 0;
+}
+
+.tarifs-premium-table tr {
+    transition: all 0.2s ease;
+}
+
+.tarifs-premium-table tr:hover td {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    transform: scale(1.002);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+/* Badges & Tags */
+.code-tag-premium {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.category-badge-premium {
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-badge-premium {
+    padding: 0.4rem 0.75rem;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.active-premium {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #10b98140;
+}
+
+.inactive-premium {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #ef444440;
+}
+
+.status-badge-premium:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+
+/* Buttons */
+.btn-premium-save {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    color: white;
+    padding: 0.75rem 1.75rem;
+    border-radius: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 10px 20px rgba(99,102,241,0.25);
+}
+
+.btn-premium-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(99,102,241,0.35);
+}
+
+.btn-premium-save:active {
+    transform: translateY(0);
+}
+
+.btn-premium-save:disabled {
+    background: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.btn-action-premium {
+    background: transparent;
+    color: #6366f1;
+    font-size: 0.875rem;
+    font-weight: 800;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-action-premium:hover {
+    background: #eef2ff;
+    border-color: #e0e7ff;
+}
+
+/* Info Tooltip */
+.info-icon-premium {
+    color: #94a3b8;
+    cursor: help;
+    transition: color 0.2s ease;
+}
+
+.info-icon-premium:hover {
+    color: #6366f1;
+}
+
+/* ═══ ANIMATIONS ════════════════════════════════════════════════ */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .base-pricing-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tarifs-premium-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+        padding: 2rem;
+    }
+    
+    .tarifs-premium-header p {
+        margin: 0 auto;
+    }
+}

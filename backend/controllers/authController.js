@@ -16,7 +16,8 @@ exports.loginAdmin = async (req, res) => {
             return res.status(401).json({ message: 'Mot de passe incorrect' });
         }
         const token = jwt.sign({ id: user.id_utilisateur, role: 'ADMIN' }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.json({ token, user: { id: user.id_utilisateur, nom: user.nom, prenom: user.prenom, role: 'ADMIN' } });
+        res.json({ token, user: { id: user.id_utilisateur, nom: user.nom, prenom: user.prenom, role: 'ADMIN', image_url: user.image_url } });
+
     } catch (err) {
         res.status(500).json({ message: 'Erreur serveur' });
     }
@@ -38,7 +39,8 @@ exports.loginAgent = async (req, res) => {
         }
 
         const token = jwt.sign({ id: user.id_utilisateur, role: 'AGENT' }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.json({ token, user: { id: user.id_utilisateur, matricule: user.matricule, nom: user.nom, prenom: user.prenom, role: 'AGENT' } });
+        res.json({ token, user: { id: user.id_utilisateur, matricule: user.matricule, nom: user.nom, prenom: user.prenom, role: 'AGENT', image_url: user.image_url } });
+
     } catch (err) {
         res.status(500).json({ message: 'Erreur serveur' });
     }

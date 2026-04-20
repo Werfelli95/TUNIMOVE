@@ -50,26 +50,69 @@ const InfoRow = ({ icon: Icon, label, value, color = '#6366F1' }) => (
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [selectedUser, setSelectedUser] = useState(null); // detail panel
+  const [selectedUser, setSelectedUser] = useState(null); 
   const [newUser, setNewUser] = useState({
     nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: 'AGENT', mot_de_passe: ''
   });
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: '', image_url: null
+  });
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewUser(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleOpenModal = () => setIsAddModalOpen(true);
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
+    setIsEditModalOpen(false);
     setFormError(null);
     setNewUser({ nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: 'AGENT', mot_de_passe: '' });
+    setSelectedUser(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+  };
+
+  const handleEditClick = (user) => {
+    setSelectedUser(user);
+    setEditForm({
+      nom: user.nom,
+      prenom: user.prenom,
+      email: user.email,
+      matricule: user.matricule,
+      num_tel: user.num_tel,
+      role: user.role,
+      image_url: user.image_url
+    });
+    setImagePreview(user.image_url ? `http://localhost:5000/${user.image_url}` : null);
+    setIsEditModalOpen(true);
   };
 
   const handleAddUser = async (e) => {
@@ -77,10 +120,17 @@ const Users = () => {
     setFormError(null);
     setIsSubmitting(true);
     try {
+      const formData = new FormData();
+      Object.keys(newUser).forEach(key => {
+        formData.append(key, newUser[key]);
+      });
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+
       const response = await fetch('http://localhost:5000/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser)
+        body: formData
       });
       if (!response.ok) {
         const data = await response.json();
@@ -96,8 +146,44 @@ const Users = () => {
     }
   };
 
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    setFormError(null);
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      Object.keys(editForm).forEach(key => {
+        if (editForm[key] !== null) {
+          formData.append(key, editForm[key]);
+        }
+      });
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+
+      const response = await fetch(`http://localhost:5000/api/users/${selectedUser.id_utilisateur}`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setUsers(prev => prev.map(u => u.id_utilisateur === selectedUser.id_utilisateur ? updated.user : u));
+        handleCloseModal();
+        alert("Utilisateur mis à jour avec succès !");
+      } else {
+        const data = await response.json();
+        setFormError(data.message || "Erreur lors de la mise à jour");
+      }
+    } catch (err) {
+      setFormError("Erreur serveur");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteUser = async (id_utilisateur) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.')) return;
     try {
       await fetch(`http://localhost:5000/api/users/${id_utilisateur}`, { method: 'DELETE' });
       setUsers(prev => prev.filter(u => u.id_utilisateur !== id_utilisateur));
@@ -112,7 +198,10 @@ const Users = () => {
     if (!window.confirm(`Êtes-vous sûr de vouloir ${action} cet utilisateur ?`)) return;
     try {
       const response = await fetch(`http://localhost:5000/api/users/${id_utilisateur}/block`, { method: 'PUT' });
-      const data = await response.json();
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || `Erreur lors de l'action`);
+      }
       setUsers(prev => prev.map(u => u.id_utilisateur === id_utilisateur ? { ...u, est_bloque: !estBloqueActuellement } : u));
       if (selectedUser?.id_utilisateur === id_utilisateur) setSelectedUser(prev => ({ ...prev, est_bloque: !estBloqueActuellement }));
     } catch (err) { alert(err.message); }
@@ -124,7 +213,9 @@ const Users = () => {
       const response = await fetch('http://localhost:5000/api/users');
       const data = await response.json();
       setUsers(data);
-    } catch (err) { } finally { setLoading(false); }
+    } catch (err) { 
+      setError(err.message);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -158,7 +249,7 @@ const Users = () => {
         <div className="users-header-card">
           <div className="header-titles">
             <h1>Gestion des Collaborateurs</h1>
-            <p>{users.length - 1} utilisateurs enregistrés dans le système</p>
+            <p>Interface d'administration des accès et profils utilisateurs</p>
           </div>
           <div className="header-actions">
             <div className="search-wrapper">
@@ -241,12 +332,14 @@ const Users = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                   <div style={{
                                     width: 40, height: 40, borderRadius: 12,
-                                    background: `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
+                                    background: user.image_url ? `url(http://localhost:5000/${user.image_url})` : `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center',
                                     border: `1.5px solid ${cfg.dot}40`,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: 13, fontWeight: 800, color: cfg.color, flexShrink: 0,
                                   }}>
-                                    {user.nom?.charAt(0)}{user.prenom?.charAt(0)}
+                                    {!user.image_url && `${user.nom?.charAt(0)}${user.prenom?.charAt(0)}`}
                                   </div>
                                   <div>
                                     <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#0F172A' }}>
@@ -286,6 +379,9 @@ const Users = () => {
                               </td>
                               <td onClick={e => e.stopPropagation()}>
                                 <div className="row-actions" style={{ opacity: 1 }}>
+                                  <button title="Modifier" className="action-btn btn-edit" onClick={() => handleEditClick(user)}>
+                                    <Edit2 size={15} />
+                                  </button>
                                   <button title={user.est_bloque ? 'Débloquer' : 'Restreindre'}
                                     className="action-btn btn-lock"
                                     onClick={() => handleToggleBlock(user.id_utilisateur, user.est_bloque)}>
@@ -322,7 +418,7 @@ const Users = () => {
 
           {/* ─── DETAIL PANEL ─────────────────────────────── */}
           <AnimatePresence>
-            {selectedUser && (
+            {selectedUser && !isEditModalOpen && (
               <motion.div
                 key={selectedUser.id_utilisateur}
                 initial={{ opacity: 0, x: 30 }}
@@ -346,12 +442,14 @@ const Users = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{
                         width: 52, height: 52, borderRadius: 16,
-                        background: `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
+                        background: selectedUser.image_url ? `url(http://localhost:5000/${selectedUser.image_url})` : `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         border: `2px solid ${getRoleCfg(selectedUser.role).dot}50`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 18, fontWeight: 900, color: getRoleCfg(selectedUser.role).color,
                       }}>
-                        {selectedUser.nom?.charAt(0)}{selectedUser.prenom?.charAt(0)}
+                        {!selectedUser.image_url && `${selectedUser.nom?.charAt(0)}${selectedUser.prenom?.charAt(0)}`}
                       </div>
                       <div>
                         <p style={{ margin: 0, fontWeight: 900, fontSize: 15, color: '#0F172A' }}>
@@ -470,11 +568,104 @@ const Users = () => {
                       <input type="password" name="mot_de_passe" required className="form-input"
                         value={newUser.mot_de_passe} onChange={handleInputChange} minLength="6" />
                     </div>
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label>Photo de profil</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                        <div style={{
+                          width: '60px', height: '60px', borderRadius: '50%', background: '#f1f5f9',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          overflow: 'hidden', border: '2px solid #e2e8f0'
+                        }}>
+                          {imagePreview ? (
+                            <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <User size={30} color="#94a3b8" />
+                          )}
+                        </div>
+                        <input type="file" accept="image/*" onChange={handleImageChange} style={{ fontSize: '0.875rem' }} />
+                      </div>
+                    </div>
                   </div>
                   <div className="modal-footer">
                     <button type="button" className="btn-cancel" onClick={handleCloseModal} disabled={isSubmitting}>Annuler</button>
                     <button type="submit" className="btn-submit" disabled={isSubmitting}>
                       {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Créer le compte'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* EDIT USER MODAL */}
+        <AnimatePresence>
+          {isEditModalOpen && (
+            <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onPointerDown={handleCloseModal}>
+              <motion.div className="modal-content" initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }} onPointerDown={e => e.stopPropagation()}>
+                <div className="modal-header" style={{
+                  background: 'linear-gradient(135deg,#1E1B4B,#4338CA)',
+                  borderBottom: 'none', padding: '20px 24px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Edit2 size={18} color="white" />
+                    </div>
+                    <h2 style={{ color: 'white', margin: 0, fontSize: 16, fontWeight: 900 }}>Modifier Collaborateur</h2>
+                  </div>
+                  <button type="button" className="btn-close" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }} onClick={handleCloseModal}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={handleUpdateUser}>
+                  <div className="modal-body">
+                    {formError && <div className="form-error">{formError}</div>}
+                    {[
+                      { label: 'Nom', name: 'nom', type: 'text' },
+                      { label: 'Prénom', name: 'prenom', type: 'text' },
+                      { label: 'Email', name: 'email', type: 'email' },
+                      { label: 'Matricule', name: 'matricule', type: 'text' },
+                      { label: 'Téléphone', name: 'num_tel', type: 'tel' },
+                    ].map(f => (
+                      <div className="form-group" key={f.name}>
+                        <label>{f.label}</label>
+                        <input type={f.type} name={f.name} required className="form-input"
+                          value={editForm[f.name]} onChange={handleEditInputChange} />
+                      </div>
+                    ))}
+                    <div className="form-group">
+                      <label>Rôle</label>
+                      <select name="role" className="form-select" value={editForm.role} onChange={handleEditInputChange}>
+                        <option value="ADMIN">Administrateur</option>
+                        <option value="AGENT">Agent de Guichet</option>
+                        <option value="RECEVEUR">Receveur</option>
+                        <option value="CONTROLEUR">Contrôleur</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label>Photo de profil</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                        <div style={{
+                          width: '60px', height: '60px', borderRadius: '50%', background: '#f1f5f9',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          overflow: 'hidden', border: '2px solid #e2e8f0'
+                        }}>
+                          {imagePreview ? (
+                            <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <User size={30} color="#94a3b8" />
+                          )}
+                        </div>
+                        <input type="file" accept="image/*" onChange={handleImageChange} style={{ fontSize: '0.875rem' }} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn-cancel" onClick={handleCloseModal} disabled={isSubmitting}>Annuler</button>
+                    <button type="submit" className="btn-submit" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Enregistrer'}
                     </button>
                   </div>
                 </form>

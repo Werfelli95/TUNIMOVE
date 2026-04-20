@@ -43,6 +43,7 @@ const Guichet = () => {
     const [myGuichet, setMyGuichet] = useState(null);
     const [dailySales, setDailySales] = useState([]);
     const [reprintTicket, setReprintTicket] = useState(null);
+    const [soldTicketInfo, setSoldTicketInfo] = useState(null);
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -341,12 +342,16 @@ const Guichet = () => {
             });
 
             if (res.ok) {
+                const data = await res.json();
+                setSoldTicketInfo(data);
                 // Update local occupied seats instantly to prevent double click while it refreshes
                 setOccupiedSeats(prev => [...prev, selectedSeat]);
                 setTimeout(() => {
                     window.print();
                     setIsPrinting(false);
-                }, 500);
+                    // Reset soldTicketInfo after print to not affect next sale until it's done
+                    setSoldTicketInfo(null);
+                }, 700);
             } else {
                 alert("Erreur lors de l'enregistrement de la vente.");
                 setIsPrinting(false);
@@ -367,14 +372,16 @@ const Guichet = () => {
     };
 
     const qrDataObj = {
-        ligne: selectedLigne,
-        ville_depart: departStation?.arret || "Non spécifié",
-        ville_arrivee: arriveeStation?.arret || "Non spécifié",
-        date: dateVoyage,
-        heure: horaire,
-        bus: selectedBus,
-        siege: selectedSeat,
-        prix: calculatedTotal.toFixed(3),
+        id_ticket: soldTicketInfo?.id_ticket || reprintTicket?.id_ticket,
+        code_ticket: soldTicketInfo?.code_ticket || reprintTicket?.qr_code,
+        ligne: selectedLigne || reprintTicket?.num_ligne,
+        ville_depart: departStation?.arret || reprintTicket?.arret_depart || "Non spécifié",
+        ville_arrivee: arriveeStation?.arret || reprintTicket?.arret_arrivee || "Non spécifié",
+        date: dateVoyage || reprintTicket?.date_voyage,
+        heure: horaire || reprintTicket?.heure,
+        bus: selectedBus || reprintTicket?.numero_bus,
+        siege: selectedSeat || reprintTicket?.siege,
+        prix: (calculatedTotal || parseFloat(reprintTicket?.prix || 0)).toFixed(3),
         Matricule: agentInfo.matricule
     };
     const qrDataString = JSON.stringify(qrDataObj);

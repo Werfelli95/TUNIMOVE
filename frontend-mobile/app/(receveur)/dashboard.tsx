@@ -11,8 +11,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
+import { RECEVEUR_SERVICE_API } from '../../constants/api';
 
-const BASE = 'http://localhost:5000/api/receveur-service';
+const BASE = RECEVEUR_SERVICE_API;
 
 interface ActiveService {
   id_service: number;

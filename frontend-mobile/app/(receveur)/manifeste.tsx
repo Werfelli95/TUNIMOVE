@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 
+import { RECEVEUR_SERVICE_API, SALES_API } from '../../constants/api';
+
 interface TicketItem {
   id_ticket: number;
   code_ticket: string;
@@ -51,8 +53,8 @@ export default function ManifesteScreen() {
   const fetchManifeste = async () => {
     try {
       let url = service_id
-        ? `http://localhost:5000/api/receveur-service/${service_id}/tickets`
-        : `http://localhost:5000/api/sales/bus/${encodeURIComponent(numero_bus)}/manifeste`;
+        ? `${RECEVEUR_SERVICE_API}/${service_id}/tickets`
+        : `${SALES_API}/bus/${encodeURIComponent(numero_bus)}/manifeste`;
       const res = await axios.get<TicketItem[]>(url);
       setTickets(res.data);
       setFiltered(res.data);

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { INCIDENTS_API, RECEVEUR_SERVICE_API } from '../../constants/api';
 
 const CATEGORIES = [
   { key: 'panne_mecanique',    label: 'Panne mécanique',   icon: Wrench,        color: Colors.warning },
@@ -58,7 +59,7 @@ export default function IncidentScreen() {
     setConfirmModal(false);
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:5000/api/incidents', {
+      await axios.post(INCIDENTS_API, {
         type_incident: `${category} [${severity}]`,
         description: description.trim(),
         numero_bus,
@@ -67,7 +68,7 @@ export default function IncidentScreen() {
       });
 
       if (closeService && service_id) {
-        await axios.post(`http://localhost:5000/api/receveur-service/${service_id}/close`, {
+        await axios.post(`${RECEVEUR_SERVICE_API}/${service_id}/close`, {
           raison_incident: `${category} — ${severity}: ${description.trim()}`,
         });
       }

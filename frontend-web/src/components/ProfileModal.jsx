@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, Hash, Mail, Phone, Shield, UserCircle, Edit2, Check, RotateCcw } from 'lucide-react';
 
-const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
+const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true, onUpdate }) => {
+
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -13,6 +14,9 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
         email: '',
         num_tel: ''
     });
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
+
 
     useEffect(() => {
         if (isOpen) {
@@ -34,6 +38,9 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
                     email: data.email,
                     num_tel: data.num_tel || ''
                 });
+                if (data.image_url) {
+                    setImagePreview(`http://localhost:5000/${data.image_url}`);
+                }
             }
         } catch (error) {
             console.error("Erreur chargement profil:", error);
@@ -42,15 +49,33 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
         }
     };
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setSelectedImage(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+
     const handleSave = async (e) => {
         e.preventDefault();
         setIsSaving(true);
         try {
             const id = profileData.id_utilisateur;
+            const data = new FormData();
+            Object.keys(formData).forEach(key => data.append(key, formData[key]));
+            if (selectedImage) {
+                data.append('image', selectedImage);
+            }
+
             const response = await fetch(`http://localhost:5000/api/users/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: data
             });
 
             if (response.ok) {
@@ -62,12 +87,17 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
                 localStorage.setItem('user', JSON.stringify({ 
                     ...currentLocal, 
                     nom: updated.user.nom, 
-                    prenom: updated.user.prenom 
+                    prenom: updated.user.prenom,
+                    image_url: updated.user.image_url
                 }));
                 
                 setIsEditing(false);
+                setSelectedImage(null);
+                if (onUpdate) onUpdate(updated.user);
                 alert("Profil mis à jour !");
+
             } else {
+
                 alert("Erreur lors de la mise à jour");
             }
         } catch (error) {
@@ -90,21 +120,54 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true }) => {
                     >
                         <div className="profile-header">
                             <div className="profile-header-content">
-                                <div className="profile-avatar-large">
-                                    {profileData ? (profileData.nom[0] + profileData.prenom[0]) : <UserCircle size={40} />}
+                                <div className="profile-avatar-large" style={{ overflow: 'hidden' }}>
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Profil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : profileData ? (
+                                        profileData.nom[0] + profileData.prenom[0]
+                                    ) : (
+                                        <UserCircle size={40} />
+                                    )}
                                 </div>
+
                                 <h2>{isEditing ? 'Modifier Profil' : 'Mon Profil'}</h2>
-                                <p>Informations personnelles et de contact</p>
-                            </div>
-                            <div className="profile-header-actions">
-                                {!isEditing && (
-                                    <button className="edit-profile-btn" onClick={() => setIsEditing(true)}>
-                                        <Edit2 size={16} />
-                                    </button>
+                                    <p>Informations personnelles et de contact</p>
+                                </div>
+                                {isEditing && (
+                                    <div style={{ marginTop: '1rem' }}>
+                                        <input 
+                                            type="file" 
+                                            accept="image/*" 
+                                            onChange={handleImageChange}
+                                            id="profile-image-upload"
+                                            style={{ display: 'none' }}
+                                        />
+                                        <label 
+                                            htmlFor="profile-image-upload" 
+                                            className="edit-image-label"
+                                            style={{
+                                                fontSize: '0.8rem',
+                                                color: '#1B2559',
+                                                cursor: 'pointer',
+                                                background: '#f1f5f9',
+                                                padding: '6px 12px',
+                                                borderRadius: '20px',
+                                                border: '1px solid #e2e8f0'
+                                            }}
+                                        >
+                                            Changer la photo
+                                        </label>
+                                    </div>
                                 )}
-                                <button className="close-profile" onClick={onClose}><X size={20} /></button>
+                                <div className="profile-header-actions">
+                                    {!isEditing && (
+                                        <button className="edit-profile-btn" onClick={() => setIsEditing(true)}>
+                                            <Edit2 size={16} />
+                                        </button>
+                                    )}
+                                    <button className="close-profile" onClick={onClose}><X size={20} /></button>
+                                </div>
                             </div>
-                        </div>
 
                         <div className="profile-body">
                             {loading ? (

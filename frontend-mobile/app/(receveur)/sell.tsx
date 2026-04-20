@@ -6,8 +6,10 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown } from 'lucide-react-native';
 import axios from 'axios';
+import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { SALES_API } from '../../constants/api';
 
-const API_URL = 'http://localhost:5000/api/sales/tickets/vendre';
+const API_URL = `${SALES_API}/tickets/vendre`;
 const TARIF_OPTIONS = ['Normal', 'Étudiant', 'Militaire'];
 
 export default function SellScreen() {

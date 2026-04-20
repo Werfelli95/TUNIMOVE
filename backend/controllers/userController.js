@@ -4,9 +4,10 @@ const db = require('../config/db');
 exports.getUsers = async (req, res) => {
     try {
         const result = await db.query(
-            'SELECT id_utilisateur, nom, prenom, matricule, email, num_tel, role, est_bloque FROM utilisateur ORDER BY nom ASC'
+            'SELECT id_utilisateur, nom, prenom, matricule, email, num_tel, role, est_bloque, image_url FROM utilisateur ORDER BY nom ASC'
 
         );
+
         res.json(result.rows);
     } catch (err) {
         console.error('Erreur getUsers:', err);
@@ -42,14 +43,17 @@ exports.createUser = async (req, res) => {
             return res.status(400).json({ message: "Ce numéro de téléphone est déjà enregistré." });
         }
 
+        const image_url = req.file ? req.file.path.replace(/\\/g, '/') : null;
+
         const newUserQuery = `
-            INSERT INTO utilisateur (nom, prenom, email, matricule, num_tel, role, mot_de_passe)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO utilisateur (nom, prenom, email, matricule, num_tel, role, mot_de_passe, image_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `;
 
-        const values = [nom, prenom, email, matricule, num_tel, role, mot_de_passe];
+        const values = [nom, prenom, email, matricule, num_tel, role, mot_de_passe, image_url];
         const result = await db.query(newUserQuery, values);
+
 
         res.status(201).json(result.rows[0]);
 
@@ -117,9 +121,10 @@ exports.getUserById = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await db.query(
-            'SELECT id_utilisateur, nom, prenom, matricule, email, num_tel, role FROM utilisateur WHERE id_utilisateur = $1',
+            'SELECT id_utilisateur, nom, prenom, matricule, email, num_tel, role, image_url FROM utilisateur WHERE id_utilisateur = $1',
             [id]
         );
+
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Utilisateur introuvable" });
@@ -136,17 +141,22 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nom, prenom, email, num_tel } = req.body;
+        const { nom, prenom, email, num_tel, matricule, role } = req.body;
+        let image_url = req.body.image_url;
+        if (req.file) {
+            image_url = req.file.path.replace(/\\/g, '/');
+        }
 
         // Mise à jour de l'utilisateur
         const query = `
             UPDATE utilisateur 
-            SET nom = $1, prenom = $2, email = $3, num_tel = $4 
-            WHERE id_utilisateur = $5 
-            RETURNING id_utilisateur, nom, prenom, email, num_tel, role, matricule;
+            SET nom = $1, prenom = $2, email = $3, num_tel = $4, image_url = $5, matricule = $6, role = $7
+            WHERE id_utilisateur = $8 
+            RETURNING id_utilisateur, nom, prenom, email, num_tel, role, matricule, image_url;
         `;
 
-        const result = await db.query(query, [nom, prenom, email, num_tel, id]);
+        const result = await db.query(query, [nom, prenom, email, num_tel, image_url, matricule, role, id]);
+
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Utilisateur introuvable" });

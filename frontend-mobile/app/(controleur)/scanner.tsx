@@ -12,10 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { SALES_API } from '../../constants/api';
 
 const { width, height } = Dimensions.get('window');
 const FRAME_SIZE = width * 0.68;
-const BASE = 'http://localhost:5000/api/sales/tickets';
+const BASE = `${SALES_API}/tickets`;
 
 type ScanStatus = 'valid' | 'invalid' | 'expired' | 'used';
 
@@ -84,7 +85,10 @@ export default function ScannerScreen() {
       setHistory(prev => [result, ...prev.slice(0, 9)]);
       setResultModal(true);
     } catch (err: any) {
+      // Extraire le message d'erreur et éventuellement le détail technique du backend
       const msg: string = err.response?.data?.message || 'Ticket invalide';
+      const detail: string = err.response?.data?.error || '';
+      
       let status: ScanStatus = 'invalid';
       if (msg.toLowerCase().includes('déjà') || msg.toLowerCase().includes('utilisé')) status = 'used';
       if (msg.toLowerCase().includes('expiré')) status = 'expired';
@@ -94,7 +98,7 @@ export default function ScannerScreen() {
         status,
         code: data,
         ticket: err.response?.data?.ticket,
-        message: msg,
+        message: detail ? `${msg} (${detail})` : msg,
         scanned_at: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       };
       setLastResult(result);
