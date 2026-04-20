@@ -10,6 +10,7 @@ const initServiceTable = async () => {
             ADD COLUMN IF NOT EXISTS date_debut TIMESTAMPTZ DEFAULT NOW(),
             ADD COLUMN IF NOT EXISTS date_fin TIMESTAMPTZ,
             ADD COLUMN IF NOT EXISTS station_actuelle VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS horaire VARCHAR(20),
             ADD COLUMN IF NOT EXISTS voyage_complet BOOLEAN DEFAULT FALSE
         `);
     } catch (err) {
@@ -23,7 +24,7 @@ initServiceTable();
  * Start a new service for the receveur's bus
  */
 exports.startService = async (req, res) => {
-    const { numero_bus, id_receveur } = req.body;
+    const { numero_bus, id_receveur, horaire } = req.body;
     if (!numero_bus) {
         return res.status(400).json({ message: 'Numéro de bus manquant' });
     }
@@ -52,10 +53,10 @@ exports.startService = async (req, res) => {
 
         // Set the initial station to ville_depart
         const result = await db.query(`
-            INSERT INTO service (num_ligne, id_bus, date_service, statut, id_receveur, date_debut, station_actuelle, voyage_complet)
-            VALUES ($1, $2, CURRENT_DATE, 'En cours', $3, NOW(), $4, FALSE)
-            RETURNING id_service, num_ligne, date_service, statut, date_debut, station_actuelle, voyage_complet
-        `, [bus.num_ligne, bus.id_bus, id_receveur || null, bus.ville_depart || null]);
+            INSERT INTO service (num_ligne, id_bus, date_service, statut, id_receveur, date_debut, station_actuelle, voyage_complet, horaire)
+            VALUES ($1, $2, CURRENT_DATE, 'En cours', $3, NOW(), $4, FALSE, $5)
+            RETURNING id_service, num_ligne, date_service, statut, date_debut, station_actuelle, voyage_complet, horaire
+        `, [bus.num_ligne, bus.id_bus, id_receveur || null, bus.ville_depart || null, horaire || null]);
 
         const service = result.rows[0];
 
@@ -125,7 +126,7 @@ exports.getActiveService = async (req, res) => {
     try {
         const result = await db.query(`
             SELECT s.id_service, s.num_ligne, s.date_service, s.statut, s.date_debut,
-                   s.station_actuelle, s.voyage_complet,
+                   s.station_actuelle, s.voyage_complet, s.horaire,
                    b.numero_bus, b.capacite,
                    l.ville_depart, l.ville_arrivee,
                    (SELECT COUNT(*) FROM ticket t WHERE t.id_service = s.id_service) as nb_tickets,

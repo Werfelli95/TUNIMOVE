@@ -32,14 +32,14 @@ export const Colors = {
 };
 
 export const Typography = {
-  pageTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.textDark, letterSpacing: -0.3 },
-  sectionTitle: { fontSize: 18, fontWeight: '700' as const, color: Colors.textDark },
-  cardTitle: { fontSize: 15, fontWeight: '700' as const, color: Colors.textDark },
-  body: { fontSize: 14, fontWeight: '400' as const, color: Colors.textMid },
-  bodyMedium: { fontSize: 14, fontWeight: '600' as const, color: Colors.textMid },
-  label: { fontSize: 12, fontWeight: '500' as const, color: Colors.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  caption: { fontSize: 12, fontWeight: '400' as const, color: Colors.textMuted },
-  smallBold: { fontSize: 11, fontWeight: '700' as const, color: Colors.textMuted },
+  pageTitle: { fontSize: 24, fontWeight: '800' as const, color: Colors.textDark, letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 20, fontWeight: '800' as const, color: Colors.textDark },
+  cardTitle: { fontSize: 17, fontWeight: '800' as const, color: Colors.textDark },
+  body: { fontSize: 16, fontWeight: '500' as const, color: Colors.textMid },
+  bodyMedium: { fontSize: 16, fontWeight: '700' as const, color: Colors.textMid },
+  label: { fontSize: 14, fontWeight: '600' as const, color: Colors.textMuted, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  caption: { fontSize: 14, fontWeight: '500' as const, color: Colors.textMuted },
+  smallBold: { fontSize: 13, fontWeight: '800' as const, color: Colors.textMuted },
 };
 
 export const Spacing = {

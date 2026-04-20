@@ -41,6 +41,7 @@ export default function VenteScreen() {
   const ville_arr   = params.ville_arrivee as string;
   const nom         = params.nom as string;
   const prenom      = params.prenom as string;
+  const paramHoraire = params.horaire as string;
 
   // ── Data
   const [ligne, setLigne]         = useState<Ligne | null>(null);
@@ -49,12 +50,12 @@ export default function VenteScreen() {
   const [loading, setLoading]     = useState(true);
 
   // ── Step state
-  const [step, setStep]           = useState(0);
+  const [step, setStep]           = useState(service_id && paramHoraire && ville_dep ? 1 : 0);
 
   // ── Step 1: Trajet
-  const [horaire, setHoraire]         = useState('');
+  const [horaire, setHoraire]         = useState(paramHoraire || '');
   const [showHoraire, setShowHoraire] = useState(false);
-  const [depart, setDepart]           = useState('');
+  const [depart, setDepart]           = useState(ville_dep || '');
   const [showDepart, setShowDepart]   = useState(false);
   const [arrivee, setArrivee]         = useState('');
   const [showArrivee, setShowArrivee] = useState(false);
@@ -86,12 +87,12 @@ export default function VenteScreen() {
         setLigne(found ?? null);
         setTarifCfg(tarifRes.data);
         
-        if (tRes.data && !tRes.data.message) {
+        if (tRes.data && Array.isArray(tRes.data)) {
             setTarifsDb(tRes.data.filter((t: any) => t.actif));
             const voyageurs = tRes.data.filter((t: any) => t.actif && t.categorie === 'VOYAGEUR');
             if(voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification.toString());
         }
-        if (bRes.data && !bRes.data.message) {
+        if (bRes.data && Array.isArray(bRes.data)) {
             setBagagesDb(bRes.data.filter((b: any) => b.actif));
         }
       } catch { /**/ }
@@ -195,11 +196,17 @@ export default function VenteScreen() {
   const handleSell = async () => {
     if (!selectedSeat || !depart || !arrivee || !horaire) return;
     setSelling(true);
-    const today = new Date().toISOString().split('T')[0];
+    try {
+      const today = new Date().toISOString().split('T')[0];
       const payload = {
-        num_ligne, bus: numero_bus,
-        date_voyage: today, heure: horaire, siege: selectedSeat,
-        prix, arret_depart: depart, arret_arrivee: arrivee,
+        num_ligne, 
+        bus: numero_bus,
+        date_voyage: today, 
+        heure: horaire, 
+        siege: selectedSeat,
+        prix, 
+        arret_depart: depart, 
+        arret_arrivee: arrivee,
         agent_id: null, 
         type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
         id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
@@ -211,22 +218,30 @@ export default function VenteScreen() {
       const r = await axios.post<any>(`${BASE}/sales/tickets/vendre`, payload);
       setOccupied(prev => [...prev, selectedSeat]);
       const code = 'TKT' + Date.now().toString().slice(-6);
+      
       setLastTicket({
         code_ticket: r.data?.code_ticket || code,
         siege: selectedSeat, 
         type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
-        montant_total: prix, station_depart: depart,
-        station_arrivee: arrivee, heure_depart: horaire,
+        montant_total: prix, 
+        station_depart: depart,
+        station_arrivee: arrivee, 
+        heure_depart: horaire,
         date_emission: new Date().toISOString(),
-        numero_bus, num_ligne,
+        numero_bus, 
+        num_ligne,
       });
+
       setSeat(null);
       setStep(0);
-      setDepart(''); setArrivee(''); setSeat(null);
+      setDepart(''); 
+      setArrivee(''); 
       setModal(true);
     } catch (err: any) {
       Alert.alert('Erreur', err.response?.data?.message || 'Impossible d\'émettre le billet');
-    } finally { setSelling(false); }
+    } finally { 
+      setSelling(false); 
+    }
   };
 
   if (loading) return (
@@ -267,56 +282,74 @@ export default function VenteScreen() {
             {/* Horaire */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}><Clock size={14} color={Colors.textMid} /> Horaire de départ</Text>
-              {horaires.length > 0 ? (
-                <>
-                  <TouchableOpacity style={styles.picker} onPress={() => { setShowHoraire(!showHoraire); setShowDepart(false); setShowArrivee(false); }}>
-                    <Text style={horaire ? styles.pickerVal : styles.pickerPh}>{horaire || 'Choisir un horaire...'}</Text>
-                    <ChevronDown color={Colors.textMuted} size={18} />
-                  </TouchableOpacity>
-                  {showHoraire && (
-                    <View style={styles.dropdown}>
-                      {horaires.map(h => (
-                        <TouchableOpacity
-                          key={h}
-                          style={[styles.ddItem, horaire === h && styles.ddItemActive]}
-                          onPress={() => { setHoraire(h); setShowHoraire(false); }}
-                        >
-                          <Clock color={horaire === h ? Colors.primary : Colors.textMuted} size={14} />
-                          <Text style={[styles.ddItemText, horaire === h && styles.ddItemTextActive]}>{h}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={[styles.picker, { opacity: 0.5 }]}>
-                  <Text style={styles.pickerPh}>Aucun horaire défini pour cette ligne</Text>
+              {service_id && paramHoraire ? (
+                <View style={[styles.picker, { backgroundColor: Colors.bgMid, opacity: 0.8 }]}>
+                    <Text style={styles.pickerVal}>{horaire}</Text>
+                    <Clock color={Colors.textMuted} size={16} />
                 </View>
+              ) : (
+                <>
+                {horaires.length > 0 ? (
+                    <>
+                        <TouchableOpacity style={styles.picker} onPress={() => { setShowHoraire(!showHoraire); setShowDepart(false); setShowArrivee(false); }}>
+                        <Text style={horaire ? styles.pickerVal : styles.pickerPh}>{horaire || 'Choisir un horaire...'}</Text>
+                        <ChevronDown color={Colors.textMuted} size={18} />
+                        </TouchableOpacity>
+                        {showHoraire && (
+                        <View style={styles.dropdown}>
+                            {horaires.map(h => (
+                            <TouchableOpacity
+                                key={h}
+                                style={[styles.ddItem, horaire === h && styles.ddItemActive]}
+                                onPress={() => { setHoraire(h); setShowHoraire(false); }}
+                            >
+                                <Clock color={horaire === h ? Colors.primary : Colors.textMuted} size={14} />
+                                <Text style={[styles.ddItemText, horaire === h && styles.ddItemTextActive]}>{h}</Text>
+                            </TouchableOpacity>
+                            ))}
+                        </View>
+                        )}
+                    </>
+                ) : (
+                <View style={[styles.picker, { opacity: 0.5 }]}>
+                    <Text style={styles.pickerPh}>Aucun horaire défini pour cette ligne</Text>
+                </View>
+                )}
+                </>
               )}
             </View>
 
             {/* Station départ */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}><MapPin size={14} color={Colors.success} /> Point de montée</Text>
-              <TouchableOpacity style={styles.picker} onPress={() => { setShowDepart(!showDepart); setShowHoraire(false); setShowArrivee(false); }}>
-                <Text style={depart ? styles.pickerVal : styles.pickerPh}>{depart || 'Station de départ...'}</Text>
-                <ChevronDown color={Colors.textMuted} size={18} />
-              </TouchableOpacity>
-              {showDepart && (
-                <View style={styles.dropdown}>
-                  {stations.map(s => (
-                    <TouchableOpacity
-                      key={s.arret}
-                      style={[styles.ddItem, depart === s.arret && styles.ddItemActive]}
-                      onPress={() => { setDepart(s.arret); setArrivee(''); setShowDepart(false); }}
-                    >
-                      <Text style={[styles.ddItemText, depart === s.arret && styles.ddItemTextActive]}>
-                        {s.arret}
-                      </Text>
-                      <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
-                    </TouchableOpacity>
-                  ))}
+              {service_id ? (
+                <View style={[styles.picker, { backgroundColor: Colors.bgMid, opacity: 0.8 }]}>
+                    <Text style={styles.pickerVal}>{depart}</Text>
+                    <MapPin color={Colors.success} size={16} />
                 </View>
+              ) : (
+                <>
+                  <TouchableOpacity style={styles.picker} onPress={() => { setShowDepart(!showDepart); setShowHoraire(false); setShowArrivee(false); }}>
+                  <Text style={depart ? styles.pickerVal : styles.pickerPh}>{depart || 'Station de départ...'}</Text>
+                  <ChevronDown color={Colors.textMuted} size={18} />
+                  </TouchableOpacity>
+                  {showDepart && (
+                    <View style={styles.dropdown}>
+                      {stations.map(s => (
+                        <TouchableOpacity
+                          key={s.arret}
+                          style={[styles.ddItem, depart === s.arret && styles.ddItemActive]}
+                          onPress={() => { setDepart(s.arret); setArrivee(''); setShowDepart(false); }}
+                        >
+                          <Text style={[styles.ddItemText, depart === s.arret && styles.ddItemTextActive]}>
+                            {s.arret}
+                          </Text>
+                          <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
               )}
             </View>
 
@@ -336,7 +369,7 @@ export default function VenteScreen() {
                   {showArrivee && (
                     <View style={styles.dropdown}>
                       {arriveeOptions.length === 0
-                        ? <View style={styles.ddItem}><Text style={{ color: Colors.textMuted, fontSize: 13 }}>Aucune station après ce départ</Text></View>
+                        ? <View style={styles.ddItem}><Text style={{ color: Colors.textMuted, fontSize: 15 }}>Aucune station après ce départ</Text></View>
                         : arriveeOptions.map(s => (
                           <TouchableOpacity
                             key={s.arret}
@@ -392,7 +425,7 @@ export default function VenteScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}><User size={14} color={Colors.textMid} /> Type de tarif</Text>
               
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginBottom: 5}}>1. Catégorie</Text>
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginBottom: 5}}>1. Catégorie</Text>
               <View style={[styles.picker, {marginBottom: 10}]}>
                   <TouchableOpacity style={{flex: 1}} onPress={() => {}}>
                     <Text style={styles.pickerVal}>{selectedCategory === 'VOYAGEUR' ? 'Voyageur' : selectedCategory === 'CONVENTION' ? 'Convention' : 'Expédition'}</Text>
@@ -416,7 +449,7 @@ export default function VenteScreen() {
                   ))}
               </View>
 
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginTop: 15, marginBottom: 5}}>2. Tarification</Text>
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginTop: 15, marginBottom: 5}}>2. Tarification</Text>
               <View style={styles.tarifGrid}>
                 {tarifsDb.filter((t:any) => t.categorie === selectedCategory).map((t:any) => (
                   <TouchableOpacity
@@ -430,7 +463,7 @@ export default function VenteScreen() {
                 ))}
               </View>
 
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 12, marginTop: 15, marginBottom: 5}}>3. Option Bagage</Text>
+              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginTop: 15, marginBottom: 5}}>3. Option Bagage</Text>
               <View style={[styles.tarifGrid, {marginBottom: 10}]}>
                 <TouchableOpacity
                     style={[styles.tarifCard, !selectedBagageId && { borderColor: Colors.textMid, backgroundColor: Colors.bgMid }]}
@@ -495,7 +528,7 @@ export default function VenteScreen() {
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Départ</Text><Text style={styles.recapVal}>{depart}</Text></View>
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Arrivée</Text><Text style={styles.recapVal}>{arrivee}</Text></View>
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Distance</Text><Text style={styles.recapVal}>{distance.toFixed(1)} km</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Siège</Text><Text style={[styles.recapVal, { color: Colors.primary, fontWeight: '900', fontSize: 18 }]}>{selectedSeat}</Text></View>
+              <View style={styles.recapRow}><Text style={styles.recapLabel}>Siège</Text><Text style={[styles.recapVal, { color: Colors.primary, fontWeight: '900', fontSize: 20 }]}>{selectedSeat}</Text></View>
               <View style={styles.recapRow}><Text style={styles.recapLabel}>Tarif</Text>
                 <Text style={styles.recapVal}>
                   {currentTarif ? currentTarif.libelle : 'Tarif Normal'}
@@ -561,7 +594,7 @@ export default function VenteScreen() {
                   ].map(([k, v]) => (
                     <View key={k} style={styles.ticketField}>
                       <Text style={styles.ticketKey}>{k}</Text>
-                      <Text style={[styles.ticketVal, k === 'Siège' && { fontSize: 22, color: Colors.primary }]}>{v}</Text>
+                      <Text style={[styles.ticketVal, k === 'Siège' && { fontSize: 24, color: Colors.primary }]}>{v}</Text>
                     </View>
                   ))}
                 </View>
@@ -608,9 +641,9 @@ const styles = StyleSheet.create({
   },
   stepNumActive: { backgroundColor: Colors.primary },
   stepNumDone: { backgroundColor: Colors.success },
-  stepNumText: { fontSize: 12, fontWeight: '800', color: Colors.textMuted },
+  stepNumText: { fontSize: 14, fontWeight: '800', color: Colors.textMuted },
   stepNumTextActive: { color: Colors.white },
-  stepLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', marginLeft: 4 },
+  stepLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', marginLeft: 4 },
   stepLabelActive: { color: Colors.primary, fontWeight: '800' },
   stepConnector: { flex: 1, height: 2, backgroundColor: Colors.border, marginHorizontal: 4 },
   stepConnectorDone: { backgroundColor: Colors.success },
@@ -623,14 +656,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.primary + '20',
   },
   bannerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
-  bannerText: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
+  bannerText: { fontSize: 14, color: Colors.primary, fontWeight: '800' },
 
   // Section
   section: {
     backgroundColor: Colors.white, borderRadius: Radius.lg,
     padding: Spacing.base, marginBottom: Spacing.sm, ...Shadow.card,
   },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
 
   // Picker
   picker: {
@@ -638,8 +671,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md,
     height: 50, paddingHorizontal: 14, backgroundColor: Colors.bgLight,
   },
-  pickerVal: { fontSize: 14, color: Colors.textDark, fontWeight: '600' },
-  pickerPh: { fontSize: 14, color: Colors.textLight },
+  pickerVal: { fontSize: 16, color: Colors.textDark, fontWeight: '700' },
+  pickerPh: { fontSize: 16, color: Colors.textLight },
 
   // Dropdown
   dropdown: {
@@ -651,9 +684,9 @@ const styles = StyleSheet.create({
     padding: 13, borderBottomWidth: 1, borderBottomColor: Colors.divider, gap: 8,
   },
   ddItemActive: { backgroundColor: Colors.primary + '10' },
-  ddItemText: { fontSize: 14, color: Colors.textMid, flex: 1 },
-  ddItemTextActive: { color: Colors.primary, fontWeight: '700' },
-  ddItemSub: { fontSize: 12, color: Colors.textLight },
+  ddItemText: { fontSize: 16, color: Colors.textMid, flex: 1 },
+  ddItemTextActive: { color: Colors.primary, fontWeight: '800' },
+  ddItemSub: { fontSize: 14, color: Colors.textLight },
 
   // Distance badge
   distBadge: {
@@ -661,7 +694,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.successLight, borderRadius: Radius.pill,
     paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginTop: 8,
   },
-  distText: { fontSize: 12, color: Colors.success, fontWeight: '700' },
+  distText: { fontSize: 14, color: Colors.success, fontWeight: '800' },
 
   // Route Summary (step 1)
   routeSummary: {
@@ -670,9 +703,9 @@ const styles = StyleSheet.create({
   },
   routeSummaryItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rsDot: { width: 10, height: 10, borderRadius: 5 },
-  rsTxt: { fontSize: 14, color: Colors.white, fontWeight: '700' },
+  rsTxt: { fontSize: 16, color: Colors.white, fontWeight: '800' },
   rsLine: { width: 2, height: 14, backgroundColor: Colors.white + '40', marginLeft: 4 },
-  rsDist: { fontSize: 12, color: Colors.accent, fontWeight: '600', marginTop: 4 },
+  rsDist: { fontSize: 14, color: Colors.accent, fontWeight: '700', marginTop: 4 },
 
   // Tarif
   tarifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
@@ -681,15 +714,15 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.border,
     backgroundColor: Colors.bgLight, gap: 3,
   },
-  tarifLabel: { fontSize: 13, fontWeight: '700', color: Colors.textMid },
-  tarifReduc: { fontSize: 11, fontWeight: '700' },
+  tarifLabel: { fontSize: 15, fontWeight: '800', color: Colors.textMid },
+  tarifReduc: { fontSize: 13, fontWeight: '800' },
 
   // Seats
   legend: { flexDirection: 'row', gap: 12, marginBottom: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 12, height: 12, borderRadius: 3 },
-  legendTxt: { fontSize: 11, color: Colors.textMuted },
-  seatWarn: { fontSize: 12, color: Colors.warning, fontWeight: '600', marginBottom: 8 },
+  legendTxt: { fontSize: 13, color: Colors.textMuted },
+  seatWarn: { fontSize: 14, color: Colors.warning, fontWeight: '700', marginBottom: 8 },
   seatGrid: { gap: 5, paddingVertical: 4 },
   seatRow: { flexDirection: 'row', gap: 5 },
   seat: {
@@ -699,7 +732,7 @@ const styles = StyleSheet.create({
   seatFree: { backgroundColor: Colors.bgMid, borderColor: Colors.border },
   seatSel: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   seatOcc: { backgroundColor: Colors.dangerLight, borderColor: Colors.danger + '50' },
-  seatTxt: { fontSize: 10, fontWeight: '700' },
+  seatTxt: { fontSize: 12, fontWeight: '800' },
   seatTxtFree: { color: Colors.textMid },
   seatTxtSel: { color: Colors.white },
   seatTxtOcc: { color: Colors.danger },
@@ -709,16 +742,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white, borderRadius: Radius.xl,
     padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
   },
-  recapTitle: { fontSize: 16, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
+  recapTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
   recapRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  recapLabel: { fontSize: 13, color: Colors.textMuted },
-  recapVal: { fontSize: 13, fontWeight: '700', color: Colors.textDark },
+  recapLabel: { fontSize: 15, color: Colors.textMuted },
+  recapVal: { fontSize: 15, fontWeight: '800', color: Colors.textDark },
   recapTotal: { borderBottomWidth: 0, marginTop: 6 },
-  recapTotalLabel: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
-  recapTotalVal: { fontSize: 24, fontWeight: '900', color: Colors.primary },
+  recapTotalLabel: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
+  recapTotalVal: { fontSize: 26, fontWeight: '900', color: Colors.primary },
 
   // Nav
   navRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'stretch' },
@@ -728,19 +761,19 @@ const styles = StyleSheet.create({
     gap: 8, ...Shadow.accent,
   },
   nextBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
-  nextBtnText: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  nextBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
   nextBtnTextDis: { color: Colors.textMuted },
   backBtn: {
     backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingHorizontal: 16, borderWidth: 1.5, borderColor: Colors.border,
   },
-  backBtnText: { fontSize: 14, fontWeight: '700', color: Colors.textMid },
+  backBtnText: { fontSize: 16, fontWeight: '800', color: Colors.textMid },
   sellBtn: {
     flex: 1, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...Shadow.accent,
   },
-  sellBtnText: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  sellBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -750,30 +783,30 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
   ticketHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.base },
-  ticketHeaderTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: Colors.textDark },
+  ticketHeaderTitle: { flex: 1, fontSize: 19, fontWeight: '800', color: Colors.textDark },
   ticketClose: { padding: 4 },
 
   ticketBody: { alignItems: 'center' },
-  ticketBrand: { fontSize: 20, fontWeight: '900', color: Colors.primary },
-  ticketSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  ticketBrand: { fontSize: 22, fontWeight: '900', color: Colors.primary },
+  ticketSubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 2 },
   ticketDivider: { width: '100%', height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
   ticketGrid: { flexDirection: 'row', flexWrap: 'wrap', width: '100%', gap: 8 },
   ticketField: { width: '48%', backgroundColor: Colors.bgLight, borderRadius: Radius.md, padding: 10 },
-  ticketKey: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  ticketVal: { fontSize: 14, fontWeight: '700', color: Colors.textDark, marginTop: 2 },
+  ticketKey: { fontSize: 12, color: Colors.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  ticketVal: { fontSize: 16, fontWeight: '800', color: Colors.textDark, marginTop: 2 },
   ticketQR: { alignItems: 'center', width: '100%' },
-  qrLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
+  qrLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
   qrCode: {
-    fontFamily: 'monospace', fontSize: 18, fontWeight: '900', color: Colors.primary,
+    fontFamily: 'monospace', fontSize: 20, fontWeight: '900', color: Colors.primary,
     letterSpacing: 3, backgroundColor: Colors.bgLight, paddingHorizontal: 20,
     paddingVertical: 12, borderRadius: 12, borderWidth: 2, borderColor: Colors.border,
   },
-  qrHint: { fontSize: 11, color: Colors.textLight, marginTop: 6 },
-  ticketTotal: { fontSize: 28, fontWeight: '900', color: Colors.primary, marginBottom: 4 },
-  ticketFooter: { fontSize: 11, color: Colors.textLight },
+  qrHint: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
+  ticketTotal: { fontSize: 30, fontWeight: '900', color: Colors.primary, marginBottom: 4 },
+  ticketFooter: { fontSize: 13, color: Colors.textLight },
   newTicketBtn: {
     backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg, marginTop: Spacing.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
   },
-  newTicketBtnText: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  newTicketBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
 });

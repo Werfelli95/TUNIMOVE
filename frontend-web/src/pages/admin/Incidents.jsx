@@ -55,7 +55,7 @@ const fmtDateLong = (d) =>
 const StatusBadge = ({ statut, size = 'md' }) => {
   const cfg = STATUS[statut] || STATUS['En attente'];
   const px = size === 'sm' ? '8px 12px' : '6px 14px';
-  const fs = size === 'sm' ? '11px' : '12px';
+  const fs = size === 'sm' ? '13px' : '15px';
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -101,7 +101,7 @@ const KpiCard = ({ label, value, icon: Icon, iconColor, iconBg, accent, onClick,
       <Icon size={24} color={iconColor} />
     </div>
     <div>
-      <p style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+      <p style={{ fontSize: 13, color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
         {label}
       </p>
       <h3 style={{ fontSize: 28, fontWeight: 900, color: active ? iconColor : '#1E293B', margin: '2px 0 0', lineHeight: 1 }}>
@@ -402,7 +402,7 @@ const Incidents = () => {
                     {['Date & Heure', 'Type d\'incident', 'Bus / Ligne', 'Signalé par', 'Statut', 'Action'].map(h => (
                       <th key={h} style={{
                         padding: '12px 20px', textAlign: 'left',
-                        fontSize: 11, fontWeight: 800, color: '#94A3B8',
+                        fontSize: '0.95rem', fontWeight: 800, color: '#94A3B8',
                         textTransform: 'uppercase', letterSpacing: '0.07em',
                         borderBottom: '1px solid #F1F5F9',
                         whiteSpace: 'nowrap',
@@ -431,10 +431,10 @@ const Incidents = () => {
                       >
                         {/* Date */}
                         <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: '#334155' }}>
                             {new Date(inc.date_incident).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                           </div>
-                          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                          <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 2 }}>
                             {new Date(inc.date_incident).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </td>
@@ -449,7 +449,7 @@ const Incidents = () => {
                             }}>
                               <TypeIcon size={16} color={tc.color} />
                             </div>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', maxWidth: 160 }}>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: '#1E293B', maxWidth: 160 }}>
                               {inc.type_incident || '—'}
                             </span>
                           </div>
@@ -463,7 +463,7 @@ const Incidents = () => {
                                 <Bus size={12} />Bus N° {inc.numero_bus}
                               </span>
                               {inc.ligne && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>
                                   <MapPin size={11} />{inc.ligne}
                                 </span>
                               )}
@@ -483,7 +483,7 @@ const Incidents = () => {
                             }}>
                               <User size={13} color="#64748B" />
                             </div>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: '#475569' }}>
                               {inc.rapporte_par || '—'}
                             </span>
                           </div>
@@ -503,7 +503,7 @@ const Incidents = () => {
                               value={inc.statut || 'En attente'}
                               onChange={e => updateStatus(inc.id_incident, e.target.value)}
                               style={{
-                                fontSize: 12, fontWeight: 700, padding: '6px 10px',
+                                fontSize: 14, fontWeight: 700, padding: '6px 10px',
                                 border: '1.5px solid #E2E8F0', borderRadius: '10px',
                                 background: 'white', color: '#475569',
                                 cursor: 'pointer', outline: 'none',
@@ -594,14 +594,14 @@ const Incidents = () => {
                       </div>
                     );
                   })()}
-                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#1E293B', lineHeight: 1.3 }}>
+                  <h4 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1E293B', lineHeight: 1.3 }}>
                     {selected.type_incident || 'Type inconnu'}
                   </h4>
                 </div>
                 <div style={{
                   background: '#F8FAFC', borderRadius: '14px',
-                  padding: '14px 16px', fontSize: 13,
-                  color: '#475569', lineHeight: 1.6, fontWeight: 500,
+                  padding: '14px 16px', fontSize: 16,
+                  color: '#475569', lineHeight: 1.6, fontWeight: 600,
                   border: '1px solid #F1F5F9',
                 }}>
                   {selected.description || <em style={{ color: '#CBD5E1' }}>Aucune description</em>}
@@ -619,9 +619,9 @@ const Incidents = () => {
                   <div key={label} style={{ background: '#F8FAFC', borderRadius: '14px', padding: '12px 14px', border: '1px solid #F1F5F9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <Icon size={12} color={color} />
-                      <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
                     </div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1E293B' }}>{value}</p>
+                    <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1E293B' }}>{value}</p>
                   </div>
                 ))}
               </div>

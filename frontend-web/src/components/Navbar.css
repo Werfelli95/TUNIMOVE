@@ -240,26 +240,26 @@
 
 .info-content label {
   display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.9rem; /* Increased from 0.75rem */
+  font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
 }
 
 .info-content p {
-  font-weight: 600;
+  font-weight: 700;
   color: #1e293b;
-  font-size: 1rem;
+  font-size: 1.15rem; /* Increased from 1rem */
 }
 
 .role-tag {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 6px 14px;
   background: #eef2ff;
   color: #4f46e5;
   border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.9rem; /* Increased from 0.75rem */
+  font-weight: 800;
 }
 
 /* Trigger dans la Navbar */

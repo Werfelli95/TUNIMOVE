@@ -372,28 +372,28 @@ const Assignments = () => {
                                         </td>
                                         <td>
                                             {(activeTab === 'bus' ? item.receveur_nom : item.agent_nom) ? (
-                                                <div className="flex items-center justify-between gap-2 group/item">
+                                                <div className="flex items-center justify-between gap-3 group/item">
                                                     <div>
-                                                        <div className="text-slate-700 font-medium">
+                                                        <div className="text-slate-700 font-bold text-lg">
                                                             {activeTab === 'bus' ? `${item.receveur_prenom} ${item.receveur_nom}` : `${item.agent_prenom} ${item.agent_nom}`}
                                                         </div>
                                                         {activeTab === 'bus' && (item.date_debut_affectation || item.date_fin_affectation) && (
-                                                            <div className="flex items-center gap-2 mt-1.5">
+                                                            <div className="flex items-center gap-2 mt-2">
                                                                 {item.date_debut_affectation && (
-                                                                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200">
+                                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200">
                                                                         Du {new Date(item.date_debut_affectation).toLocaleDateString()}
                                                                     </span>
                                                                 )}
                                                                 {item.date_fin_affectation && (
-                                                                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200">
+                                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200">
                                                                         Au {new Date(item.date_fin_affectation).toLocaleDateString()}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         )}
                                                         {activeTab === 'guichet' && item.emplacement && (
-                                                            <div className="flex flex-col gap-1 mt-1.5">
-                                                                <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-medium border border-slate-200 w-fit">
+                                                            <div className="flex flex-col gap-1 mt-2">
+                                                                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200 w-fit">
                                                                     Emplacement: {item.emplacement}
                                                                 </span>
                                                             </div>
@@ -434,14 +434,14 @@ const Assignments = () => {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <span className="text-slate-400 italic bg-slate-50 px-3 py-1 rounded-full text-xs border border-slate-100">
+                                                <span className="text-slate-400 italic bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
                                                     Non affecté
                                                 </span>
                                             )}
                                         </td>
                                         <td className="text-center">
                                             <button
-                                                className={`btn-add-user h-8 py-0 px-4 text-xs ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
+                                                className={`btn-add-user h-10 py-0 px-6 text-sm ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
                                                 onClick={() => handleOpenModal(item)}
                                                 disabled={activeTab === 'bus' && item.etat !== 'En service'}
                                                 style={activeTab === 'bus' && item.etat !== 'En service' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert
+  ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -62,11 +62,22 @@ export default function ReceveurDashboard() {
     ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}min`
     : `${elapsed}min`;
 
-  const handleLogout = () =>
-    Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Déconnecter', style: 'destructive', onPress: () => router.replace('/') },
-    ]);
+  const handleLogout = () => {
+    const logoutAction = () => {
+      router.replace('/');
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Voulez-vous vous déconnecter ?')) {
+        logoutAction();
+      }
+    } else {
+      Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Déconnecter', style: 'destructive', onPress: logoutAction },
+      ]);
+    }
+  };
 
   const goService = () => router.push({ pathname: '/(receveur)/service', params: navParams });
   const goVente = () => {
@@ -99,7 +110,12 @@ export default function ReceveurDashboard() {
             <Text style={styles.topName}>{prenom} {nom}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={styles.logoutBtn} 
+          onPress={handleLogout}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
+        >
           <LogOut color={Colors.textMuted} size={20} />
         </TouchableOpacity>
       </View>
@@ -301,9 +317,9 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  topAvatarText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
-  topGreeting: { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
-  topName: { fontSize: 15, fontWeight: '800', color: Colors.textDark },
+  topAvatarText: { color: Colors.white, fontWeight: '800', fontSize: 18 },
+  topGreeting: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
+  topName: { fontSize: 17, fontWeight: '800', color: Colors.textDark },
   logoutBtn: {
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
@@ -319,8 +335,8 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: Colors.white + '20', alignItems: 'center', justifyContent: 'center',
   },
-  assignBusLabel: { fontSize: 10, color: Colors.accent, fontWeight: '700', letterSpacing: 1 },
-  assignBus: { fontSize: 20, fontWeight: '900', color: Colors.white },
+  assignBusLabel: { fontSize: 12, color: Colors.accent, fontWeight: '800', letterSpacing: 1 },
+  assignBus: { fontSize: 22, fontWeight: '900', color: Colors.white },
   statusBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill,
@@ -329,20 +345,20 @@ const styles = StyleSheet.create({
   statusActive: {},
   statusIdle: {},
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  statusText: { fontSize: 13, fontWeight: '800' },
   assignDivider: { height: 1, backgroundColor: Colors.white + '20', marginVertical: Spacing.md },
   assignRow: { flexDirection: 'row', alignItems: 'center' },
   assignItem: { flex: 1, gap: 3, alignItems: 'center' },
-  assignItemLabel: { fontSize: 10, color: Colors.accent, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
-  assignItemValue: { fontSize: 13, color: Colors.white, fontWeight: '700' },
+  assignItemLabel: { fontSize: 12, color: Colors.accent, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
+  assignItemValue: { fontSize: 15, color: Colors.white, fontWeight: '800' },
   assignSep: { width: 1, height: 32, backgroundColor: Colors.white + '25', marginHorizontal: Spacing.md },
 
   noAssignCard: {
     backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.xl,
     alignItems: 'center', marginBottom: Spacing.md, ...Shadow.card,
   },
-  noAssignTitle: { fontSize: 16, fontWeight: '700', color: Colors.textMid, marginTop: 12 },
-  noAssignSub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  noAssignTitle: { fontSize: 18, fontWeight: '800', color: Colors.textMid, marginTop: 12 },
+  noAssignSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 18 },
 
   // KPI Row
   kpiRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
@@ -350,8 +366,8 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: Colors.white, borderRadius: Radius.lg,
     padding: Spacing.md, alignItems: 'center', gap: 4, ...Shadow.card,
   },
-  kpiValue: { fontSize: 20, fontWeight: '900', color: Colors.textDark },
-  kpiLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  kpiValue: { fontSize: 22, fontWeight: '900', color: Colors.textDark },
+  kpiLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   stopBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -359,9 +375,9 @@ const styles = StyleSheet.create({
     padding: Spacing.md, marginBottom: Spacing.md,
     borderWidth: 1, borderColor: Colors.primary + '20',
   },
-  stopBannerText: { flex: 1, fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  stopBannerText: { flex: 1, fontSize: 15, color: Colors.primary, fontWeight: '700' },
   completeBadge: { backgroundColor: Colors.successLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
-  completeBadgeTxt: { fontSize: 11, fontWeight: '700', color: Colors.success },
+  completeBadgeTxt: { fontSize: 13, fontWeight: '800', color: Colors.success },
 
   // Section
   sectionLabel: { ...Typography.label, marginBottom: Spacing.md, marginTop: 4 },
@@ -377,8 +393,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white + '30', alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
   },
   primaryCTAContent: { flex: 1 },
-  primaryCTATitle: { fontSize: 16, fontWeight: '800', color: Colors.primary },
-  primaryCTASub: { fontSize: 12, color: Colors.primary + 'AA', marginTop: 2, fontWeight: '500' },
+  primaryCTATitle: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  primaryCTASub: { fontSize: 14, color: Colors.primary + 'AA', marginTop: 2, fontWeight: '600' },
 
   // Action Grid
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.base },
@@ -391,9 +407,9 @@ const styles = StyleSheet.create({
     width: 46, height: 46, borderRadius: Radius.md,
     alignItems: 'center', justifyContent: 'center',
   },
-  actionTitle: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
+  actionTitle: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
   actionTitleDisabled: { color: Colors.textMuted },
-  actionSub: { fontSize: 11, color: Colors.textMuted, fontWeight: '500' },
+  actionSub: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
 
   // Helper
   helperBox: {
@@ -401,5 +417,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warningLight, borderRadius: Radius.md,
     padding: Spacing.md, borderWidth: 1, borderColor: Colors.warning + '40',
   },
-  helperText: { flex: 1, fontSize: 12, color: Colors.warning, fontWeight: '600', lineHeight: 18 },
+  helperText: { flex: 1, fontSize: 14, color: Colors.warning, fontWeight: '700', lineHeight: 18 },
 });

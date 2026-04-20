@@ -21,6 +21,7 @@ interface ActiveService {
   num_ligne: string | number;
   date_debut: string;
   station_actuelle: string | null;
+  horaire: string | null;
   voyage_complet: boolean;
   numero_bus: string;
   ville_depart: string;
@@ -47,6 +48,9 @@ export default function ServiceScreen() {
   const [advancing, setAdv]     = useState(false);
   const [closing, setClosing]   = useState(false);
   const [stations, setStations] = useState<string[]>([]);
+  const [horaires, setHoraires] = useState<string[]>([]);
+  const [selHoraire, setSelHoraire] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
   const [incModal, setIncModal] = useState(false);
   const [incRaison, setIncRaison] = useState('');
 
@@ -55,11 +59,18 @@ export default function ServiceScreen() {
     try {
       const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(numero_bus)}`);
       setSvc(r.data);
-      if (r.data?.num_ligne) {
+      
+      const targetLigne = r.data?.num_ligne || num_ligne;
+      if (targetLigne) {
         try {
           const net = await axios.get<any[]>(NET);
-          const ligne = net.data.find((l: any) => String(l.num_ligne) === String(r.data!.num_ligne));
+          const ligne = net.data.find((l: any) => String(l.num_ligne) === String(targetLigne));
           if (ligne) {
+            // Hours
+            setHoraires(ligne.horaires || []);
+            if (!selHoraire && ligne.horaires?.length > 0) setSelHoraire(ligne.horaires[0]);
+
+            // Stations
             const list = [...(ligne.stations || [])].sort((a: any, b: any) => a.distance_km - b.distance_km);
             if (!list.some((s: any) => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase()))
               list.unshift({ arret: ligne.ville_depart, distance_km: 0 });
@@ -100,11 +111,15 @@ export default function ServiceScreen() {
 
   // ── Handlers ──
   const handleStart = () => {
-    const msg = `Démarrer un service pour le Bus N° ${numero_bus} ?`;
+    if (!selHoraire && horaires.length > 0) {
+        Alert.alert('Horaire requis', 'Veuillez sélectionner un horaire de départ.');
+        return;
+    }
+    const msg = `Démarrer le service de ${selHoraire || 'votre choix'} pour le Bus N° ${numero_bus} ?`;
     const proceed = async () => {
       setStarting(true);
       try {
-        const r = await axios.post<any>(`${BASE}/start`, { numero_bus });
+        const r = await axios.post<any>(`${BASE}/start`, { numero_bus, horaire: selHoraire });
         const s = r.data.service as ActiveService;
         setSvc({ ...s, nb_tickets: 0, recette: 0 });
         if (Platform.OS === 'web') window.alert(`✅ Service #${s.id_service} démarré.`);
@@ -178,10 +193,11 @@ export default function ServiceScreen() {
 
   const navParams = {
     nom, prenom, numero_bus,
-    ville_depart: svc?.ville_depart ?? ville_dep,
-    ville_arrivee: svc?.ville_arrivee ?? ville_arr,
+    ville_depart: svc?.station_actuelle || svc?.ville_depart || ville_dep,
+    ville_arrivee: svc?.ville_arrivee || ville_arr,
     num_ligne: svc ? String(svc.num_ligne) : num_ligne,
     service_id: svc ? String(svc.id_service) : '',
+    horaire: svc?.horaire || '',
   };
 
   if (loading) return (
@@ -356,15 +372,45 @@ export default function ServiceScreen() {
               <Text style={styles.idleTitle}>Aucun service actif</Text>
               <Text style={styles.idleSub}>Bus N° {numero_bus}</Text>
               <Text style={styles.idleRoute}>{ville_dep} → {ville_arr}</Text>
-              <Text style={styles.idleHint}>
+              
+              <View style={{ width: '100%', marginTop: 20 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textMuted, marginBottom: 8, textTransform: 'uppercase' }}>
+                    Horaire de départ
+                </Text>
+                <TouchableOpacity 
+                    style={[styles.picker, { borderColor: Colors.primary }]} 
+                    onPress={() => setShowPicker(!showPicker)}
+                >
+                    <Clock size={18} color={Colors.primary} />
+                    <Text style={{ flex: 1, marginLeft: 10, fontSize: 16, fontWeight: '700', color: Colors.textDark }}>
+                        {selHoraire || 'Sélectionner l\'heure...'}
+                    </Text>
+                    <ChevronDown size={20} color={Colors.textMuted} />
+                </TouchableOpacity>
+                {showPicker && (
+                    <View style={styles.horairesDropdown}>
+                        {horaires.map(h => (
+                            <TouchableOpacity 
+                                key={h} 
+                                style={[styles.hStep, selHoraire === h && styles.hStepActive]}
+                                onPress={() => { setSelHoraire(h); setShowPicker(false); }}
+                            >
+                                <Text style={[styles.hStepText, selHoraire === h && styles.hStepTextActive]}>{h}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+              </View>
+
+              <Text style={[styles.idleHint, { marginTop: 20 }]}>
                 Démarrez un service pour commencer à vendre des billets et suivre les passagers.
               </Text>
             </View>
 
             <TouchableOpacity
-              style={[styles.startBtn, starting && styles.btnDisabled]}
+              style={[styles.startBtn, (starting || !selHoraire) && styles.btnDisabled]}
               onPress={handleStart}
-              disabled={starting}
+              disabled={starting || !selHoraire}
             >
               {starting
                 ? <ActivityIndicator color={Colors.primary} />
@@ -433,11 +479,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.success + '30', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill,
   },
   activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success },
-  activePillText: { fontSize: 10, fontWeight: '800', color: Colors.success, letterSpacing: 1 },
-  serviceNum: { fontSize: 22, fontWeight: '900', color: Colors.white },
+  activePillText: { fontSize: 12, fontWeight: '800', color: Colors.success, letterSpacing: 1 },
+  serviceNum: { fontSize: 24, fontWeight: '900', color: Colors.white },
   serviceHeaderInfo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm },
   sInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sInfoText: { fontSize: 12, color: Colors.white + 'CC', fontWeight: '600' },
+  sInfoText: { fontSize: 14, color: Colors.white + 'CC', fontWeight: '700' },
   sInfoDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: Colors.white + '50' },
 
   // KPI
@@ -446,8 +492,8 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: Colors.white, borderRadius: Radius.lg,
     padding: Spacing.md, alignItems: 'center', gap: 4, ...Shadow.card,
   },
-  kpiVal: { fontSize: 18, fontWeight: '900', color: Colors.textDark },
-  kpiLbl: { fontSize: 10, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  kpiVal: { fontSize: 20, fontWeight: '900', color: Colors.textDark },
+  kpiLbl: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Route
   routeCard: {
@@ -455,15 +501,15 @@ const styles = StyleSheet.create({
     padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
   },
   routeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm },
-  routeTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: Colors.textDark },
+  routeTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.textDark },
   doneBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.successLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
   },
-  doneBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.success },
+  doneBadgeText: { fontSize: 13, fontWeight: '800', color: Colors.success },
   dirRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
-  dirFrom: { fontSize: 13, fontWeight: '700', color: Colors.primary },
-  dirTo: { fontSize: 13, fontWeight: '700', color: Colors.danger },
+  dirFrom: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  dirTo: { fontSize: 15, fontWeight: '800', color: Colors.danger },
 
   // Timeline
   timeline: { gap: 0 },
@@ -479,16 +525,16 @@ const styles = StyleSheet.create({
   tlLine: { width: 2, flex: 1, backgroundColor: Colors.border, marginTop: 2, marginBottom: 2 },
   lineDone: { backgroundColor: Colors.success },
   tlContent: { flex: 1, paddingBottom: 16, paddingTop: 0 },
-  tlStation: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
-  tlCur: { color: Colors.primary, fontWeight: '800', fontSize: 14 },
-  tlPast: { color: Colors.success, fontWeight: '600' },
-  tlNext: { color: Colors.primary, fontWeight: '600' },
+  tlStation: { fontSize: 15, color: Colors.textMuted, fontWeight: '600' },
+  tlCur: { color: Colors.primary, fontWeight: '800', fontSize: 16 },
+  tlPast: { color: Colors.success, fontWeight: '700' },
+  tlNext: { color: Colors.primary, fontWeight: '700' },
 
   avancerBtn: {
     backgroundColor: Colors.primary, height: 44, borderRadius: Radius.md, marginTop: Spacing.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  avancerBtnText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+  avancerBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 
   // Action Buttons
   primaryBtn: {
@@ -496,7 +542,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base,
     gap: 10, marginBottom: Spacing.sm, ...Shadow.accent,
   },
-  primaryBtnText: { fontSize: 15, fontWeight: '800', color: Colors.primary, flex: 1 },
+  primaryBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary, flex: 1 },
 
   secondaryBtn: {
     backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
@@ -504,14 +550,14 @@ const styles = StyleSheet.create({
     gap: 10, marginBottom: Spacing.md, ...Shadow.card,
     borderWidth: 1.5, borderColor: Colors.infoLight,
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: Colors.info, flex: 1 },
+  secondaryBtnText: { fontSize: 16, fontWeight: '800', color: Colors.info, flex: 1 },
 
   closeBtn: {
     backgroundColor: Colors.success, height: 50, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     marginBottom: Spacing.sm,
   },
-  closeBtnText: { fontSize: 15, fontWeight: '800', color: Colors.white },
+  closeBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
 
   incidentBtn: {
     height: 48, borderRadius: Radius.lg,
@@ -519,7 +565,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.danger + '50',
     backgroundColor: Colors.dangerLight,
   },
-  incidentBtnText: { fontSize: 13, fontWeight: '700', color: Colors.danger },
+  incidentBtnText: { fontSize: 15, fontWeight: '800', color: Colors.danger },
 
   btnDisabled: { opacity: 0.5 },
 
@@ -532,16 +578,16 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 20,
     backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
   },
-  idleTitle: { fontSize: 20, fontWeight: '800', color: Colors.textMid, marginBottom: 4 },
-  idleSub: { fontSize: 14, fontWeight: '700', color: Colors.primary, marginBottom: 4 },
-  idleRoute: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.md },
-  idleHint: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  idleTitle: { fontSize: 22, fontWeight: '800', color: Colors.textMid, marginBottom: 4 },
+  idleSub: { fontSize: 16, fontWeight: '800', color: Colors.primary, marginBottom: 4 },
+  idleRoute: { fontSize: 15, color: Colors.textMuted, marginBottom: Spacing.md },
+  idleHint: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
 
   startBtn: {
     backgroundColor: Colors.accent, height: 60, borderRadius: Radius.xl,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadow.accent,
   },
-  startBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary },
+  startBtnText: { fontSize: 19, fontWeight: '800', color: Colors.primary },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -551,17 +597,31 @@ const styles = StyleSheet.create({
   },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
   modalHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
-  modalTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.textDark },
+  modalTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: Colors.textDark },
   modalClose: { padding: 4 },
-  modalSub: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.md, lineHeight: 20 },
+  modalSub: { fontSize: 15, color: Colors.textMuted, marginBottom: Spacing.md, lineHeight: 20 },
   incidentInput: {
     borderWidth: 1.5, borderColor: Colors.danger + '50', borderRadius: Radius.md,
-    padding: Spacing.md, fontSize: 14, color: Colors.textDark,
+    padding: Spacing.md, fontSize: 16, color: Colors.textDark,
     backgroundColor: Colors.dangerLight + '30', minHeight: 90, marginBottom: Spacing.base,
   },
   modalConfirm: {
     backgroundColor: Colors.danger, height: 52, borderRadius: Radius.lg,
     alignItems: 'center', justifyContent: 'center',
   },
-  modalConfirmText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  modalConfirmText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
+  
+  // Custom horaires picker styles
+  picker: {
+    height: 52, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border,
+    paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
+  },
+  horairesDropdown: {
+    marginTop: 8, backgroundColor: Colors.white, borderRadius: Radius.lg,
+    borderWidth: 1.5, borderColor: Colors.primary + '30', overflow: 'hidden',
+  },
+  hStep: { padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  hStepActive: { backgroundColor: Colors.primary + '10' },
+  hStepText: { fontSize: 15, color: Colors.textMid, fontWeight: '600' },
+  hStepTextActive: { color: Colors.primary, fontWeight: '800' },
 });

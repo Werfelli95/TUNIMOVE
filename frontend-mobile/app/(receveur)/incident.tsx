@@ -291,18 +291,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, borderRadius: Radius.xl,
     padding: Spacing.base, marginBottom: Spacing.base, ...Shadow.strong,
   },
-  contextTitle: { fontSize: 11, color: Colors.accent, fontWeight: '700', letterSpacing: 1, marginBottom: Spacing.sm },
+  contextTitle: { fontSize: 13, color: Colors.accent, fontWeight: '800', letterSpacing: 1, marginBottom: Spacing.sm },
   contextGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   contextItem: {
     flex: 1, minWidth: '45%', backgroundColor: Colors.white + '12',
     borderRadius: Radius.md, padding: 10, gap: 2, alignItems: 'center',
   },
-  contextLabel: { fontSize: 10, color: Colors.accent, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  contextValue: { fontSize: 13, color: Colors.white, fontWeight: '700' },
+  contextLabel: { fontSize: 12, color: Colors.accent, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  contextValue: { fontSize: 15, color: Colors.white, fontWeight: '800' },
 
   // Steps
   stepLabel: {
-    fontSize: 12, fontWeight: '800', color: Colors.textMid,
+    fontSize: 14, fontWeight: '800', color: Colors.textMid,
     textTransform: 'uppercase', letterSpacing: 0.5,
     marginBottom: Spacing.sm, marginTop: Spacing.base,
   },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg, padding: Spacing.md, alignItems: 'center', gap: 6,
     borderWidth: 2, borderColor: 'transparent', ...Shadow.card,
   },
-  catLabel: { fontSize: 11, fontWeight: '600', color: Colors.textMuted, textAlign: 'center' },
+  catLabel: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, textAlign: 'center' },
 
   // Severity
   sevList: { gap: Spacing.sm, marginBottom: 4 },
@@ -324,8 +324,8 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: 'transparent', ...Shadow.card,
   },
   sevDot: { width: 14, height: 14, borderRadius: 7 },
-  sevLabel: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
-  sevSub: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  sevLabel: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  sevSub: { fontSize: 13, color: Colors.textMuted, marginTop: 1 },
 
   // Description
   descWrap: {
@@ -334,9 +334,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.border,
   },
   descInput: {
-    fontSize: 14, color: Colors.textDark, minHeight: 100, lineHeight: 22,
+    fontSize: 16, color: Colors.textDark, minHeight: 100, lineHeight: 22,
   },
-  descCount: { fontSize: 11, color: Colors.textLight, textAlign: 'right', marginTop: 4 },
+  descCount: { fontSize: 13, color: Colors.textLight, textAlign: 'right', marginTop: 4 },
 
   // Critical
   criticalBanner: {
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md, marginTop: Spacing.md,
     borderWidth: 1, borderColor: Colors.danger + '30',
   },
-  criticalText: { flex: 1, fontSize: 12, color: Colors.danger, fontWeight: '600', lineHeight: 18 },
+  criticalText: { flex: 1, fontSize: 14, color: Colors.danger, fontWeight: '700', lineHeight: 18 },
 
   // Submit
   submitBtn: {
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     shadowColor: Colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
   submitBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
-  submitBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  submitBtnText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
 
   // Confirm Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border,
     alignSelf: 'center', marginBottom: Spacing.sm,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
   modalSummary: {
     backgroundColor: Colors.bgLight, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md,
   },
@@ -375,13 +375,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  modalSummaryLabel: { fontSize: 13, color: Colors.textMuted },
-  modalSummaryValue: { fontSize: 13, fontWeight: '700', color: Colors.textDark },
+  modalSummaryLabel: { fontSize: 15, color: Colors.textMuted },
+  modalSummaryValue: { fontSize: 15, fontWeight: '800', color: Colors.textDark },
   modalBtn: {
     height: 50, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  modalBtnText: { fontSize: 14, fontWeight: '800' },
+  modalBtnText: { fontSize: 16, fontWeight: '800' },
 
   // Success
   successOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 40 },
@@ -393,11 +393,11 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 20,
     backgroundColor: Colors.successLight, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
   },
-  successTitle: { fontSize: 20, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
-  successSub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
+  successTitle: { fontSize: 22, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
+  successSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
   successBtn: {
     backgroundColor: Colors.primary, height: 50, borderRadius: Radius.lg,
     alignItems: 'center', justifyContent: 'center', width: '100%',
   },
-  successBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  successBtnText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
 });

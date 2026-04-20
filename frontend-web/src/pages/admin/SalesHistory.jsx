@@ -122,10 +122,10 @@ const SalesHistory = () => {
                                 <ShoppingCart size={20} />
                             </div>
                             <div>
-                                <span style={{ fontWeight: 700, color: '#4338ca', display: 'block', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
+                                <span style={{ fontWeight: 800, color: '#4338ca', display: 'block', textTransform: 'uppercase', fontSize: '0.95rem', letterSpacing: '0.05em' }}>
                                     Revenu de la période
                                 </span>
-                                <span style={{ color: '#4f46e5', fontSize: '0.875rem' }}>
+                                <span style={{ color: '#4f46e5', fontSize: '1.05rem', fontWeight: 600 }}>
                                     {filteredSales.length} ticket{filteredSales.length > 1 ? 's' : ''} vendu{filteredSales.length > 1 ? 's' : ''}
                                 </span>
                             </div>
@@ -166,13 +166,13 @@ const SalesHistory = () => {
                                                 animate={{ opacity: 1 }}
                                                 exit={{ opacity: 0 }}
                                             >
-                                                <td style={{ fontWeight: 700, color: '#4f46e5' }}>{sale.id}</td>
+                                                <td style={{ fontWeight: 800, color: '#4f46e5', fontSize: '1.1rem' }}>{sale.id}</td>
                                                 <td>
-                                                    <div style={{ fontWeight: 600, color: '#1e293b' }}>{sale.ligne}</div>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>{sale.ligne}</div>
                                                 </td>
-                                                <td><span className="user-matricule" style={{ fontStyle: 'italic' }}>{sale.trajet}</span></td>
-                                                <td>{sale.date}</td>
-                                                <td style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{sale.prix}</td>
+                                                <td><span className="user-matricule" style={{ fontStyle: 'italic', fontSize: '1.05rem' }}>{sale.trajet}</span></td>
+                                                <td style={{ fontSize: '1.05rem', fontWeight: 600 }}>{sale.date}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 900, color: '#0f172a', fontSize: '1.25rem' }}>{sale.prix}</td>
 
                                             </motion.tr>
                                         ))

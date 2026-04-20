@@ -159,20 +159,20 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     alignItems: 'center',
   },
-  infoLabel: { fontSize: 22, fontWeight: 'bold', color: '#fbbf24' },
-  infoRoute: { fontSize: 14, color: '#94a3b8', marginTop: 4 },
-  infoDate: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  infoLabel: { fontSize: 24, fontWeight: 'bold', color: '#fbbf24' },
+  infoRoute: { fontSize: 16, color: '#94a3b8', marginTop: 4 },
+  infoDate: { fontSize: 14, color: '#64748b', marginTop: 4 },
   sectionTitle: {
-    fontSize: 16, fontWeight: '700', color: '#334155',
+    fontSize: 18, fontWeight: '800', color: '#334155',
     marginBottom: 16,
   },
   fieldGroup: { marginBottom: 18 },
-  label: { fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 8 },
+  label: { fontSize: 15, fontWeight: '700', color: '#475569', marginBottom: 8 },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1, borderColor: '#e2e8f0',
     borderRadius: 12, height: 52,
-    paddingHorizontal: 16, fontSize: 16, color: '#0f172a',
+    paddingHorizontal: 16, fontSize: 18, color: '#0f172a',
   },
   dropdown: {
     backgroundColor: '#fff',
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  dropdownText: { fontSize: 16, color: '#0f172a' },
+  dropdownText: { fontSize: 18, color: '#0f172a' },
   dropdownMenu: {
     backgroundColor: '#fff',
     borderWidth: 1, borderColor: '#e2e8f0',
@@ -190,8 +190,8 @@ const styles = StyleSheet.create({
   },
   dropdownItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   dropdownItemActive: { backgroundColor: '#eff6ff' },
-  dropdownItemText: { fontSize: 15, color: '#334155' },
-  dropdownItemTextActive: { color: '#1a3a52', fontWeight: '700' },
+  dropdownItemText: { fontSize: 17, color: '#334155' },
+  dropdownItemTextActive: { color: '#1a3a52', fontWeight: '800' },
   button: {
     backgroundColor: '#fbbf24', height: 56,
     borderRadius: 16, alignItems: 'center', justifyContent: 'center',
@@ -200,5 +200,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   buttonDisabled: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
-  buttonText: { fontSize: 16, fontWeight: 'bold', color: '#1a3a52' },
+  buttonText: { fontSize: 18, fontWeight: 'bold', color: '#1a3a52' },
 });

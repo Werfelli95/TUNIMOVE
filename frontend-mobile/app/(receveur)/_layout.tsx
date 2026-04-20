@@ -4,7 +4,7 @@ import { Colors } from '../../constants/theme';
 const HEADER = {
   headerStyle: { backgroundColor: Colors.primary },
   headerTintColor: Colors.white,
-  headerTitleStyle: { fontWeight: '700' as const, fontSize: 16 },
+  headerTitleStyle: { fontWeight: '800' as const, fontSize: 18 },
   headerBackTitleVisible: false,
 };
 

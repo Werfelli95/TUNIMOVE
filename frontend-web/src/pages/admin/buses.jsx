@@ -191,22 +191,22 @@ const Fleet = () => {
                                     <Bus size={20} color={cfg.color} />
                                   </div>
                                   <div>
-                                    <p style={{ margin: 0, fontWeight: 900, fontSize: 14, color: '#0F172A' }}>N° {bus.numero_bus}</p>
-                                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>ID #{bus.id_bus}</p>
+                                    <p style={{ margin: 0, fontWeight: 900, fontSize: 18, color: '#0F172A' }}>N° {bus.numero_bus}</p>
+                                    <p style={{ margin: '2px 0 0', fontSize: 14, color: '#94A3B8', fontWeight: 600 }}>ID #{bus.id_bus}</p>
                                   </div>
                                 </div>
                               </td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <Users size={14} color="#94A3B8" />
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{bus.capacite} places</span>
+                                  <span style={{ fontSize: 15, fontWeight: 700, color: '#334155' }}>{bus.capacite} places</span>
                                 </div>
                               </td>
                               <td>
                                 {bus.ville_depart ? (
                                   <div>
-                                    <span style={{ fontSize: 12, fontWeight: 800, color: '#4F46E5' }}>L{bus.num_ligne} </span>
-                                    <span style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>{bus.ville_depart} → {bus.ville_arrivee}</span>
+                                    <span style={{ fontSize: 14, fontWeight: 800, color: '#4F46E5' }}>L{bus.num_ligne} </span>
+                                    <span style={{ fontSize: 15, color: '#475569', fontWeight: 700 }}>{bus.ville_depart} → {bus.ville_arrivee}</span>
                                   </div>
                                 ) : (
                                   <span style={{ fontSize: 12, color: '#CBD5E1', fontStyle: 'italic' }}>Non assigné</span>
@@ -214,10 +214,10 @@ const Fleet = () => {
                               </td>
                               <td>
                                 {bus.horaire_affecte ? (
-                                  <span style={{ padding: '3px 10px', background: '#EEF2FF', color: '#4338CA', borderRadius: 8, fontSize: 12, fontWeight: 800, border: '1px solid #C7D2FE' }}>
+                                  <span style={{ padding: '3px 10px', background: '#EEF2FF', color: '#4338CA', borderRadius: 8, fontSize: 14, fontWeight: 800, border: '1px solid #C7D2FE' }}>
                                     🕒 {bus.horaire_affecte}
                                   </span>
-                                ) : <span style={{ color: '#CBD5E1', fontSize: 12 }}>—</span>}
+                                ) : <span style={{ color: '#CBD5E1', fontSize: 14 }}>—</span>}
                               </td>
                               <td><StateBadge etat={bus.etat} /></td>
                               <td onClick={e => e.stopPropagation()}>

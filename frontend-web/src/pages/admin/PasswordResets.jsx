@@ -155,11 +155,11 @@ const PasswordResets = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-slate-50">
-                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-xs tracking-[0.15em]">Agent</th>
-                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-xs tracking-[0.15em]">Matricule</th>
-                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-xs tracking-[0.15em]">Contact Email</th>
-                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-xs tracking-[0.15em]">Date de réception</th>
-                                <th className="px-8 py-5 text-right text-slate-400 font-bold uppercase text-xs tracking-[0.15em]">Actions</th>
+                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-sm tracking-[0.15em]">Agent</th>
+                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-sm tracking-[0.15em]">Matricule</th>
+                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-sm tracking-[0.15em]">Contact Email</th>
+                                <th className="px-8 py-5 text-slate-400 font-bold uppercase text-sm tracking-[0.15em]">Date de réception</th>
+                                <th className="px-8 py-5 text-right text-slate-400 font-bold uppercase text-sm tracking-[0.15em]">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -197,25 +197,25 @@ const PasswordResets = () => {
                                                         {req.prenom?.[0].toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <div className="font-black text-slate-800 text-lg leading-tight uppercase tracking-tight">{req.prenom} {req.nom}</div>
-                                                        <div className="text-xs text-indigo-500 font-bold uppercase tracking-widest mt-1">Guichetier</div>
+                                                        <div className="font-black text-slate-800 text-xl leading-tight uppercase tracking-tight">{req.prenom} {req.nom}</div>
+                                                        <div className="text-sm text-indigo-500 font-bold uppercase tracking-widest mt-1">Guichetier</div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <span className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600 text-sm font-bold border border-slate-200/50">{req.matricule}</span>
+                                                <span className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-slate-600 text-base font-bold border border-slate-200/50">{req.matricule}</span>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="flex items-center gap-2 text-slate-600 font-bold">
+                                                <div className="flex items-center gap-2 text-slate-600 font-bold text-lg">
                                                     <div className="p-1.5 bg-slate-100 rounded-lg">
-                                                        <Mail size={14} className="text-slate-400" />
+                                                        <Mail size={16} className="text-slate-400" />
                                                     </div>
                                                     {req.email}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="flex items-center gap-2 text-slate-500 font-bold text-sm">
-                                                    <Clock size={16} className="text-slate-300" />
+                                                <div className="flex items-center gap-2 text-slate-500 font-bold text-base">
+                                                    <Clock size={18} className="text-slate-300" />
                                                     {new Date(req.date_demande).toLocaleDateString('fr-FR', {
                                                         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                                                     })}
@@ -226,9 +226,9 @@ const PasswordResets = () => {
                                                     <button
                                                         onClick={() => handleApprove(req.id)}
                                                         disabled={actionLoading === req.id}
-                                                        className={`group/btn flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white font-black text-sm hover:bg-indigo-700 hover:-translate-y-0.5 transition-all shadow-lg shadow-indigo-100 active:translate-y-0 ${actionLoading === req.id ? 'opacity-50' : ''}`}
+                                                        className={`group/btn flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 text-white font-black text-base hover:bg-indigo-700 hover:-translate-y-0.5 transition-all shadow-lg shadow-indigo-100 active:translate-y-0 ${actionLoading === req.id ? 'opacity-50' : ''}`}
                                                     >
-                                                        {actionLoading === req.id ? <RefreshCw className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                                                        {actionLoading === req.id ? <RefreshCw className="animate-spin" size={20} /> : <CheckCircle size={20} />}
                                                         <span>APPROUVER</span>
                                                     </button>
                                                     <button

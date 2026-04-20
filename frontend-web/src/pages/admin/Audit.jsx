@@ -67,17 +67,17 @@ const Audit = () => {
                                     {records.length > 0 ? (
                                         records.map(r => (
                                             <motion.tr key={r.id_fiche} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                                <td style={{ fontWeight: 600, color: '#64748b' }}>#A{String(r.id_fiche).padStart(3, '0')}</td>
-                                                <td><div style={{ fontWeight: 600, color: '#1e293b' }}>{r.receveur_prenom} {r.receveur_nom}</div></td>
+                                                <td style={{ fontWeight: 700, color: '#64748b', fontSize: '1.05rem' }}>#A{String(r.id_fiche).padStart(3, '0')}</td>
+                                                <td><div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>{r.receveur_prenom} {r.receveur_nom}</div></td>
                                                 <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <Bus size={16} color="#4f46e5" />
-                                                        <span style={{ fontWeight: 600 }}>N° {r.numero_bus}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
+                                                        <Bus size={18} color="#4f46e5" />
+                                                        <span style={{ fontWeight: 700 }}>N° {r.numero_bus}</span>
                                                     </div>
                                                 </td>
-                                                <td>{new Date(r.heure_cloture).toLocaleDateString()}</td>
-                                                <td><span style={{ fontWeight: 800 }}>{parseFloat(r.total_collecte || 0).toFixed(3)} TND</span></td>
-                                                <td><span className="user-matricule">{r.tickets_count} tickets</span></td>
+                                                <td style={{ fontSize: '1.05rem', fontWeight: 600 }}>{new Date(r.heure_cloture).toLocaleDateString()}</td>
+                                                <td><span style={{ fontWeight: 900, fontSize: '1.15rem' }}>{parseFloat(r.total_collecte || 0).toFixed(3)} TND</span></td>
+                                                <td><span className="user-matricule" style={{ fontSize: '1.05rem' }}>{r.tickets_count} tickets</span></td>
                                                 <td>
                                                     <span className={`role-badge ${r.statut === 'Validé' ? 'badge-agent' : r.statut === 'Rejeté' ? 'badge-receveur' : ''}`}
                                                         style={!r.statut || r.statut === 'En attente' ? { backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7' } : {}}>
@@ -87,15 +87,15 @@ const Audit = () => {
                                                 <td>
                                                     {(!r.statut || r.statut === 'En attente') ? (
                                                         <div className="row-actions" style={{ opacity: 1, gap: '10px' }}>
-                                                            <button className="btn-add-user" style={{ padding: '0.4rem 0.8rem', background: '#22c55e', boxShadow: 'none' }} onClick={() => handleAction(r.id_fiche, 'Validé')}>
-                                                                <CheckCircle size={14} /> Valider
+                                                             <button className="btn-add-user" style={{ padding: '0.6rem 1rem', background: '#22c55e', boxShadow: 'none', fontSize: '0.95rem' }} onClick={() => handleAction(r.id_fiche, 'Validé')}>
+                                                                <CheckCircle size={16} /> Valider
                                                             </button>
-                                                            <button className="btn-add-user" style={{ padding: '0.4rem 0.8rem', background: '#ef4444', boxShadow: 'none' }} onClick={() => handleAction(r.id_fiche, 'Rejeté')}>
-                                                                <XCircle size={14} /> Rejeter
+                                                            <button className="btn-add-user" style={{ padding: '0.6rem 1rem', background: '#ef4444', boxShadow: 'none', fontSize: '0.95rem' }} onClick={() => handleAction(r.id_fiche, 'Rejeté')}>
+                                                                <XCircle size={16} /> Rejeter
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>Traité</div>
+                                                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '1rem', fontWeight: 700 }}>Traité</div>
                                                     )}
                                                 </td>
                                             </motion.tr>

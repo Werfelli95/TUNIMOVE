@@ -246,16 +246,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
     marginBottom: 12, ...Shadow.strong,
   },
-  brandName: { fontSize: 28, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
-  brandTagline: { fontSize: 13, color: Colors.textMuted, marginTop: 4, fontWeight: '500' },
+  brandName: { fontSize: 30, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
+  brandTagline: { fontSize: 15, color: Colors.textMuted, marginTop: 4, fontWeight: '600' },
 
   // Card
   card: {
     backgroundColor: Colors.white, borderRadius: Radius.xxl,
     padding: Spacing.xl, ...Shadow.card,
   },
-  cardHeading: { fontSize: 20, fontWeight: '800', color: Colors.textDark, marginBottom: 4 },
-  cardSub: { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.xl },
+  cardHeading: { fontSize: 22, fontWeight: '800', color: Colors.textDark, marginBottom: 4 },
+  cardSub: { fontSize: 15, color: Colors.textMuted, marginBottom: Spacing.xl },
 
   // Roles
   roleGrid: { flexDirection: 'row', gap: 10, marginBottom: 4 },
@@ -273,20 +273,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white + '25', alignItems: 'center', justifyContent: 'center',
   },
   roleIconActive: { backgroundColor: Colors.white + '25' },
-  roleTitle: { fontSize: 14, fontWeight: '800', color: Colors.primary },
+  roleTitle: { fontSize: 16, fontWeight: '800', color: Colors.primary },
   roleTitleActive: { color: Colors.white },
-  roleHelper: { fontSize: 11, color: Colors.textMuted, textAlign: 'center', fontWeight: '500' },
+  roleHelper: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', fontWeight: '600' },
   roleCheck: { position: 'absolute', top: 8, right: 8 },
 
   // Divider
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.lg, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  dividerText: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  dividerText: { fontSize: 13, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
 
   // Fields
   fields: {},
   fieldGroup: { marginBottom: Spacing.base },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMid, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldLabel: { fontSize: 14, fontWeight: '800', color: Colors.textMid, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   fieldWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: Colors.bgLight, borderRadius: Radius.md,
@@ -294,16 +294,16 @@ const styles = StyleSheet.create({
     height: 52, paddingHorizontal: 14,
   },
   fieldError: { borderColor: Colors.danger, backgroundColor: Colors.dangerLight + '40' },
-  fieldInput: { flex: 1, fontSize: 15, color: Colors.textDark, fontWeight: '500' },
+  fieldInput: { flex: 1, fontSize: 17, color: Colors.textDark, fontWeight: '600' },
   errRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  errText: { fontSize: 11, color: Colors.danger, fontWeight: '500' },
+  errText: { fontSize: 13, color: Colors.danger, fontWeight: '600' },
   globalErr: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: Colors.dangerLight, borderRadius: Radius.md,
     padding: Spacing.md, marginTop: 4, marginBottom: 4,
     borderWidth: 1, borderColor: Colors.danger + '30',
   },
-  globalErrText: { flex: 1, fontSize: 13, color: Colors.danger, fontWeight: '600' },
+  globalErrText: { flex: 1, fontSize: 15, color: Colors.danger, fontWeight: '700' },
 
   // Button
   loginBtn: {
@@ -312,9 +312,9 @@ const styles = StyleSheet.create({
     gap: 8, marginTop: Spacing.lg, ...Shadow.accent,
   },
   loginBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
-  loginBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  loginBtnText: { fontSize: 18, fontWeight: '800', color: Colors.primary },
   loginBtnTextDisabled: { color: Colors.textMuted },
 
   // Footer
-  version: { textAlign: 'center', fontSize: 11, color: Colors.textLight, marginTop: Spacing.lg, fontWeight: '500' },
+  version: { textAlign: 'center', fontSize: 13, color: Colors.textLight, marginTop: Spacing.lg, fontWeight: '600' },
 });

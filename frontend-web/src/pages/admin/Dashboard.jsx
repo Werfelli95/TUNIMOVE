@@ -60,16 +60,16 @@ const PremiumStatCard = ({ title, value, subtext, icon, color, trend, onClick })
           <div style={{
             display: 'flex', alignItems: 'center', gap: '4px',
             background: '#ECFDF5', color: '#059669',
-            padding: '4px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 800
+            padding: '4px 10px', borderRadius: '99px', fontSize: '14px', fontWeight: 800
           }}>
             <TrendingUp size={14} /> {trend}
           </div>
         )}
       </div>
       <div>
-        <p style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
-        <h3 style={{ margin: '4px 0 0', fontSize: '32px', fontWeight: 900, color: '#0F172A', lineHeight: 1 }}>{value}</h3>
-        {subtext && <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748B', fontWeight: 500 }}>{subtext}</p>}
+        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
+        <h3 style={{ margin: '4px 0 0', fontSize: '36px', fontWeight: 900, color: '#0F172A', lineHeight: 1 }}>{value}</h3>
+        {subtext && <p style={{ margin: '6px 0 0', fontSize: '15px', color: '#64748B', fontWeight: 600 }}>{subtext}</p>}
       </div>
     </div>
   );
@@ -82,9 +82,9 @@ const CustomTooltip = ({ active, payload, label }) => {
         background: 'white', padding: '16px', borderRadius: '16px',
         boxShadow: '0 10px 25px rgba(0,0,0,0.1)', border: '1px solid #F1F5F9', minWidth: '150px'
       }}>
-        <p style={{ margin: '0 0 4px', fontSize: '12px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase' }}>{label}</p>
-        <p style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#4338CA' }}>
-          {Number(payload[0].value).toFixed(2)} <span style={{ fontSize: '14px', color: '#64748B' }}>TND</span>
+        <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase' }}>{label}</p>
+        <p style={{ margin: 0, fontSize: '24px', fontWeight: 900, color: '#4338CA' }}>
+          {Number(payload[0].value).toFixed(2)} <span style={{ fontSize: '16px', color: '#64748B' }}>TND</span>
         </p>
       </div>
     );
@@ -210,19 +210,19 @@ const Dashboard = () => {
         <div style={{ flex: 2, background: 'white', borderRadius: '24px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #F1F5F9' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0F172A' }}>Historique des Recettes</h2>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748B', fontWeight: 500 }}>Évolution des ventes (TND)</p>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900, color: '#0F172A' }}>Historique des Recettes</h2>
+              <p style={{ margin: '4px 0 0', fontSize: '15px', color: '#64748B', fontWeight: 600 }}>Évolution des ventes (TND)</p>
             </div>
             <div style={{ display: 'flex', background: '#F8FAFC', padding: '6px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
               <button onClick={() => setPeriod('week')} style={{
                 border: 'none', background: period === 'week' ? 'white' : 'transparent',
-                padding: '8px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 800,
+                padding: '10px 20px', borderRadius: '10px', fontSize: '15px', fontWeight: 800,
                 color: period === 'week' ? '#4338CA' : '#64748B', cursor: 'pointer',
                 boxShadow: period === 'week' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s'
               }}>7 derniers jours</button>
               <button onClick={() => setPeriod('month')} style={{
                 border: 'none', background: period === 'month' ? 'white' : 'transparent',
-                padding: '8px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 800,
+                padding: '10px 20px', borderRadius: '10px', fontSize: '15px', fontWeight: 800,
                 color: period === 'month' ? '#4338CA' : '#64748B', cursor: 'pointer',
                 boxShadow: period === 'month' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s'
               }}>30 derniers jours</button>
@@ -240,8 +240,8 @@ const Dashboard = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700 }} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 14, fontWeight: 700 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 14, fontWeight: 700 }} />
                   <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#CBD5E1', strokeWidth: 1, strokeDasharray: '4 4' }} />
                   <Area type="monotone" dataKey="value" stroke="#4F46E5" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" animationDuration={1000} />
                 </AreaChart>
@@ -259,8 +259,8 @@ const Dashboard = () => {
           <div style={{ position: 'absolute', right: '-40px', bottom: '-40px', opacity: 0.05, transform: 'rotate(-10deg)' }}>
             <Users size={250} color="white" />
           </div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900 }}>Volume Passagers</h2>
-          <p style={{ margin: '4px 0 30px', fontSize: '13px', color: '#94A3B8', fontWeight: 500 }}>Mix tarifaire actuel</p>
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Volume Passagers</h2>
+          <p style={{ margin: '4px 0 30px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Mix tarifaire actuel</p>
           
           <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {passengerData.map((item, idx) => {
@@ -282,8 +282,8 @@ const Dashboard = () => {
           </div>
 
           <div style={{ marginTop: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', padding: '20px', minHeight: '90px' }}>
-            <p style={{ margin: '0 0 5px', fontSize: '11px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tickets émis (Période)</p>
-            <h3 style={{ margin: 0, fontSize: '36px', fontWeight: 900 }}>{totalTickets}</h3>
+            <p style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tickets émis (Période)</p>
+            <h3 style={{ margin: 0, fontSize: '42px', fontWeight: 900 }}>{totalTickets}</h3>
           </div>
         </div>
       </div>
@@ -303,8 +303,8 @@ const Dashboard = () => {
               <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#6366F1' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <p style={{ margin: 0, color: '#6366F1', fontWeight: 800, fontSize: '13px', textTransform: 'uppercase' }}>Guichetiers</p>
-                  <h3 style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 900, color: '#1E1B4B' }}>{rolesData.agents?.total || 0}</h3>
+                  <p style={{ margin: 0, color: '#6366F1', fontWeight: 800, fontSize: '15px', textTransform: 'uppercase' }}>Guichetiers</p>
+                  <h3 style={{ margin: '8px 0 0', fontSize: '36px', fontWeight: 900, color: '#1E1B4B' }}>{rolesData.agents?.total || 0}</h3>
                 </div>
                 <div style={{ width: '40px', height: '40px', background: '#EEF2FF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Store size={20} color="#6366F1" /></div>
               </div>
@@ -319,9 +319,9 @@ const Dashboard = () => {
               <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#3B82F6' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <p style={{ margin: 0, color: '#3B82F6', fontWeight: 800, fontSize: '13px', textTransform: 'uppercase' }}>Receveurs Bus</p>
-                  <h3 style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 900, color: '#1E3A8A' }}>{rolesData.receveurs?.total || 0}</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748B', fontWeight: 600 }}>{rolesData.receveurs?.activeServices || 0} en service actuellement</p>
+                  <p style={{ margin: 0, color: '#3B82F6', fontWeight: 800, fontSize: '15px', textTransform: 'uppercase' }}>Receveurs Bus</p>
+                  <h3 style={{ margin: '8px 0 0', fontSize: '36px', fontWeight: 900, color: '#1E3A8A' }}>{rolesData.receveurs?.total || 0}</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748B', fontWeight: 700 }}>{rolesData.receveurs?.activeServices || 0} en service actuellement</p>
                 </div>
                 <div style={{ width: '40px', height: '40px', background: '#EFF6FF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bus size={20} color="#3B82F6" /></div>
               </div>
@@ -336,8 +336,8 @@ const Dashboard = () => {
               <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#10B981' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <p style={{ margin: 0, color: '#10B981', fontWeight: 800, fontSize: '13px', textTransform: 'uppercase' }}>Contrôleurs</p>
-                  <h3 style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 900, color: '#064E3B' }}>{rolesData.controleurs?.total || 0}</h3>
+                  <p style={{ margin: 0, color: '#10B981', fontWeight: 800, fontSize: '15px', textTransform: 'uppercase' }}>Contrôleurs</p>
+                  <h3 style={{ margin: '8px 0 0', fontSize: '36px', fontWeight: 900, color: '#064E3B' }}>{rolesData.controleurs?.total || 0}</h3>
                 </div>
                 <div style={{ width: '40px', height: '40px', background: '#ECFDF5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShieldCheck size={20} color="#10B981" /></div>
               </div>
@@ -352,9 +352,9 @@ const Dashboard = () => {
               <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: '#F43F5E' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <p style={{ margin: 0, color: '#F43F5E', fontWeight: 800, fontSize: '13px', textTransform: 'uppercase' }}>Incidents (24H)</p>
-                  <h3 style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: 900, color: '#881337' }}>{rolesData.incidents?.last24h || 0}</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#F43F5E', fontWeight: 600, opacity: 0.8 }}>Signalés sur le terrain</p>
+                  <p style={{ margin: 0, color: '#F43F5E', fontWeight: 800, fontSize: '15px', textTransform: 'uppercase' }}>Incidents (24H)</p>
+                  <h3 style={{ margin: '8px 0 0', fontSize: '36px', fontWeight: 900, color: '#881337' }}>{rolesData.incidents?.last24h || 0}</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#F43F5E', fontWeight: 700, opacity: 0.8 }}>Signalés sur le terrain</p>
                 </div>
                 <div style={{ width: '40px', height: '40px', background: 'rgba(244,63,94,0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={20} color="#F43F5E" /></div>
               </div>
@@ -400,11 +400,11 @@ const Dashboard = () => {
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontWeight: 700, color: '#64748B', fontSize: '13px' }}>{inc.categorie}</span>
+                        <span style={{ fontWeight: 800, color: '#64748B', fontSize: '15px' }}>{inc.categorie}</span>
                       </td>
                       <td>
                         <span style={{
-                          display: 'inline-block', padding: '4px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase',
+                          display: 'inline-block', padding: '4px 12px', borderRadius: '99px', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase',
                           background: inc.gravite === 'critique' ? '#FEF2F2' : inc.gravite === 'moyenne' ? '#FFFBEB' : '#F0FDF4',
                           color: inc.gravite === 'critique' ? '#DC2626' : inc.gravite === 'moyenne' ? '#D97706' : '#16A34A',
                           border: `1px solid ${inc.gravite === 'critique' ? '#FECACA' : inc.gravite === 'moyenne' ? '#FDE68A' : '#BBF7D0'}`
@@ -413,7 +413,7 @@ const Dashboard = () => {
                         </span>
                       </td>
                       <td style={{ maxWidth: '250px' }}>
-                        <p style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '13px', color: '#64748B' }}>
+                        <p style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '15px', color: '#64748B', fontWeight: 600 }}>
                           {inc.description}
                         </p>
                       </td>
@@ -422,7 +422,7 @@ const Dashboard = () => {
                           <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#F1F5F9', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <User size={14} color="#64748B" />
                           </div>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>{inc.signale_par}</span>
+                          <span style={{ fontSize: '15px', fontWeight: 700, color: '#475569' }}>{inc.signale_par}</span>
                         </div>
                       </td>
                     </tr>

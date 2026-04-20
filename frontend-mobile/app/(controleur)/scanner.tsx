@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ScrollView, ActivityIndicator, Alert, Dimensions, Vibration
+  ScrollView, ActivityIndicator, Alert, Dimensions, Vibration, Platform
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -113,11 +113,22 @@ export default function ScannerScreen() {
     lastScanned.current = '';
   };
 
-  const handleLogout = () =>
-    Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Déconnecter', style: 'destructive', onPress: () => router.replace('/') },
-    ]);
+  const handleLogout = () => {
+    const logoutAction = () => {
+      router.replace('/');
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Voulez-vous vous déconnecter ?')) {
+        logoutAction();
+      }
+    } else {
+      Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Déconnecter', style: 'destructive', onPress: logoutAction },
+      ]);
+    }
+  };
 
   // ── Permission not granted ──
   if (!permission) {
@@ -219,7 +230,12 @@ export default function ScannerScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
+                <TouchableOpacity 
+                  style={styles.iconBtn} 
+                  onPress={handleLogout}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  activeOpacity={0.7}
+                >
                   <LogOut color={Colors.white} size={20} />
                 </TouchableOpacity>
               </View>
@@ -363,16 +379,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
     marginBottom: Spacing.xl,
   },
-  permTitle: { fontSize: 20, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
-  permSub: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
+  permTitle: { fontSize: 22, fontWeight: '800', color: Colors.textDark, marginBottom: 8 },
+  permSub: { fontSize: 16, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
   permBtn: {
     backgroundColor: Colors.primary, height: 52, borderRadius: Radius.lg,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32,
     marginBottom: Spacing.md,
   },
-  permBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  permBtnText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
   permBackBtn: { padding: Spacing.md },
-  permBackBtnText: { color: Colors.textMuted, fontSize: 14 },
+  permBackBtnText: { color: Colors.textMuted, fontSize: 16 },
 
   // Overlay top
   overlayTop: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
@@ -381,8 +397,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  scanTitle: { color: Colors.white, fontSize: 18, fontWeight: '800' },
-  scanAgent: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 1 },
+  scanTitle: { color: Colors.white, fontSize: 20, fontWeight: '800' },
+  scanAgent: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 1 },
   scanTopActions: { flexDirection: 'row', gap: Spacing.sm },
   iconBtn: {
     width: 40, height: 40, borderRadius: 10,
@@ -394,7 +410,7 @@ const styles = StyleSheet.create({
     width: 18, height: 18, borderRadius: 9,
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
   },
-  histBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.primary },
+  histBadgeText: { fontSize: 12, fontWeight: '800', color: Colors.primary },
 
   // Frame (dark corners)
   frameContainer: { flex: 1, justifyContent: 'center' },
@@ -428,14 +444,14 @@ const styles = StyleSheet.create({
     alignItems: 'center', gap: Spacing.base,
     zIndex: 10,
   },
-  scanInstruction: { color: Colors.white, fontSize: 14, fontWeight: '600', opacity: 0.9 },
+  scanInstruction: { color: Colors.white, fontSize: 16, fontWeight: '700', opacity: 0.9 },
   torchBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: Radius.pill,
   },
   torchBtnActive: { backgroundColor: Colors.accent },
-  torchText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
+  torchText: { color: Colors.white, fontSize: 15, fontWeight: '800' },
 
   // History
   historyContainer: { flex: 1, backgroundColor: Colors.bgLight },
@@ -448,18 +464,18 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
   },
-  histTitle: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  histTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
   histCard: {
     backgroundColor: Colors.white, borderRadius: Radius.lg, padding: Spacing.base,
     marginBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', borderLeftWidth: 4, ...Shadow.card,
   },
   histCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  histStatus: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  histCode: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  histTime: { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+  histStatus: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  histCode: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  histTime: { fontSize: 13, color: Colors.textMuted, fontWeight: '700' },
   emptyHist: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyHistText: { fontSize: 14, color: Colors.textMuted },
+  emptyHistText: { fontSize: 16, color: Colors.textMuted },
 
   // Result Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
@@ -476,8 +492,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 14,
     margin: Spacing.base, padding: Spacing.base, borderRadius: Radius.lg,
   },
-  sheetStatusLabel: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
-  sheetMessage: { fontSize: 13, color: Colors.textMuted, marginTop: 2, fontWeight: '500' },
+  sheetStatusLabel: { fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  sheetMessage: { fontSize: 15, color: Colors.textMuted, marginTop: 2, fontWeight: '600' },
   sheetDetails: {
     marginHorizontal: Spacing.base, borderRadius: Radius.lg,
     backgroundColor: Colors.bgLight, overflow: 'hidden', marginBottom: Spacing.base,
@@ -488,13 +504,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
   detailRowTotal: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: Colors.divider },
-  detailLabel: { flex: 1, fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
-  detailValue: { fontSize: 13, color: Colors.textDark, fontWeight: '700', maxWidth: '55%' },
-  detailTotalLabel: { flex: 1, fontSize: 14, color: Colors.textDark, fontWeight: '800' },
-  detailTotalValue: { fontSize: 18, color: Colors.success, fontWeight: '900' },
+  detailLabel: { flex: 1, fontSize: 15, color: Colors.textMuted, fontWeight: '600' },
+  detailValue: { fontSize: 15, color: Colors.textDark, fontWeight: '800', maxWidth: '55%' },
+  detailTotalLabel: { flex: 1, fontSize: 16, color: Colors.textDark, fontWeight: '800' },
+  detailTotalValue: { fontSize: 20, color: Colors.success, fontWeight: '900' },
   sheetClose: {
     backgroundColor: Colors.primary, height: 52, borderRadius: Radius.lg,
     alignItems: 'center', justifyContent: 'center', marginHorizontal: Spacing.base,
   },
-  sheetCloseText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  sheetCloseText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
 });
