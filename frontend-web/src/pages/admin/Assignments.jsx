@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus } from 'lucide-react';
+import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On réutilise vos styles premium
 
@@ -229,6 +229,24 @@ const Assignments = () => {
         }
     };
 
+    const handleDeleteGuichet = async (id) => {
+        if (!window.confirm("Voulez-vous vraiment supprimer ce guichet ? Cette action est irréversible.")) return;
+
+        try {
+            const res = await fetch(`http://localhost:5000/api/guichets/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                await fetchGuichetData();
+            } else {
+                const data = await res.json();
+                alert(data.message || "Erreur lors de la suppression");
+            }
+        } catch (error) {
+            alert("Erreur lors de la suppression");
+        }
+    };
+
     const filteredBus = assignments.filter(a =>
         a.numero_bus.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (a.receveur_nom && a.receveur_nom.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -440,18 +458,30 @@ const Assignments = () => {
                                             )}
                                         </td>
                                         <td className="text-center">
-                                            <button
-                                                className={`btn-add-user h-10 py-0 px-6 text-sm ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
-                                                onClick={() => handleOpenModal(item)}
-                                                disabled={activeTab === 'bus' && item.etat !== 'En service'}
-                                                style={activeTab === 'bus' && item.etat !== 'En service' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                                            >
-                                                {(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? (
-                                                    <><Edit2 size={14} /><span>Modifier</span></>
-                                                ) : (
-                                                    <><UserPlus size={14} /><span>Affecter</span></>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    className={`btn-add-user h-10 py-0 px-6 text-sm ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
+                                                    onClick={() => handleOpenModal(item)}
+                                                    disabled={activeTab === 'bus' && item.etat !== 'En service'}
+                                                    style={activeTab === 'bus' && item.etat !== 'En service' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                                >
+                                                    {(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? (
+                                                        <><Edit2 size={14} /><span>Modifier</span></>
+                                                    ) : (
+                                                        <><UserPlus size={14} /><span>Affecter</span></>
+                                                    )}
+                                                </button>
+                                                
+                                                {activeTab === 'guichet' && (
+                                                    <button
+                                                        className="btn-danger-premium"
+                                                        onClick={() => handleDeleteGuichet(item.id_guichet)}
+                                                        title="Supprimer le guichet"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
                                                 )}
-                                            </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

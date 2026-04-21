@@ -19,7 +19,7 @@ const AgentLogin = () => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        
+
         // Exact 5 digits validation
         if (!/^\d{5}$/.test(matricule)) {
             setError('Le matricule doit contenir exactement 5 chiffres.');
@@ -62,9 +62,9 @@ const AgentLogin = () => {
                 setResetMessage({ type: '', text: '' });
             }, 3000);
         } catch (err) {
-            setResetMessage({ 
-                type: 'error', 
-                text: err.response?.data?.message || "Erreur lors de l'envoi de la demande." 
+            setResetMessage({
+                type: 'error',
+                text: err.response?.data?.message || "Erreur lors de l'envoi de la demande."
             });
         } finally {
             setIsSubmittingReset(false);
@@ -86,23 +86,23 @@ const AgentLogin = () => {
                 .auth-btn:hover:not(:disabled) { background-color: #1F4B6E; }
                 .auth-btn:disabled { opacity: 0.7; cursor: not-allowed; }
             `}</style>
-            
+
             {/* LÈFT PANEL - IMAGE & BRANDING */}
             <div style={{ flex: 1, position: 'relative', background: '#163A59', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '10%', color: 'white' }}>
                 <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(/images/login_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(22,58,89,0.95), rgba(22,58,89,0.7))' }} />
-                
+
                 <div style={{ position: 'relative', zIndex: 1, maxWidth: '500px' }}>
                     <a href="/login" style={{ display: 'inline-block', background: 'white', padding: '16px 28px', borderRadius: '20px', marginBottom: '48px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
                         <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '80px', width: 'auto', display: 'block' }} />
                     </a>
-                    <motion.h1 
+                    <motion.h1
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, marginBottom: '24px', letterSpacing: '-0.02em' }}
                     >
                         Plateforme intelligente de gestion du transport public
                     </motion.h1>
-                    <motion.p 
+                    <motion.p
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
                         style={{ fontSize: '1.1rem', color: '#94A3B8', fontWeight: 500, lineHeight: 1.6 }}
                     >
@@ -113,13 +113,11 @@ const AgentLogin = () => {
 
             {/* RIGHT PANEL - LOGIN CARD */}
             <div style={{ flex: 1, background: '#F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}
                     style={{ width: '100%', maxWidth: '440px', background: 'white', borderRadius: '20px', padding: '48px', boxShadow: '0 10px 40px rgba(22,58,89,0.08)' }}
                 >
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: 'rgba(245,183,0,0.1)', borderRadius: '99px', color: '#B47800', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '24px' }}>
-                        <Ticket size={16} /> Espace Vente
-                    </div>
+
 
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#163A59', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Espace Agent de Guichet</h2>
                     <p style={{ margin: '0 0 32px', color: '#64748B', fontSize: '0.95rem', lineHeight: 1.5 }}>Accès à la vente directe, aux réservations et à l’historique des tickets.</p>
@@ -173,11 +171,8 @@ const AgentLogin = () => {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <input type="checkbox" id="remember-agent" style={{ width: '16px', height: '16px', accentColor: '#163A59', cursor: 'pointer' }} />
-                                <label htmlFor="remember-agent" style={{ fontSize: '0.85rem', color: '#64748B', cursor: 'pointer', userSelect: 'none' }}>Se souvenir</label>
-                            </div>
-                            <button 
+
+                            <button
                                 type="button"
                                 onClick={() => setShowResetModal(true)}
                                 style={{ background: 'none', border: 'none', color: '#163A59', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 700, padding: 0 }}
@@ -186,12 +181,12 @@ const AgentLogin = () => {
                             </button>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isSubmitting}
                             className="auth-btn"
-                            style={{ 
-                                width: '100%', padding: '16px', background: '#163A59', color: 'white', border: 'none', borderRadius: '12px', 
+                            style={{
+                                width: '100%', padding: '16px', background: '#163A59', color: 'white', border: 'none', borderRadius: '12px',
                                 fontSize: '1rem', fontWeight: 700, marginTop: '8px', transition: 'all 0.2s',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                             }}
@@ -210,7 +205,7 @@ const AgentLogin = () => {
             <AnimatePresence>
                 {showResetModal && (
                     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                             style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '24px', padding: '32px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)' }}
                         >
@@ -220,9 +215,9 @@ const AgentLogin = () => {
                             </p>
 
                             {resetMessage.text && (
-                                <div style={{ 
-                                    background: resetMessage.type === 'success' ? '#F0FDF4' : '#FEF2F2', 
-                                    color: resetMessage.type === 'success' ? '#15803D' : '#DC2626', 
+                                <div style={{
+                                    background: resetMessage.type === 'success' ? '#F0FDF4' : '#FEF2F2',
+                                    color: resetMessage.type === 'success' ? '#15803D' : '#DC2626',
                                     padding: '12px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600, marginBottom: '20px',
                                     border: `1px solid ${resetMessage.type === 'success' ? '#BBF7D0' : '#FECACA'}`
                                 }}>
@@ -233,7 +228,7 @@ const AgentLogin = () => {
                             <form onSubmit={handleRequestReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>Matricule Agent</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         className="auth-input"
                                         placeholder="Ex: 84729"
@@ -249,7 +244,7 @@ const AgentLogin = () => {
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>Adresse Email</label>
-                                    <input 
+                                    <input
                                         type="email"
                                         className="auth-input"
                                         placeholder="exemple@tunimove.tn"
@@ -261,15 +256,15 @@ const AgentLogin = () => {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={() => setShowResetModal(false)}
                                         style={{ flex: 1, padding: '12px', background: '#F1F5F9', color: '#475569', border: 'none', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}
                                     >
                                         Annuler
                                     </button>
-                                    <button 
-                                        type="submit" 
+                                    <button
+                                        type="submit"
                                         disabled={isSubmittingReset}
                                         className="auth-btn"
                                         style={{ flex: 1, padding: '12px', background: '#163A59', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 700, display: 'flex', justifyContent: 'center' }}

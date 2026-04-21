@@ -47,7 +47,7 @@ exports.getResetStats = async (req, res) => {
         const stats = await db.query(`
             SELECT 
                 COUNT(*) FILTER (WHERE statut = 'En attente') as pending,
-                COUNT(*) FILTER (WHERE statut = 'Traité') as total_treated,
+                COUNT(*) FILTER (WHERE date_demande >= CURRENT_DATE) as total_today,
                 COUNT(*) FILTER (WHERE statut = 'Traité' AND date_demande >= CURRENT_DATE) as treated_today
             FROM demande_reinitialisation
         `);

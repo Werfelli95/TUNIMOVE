@@ -103,7 +103,7 @@ const Dashboard = () => {
   const [totalTickets, setTotalTickets] = useState(0);
   const [rolesData, setRolesData] = useState(null);
   const [avgPrice, setAvgPrice] = useState(0);
-  const [advancedStats, setAdvancedStats] = useState({ topLine: null, avgOccupancy: 0, peakHour: null });
+  const [advancedStats, setAdvancedStats] = useState({ topLine: null, avgOccupancy: 0, peakHour: null, todayRevenue: 0 });
   const [period, setPeriod] = useState('week');
 
   useEffect(() => {
@@ -197,8 +197,9 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* TOP 4 KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '32px' }}>
+      {/* TOP 5 KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', marginBottom: '32px' }}>
+        <PremiumStatCard title="Recette du jour" value={`${(advancedStats.todayRevenue || 0).toFixed(3)} TND`} subtext="Chiffre d'affaires aujourd'hui" icon={<TrendingUp size={28} />} color="amber" />
         <PremiumStatCard title="Guichets actifs" value={activeGuichetCount} subtext="Stations ouvertes à la vente" icon={<Store size={28} />} color="indigo" onClick={() => navigate('/admin-dashboard/assignments')} />
         <PremiumStatCard title="Flotte Active" value={activeBusCount} subtext="Véhicules en service" icon={<Bus size={28} />} color="green" onClick={() => navigate('/admin-dashboard/fleet')} />
         <PremiumStatCard title="Réseau" value={activeLineCount} subtext="Lignes couvertes" icon={<Network size={28} />} color="blue" onClick={() => navigate('/admin-dashboard/network')} />

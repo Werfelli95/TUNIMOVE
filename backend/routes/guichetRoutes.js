@@ -9,5 +9,6 @@ router.get('/agent/:id', guichetController.getGuichetByAgent);
 router.post('/update', guichetController.updateAssignment);
 router.post('/status', guichetController.updateStatus);
 router.post('/', guichetController.createGuichet);
+router.delete('/:id', guichetController.deleteGuichet);
 
 module.exports = router;

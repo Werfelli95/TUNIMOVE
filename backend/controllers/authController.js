@@ -38,6 +38,12 @@ exports.loginAgent = async (req, res) => {
             return res.status(403).json({ message: "Votre compte a été suspendu par un administrateur." });
         }
 
+        // Vérifier si l'agent est affecté à un guichet
+        const guichetResult = await db.query('SELECT id_guichet FROM guichet WHERE id_agent = $1', [user.id_utilisateur]);
+        if (guichetResult.rows.length === 0) {
+            return res.status(403).json({ message: "Vous n'êtes affecté à aucun guichet." });
+        }
+
         const token = jwt.sign({ id: user.id_utilisateur, role: 'AGENT' }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({ token, user: { id: user.id_utilisateur, matricule: user.matricule, nom: user.nom, prenom: user.prenom, role: 'AGENT', image_url: user.image_url } });
 

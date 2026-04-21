@@ -109,10 +109,6 @@ const Tarifs = () => {
                         <CircleDollarSign size={32} className="text-white" />
                         Gestion Tarifaire & Billetterie
                     </h1>
-                    <p>
-                        Configurez les paramètres financiers de votre réseau : prix de base au kilomètre,
-                        réductions catégorielles et suppléments bagages en temps réel.
-                    </p>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white' }}>

@@ -287,7 +287,7 @@
     background: #FAFBFF;
     padding: 1rem 1.5rem;
     text-align: left;
-    font-size: 0.85rem; /* Increased from 0.7rem */
+    font-size: 0.95rem; /* Increased from 0.85rem */
     font-weight: 800;
     color: #94a3b8;
     text-transform: uppercase;
@@ -300,7 +300,7 @@
     vertical-align: middle;
     border-bottom: 1px solid #F8FAFC;
     transition: background 0.15s;
-    font-size: 1.05rem; /* Increased from 0.9rem */
+    font-size: 1.15rem; /* Increased from 1.05rem */
     font-weight: 500;
 }
 
@@ -336,18 +336,18 @@
 .user-name {
     font-weight: 700;
     color: #1e293b;
-    font-size: 1.15rem; /* Increased from 0.9375rem */
+    font-size: 1.25rem; /* Increased from 1.15rem */
 }
 
 .user-email {
     color: #64748b;
-    font-size: 1rem; /* Increased from 0.875rem */
+    font-size: 1.1rem; /* Increased from 1rem */
     font-weight: 500;
 }
 
 .user-matricule {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9rem; /* Increased from 0.75rem */
+    font-size: 1rem; /* Increased from 0.75rem */
     padding: 0.35rem 0.75rem;
     background: #f1f5f9;
     color: #1e293b;
@@ -360,7 +360,7 @@
 .role-badge {
     padding: 0.4rem 1rem;
     border-radius: 99px;
-    font-size: 0.8rem; /* Increased from 0.72rem */
+    font-size: 0.9rem; /* Increased from 0.8rem */
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -1201,4 +1201,30 @@ tr:hover .row-actions {
 .btn-modifier:hover {
     background: #d97706;
     box-shadow: 0 6px 15px rgba(245, 158, 11, 0.2);
+}
+
+.btn-danger-premium {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #fee2e2;
+    color: #ef4444;
+    border: 1px solid #fecaca;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
+}
+
+.btn-danger-premium:hover {
+    background: #ef4444;
+    color: #ffffff;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.btn-danger-premium:active {
+    transform: scale(0.95);
 }

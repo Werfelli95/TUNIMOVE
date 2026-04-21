@@ -130,3 +130,15 @@ exports.getGuichetByAgent = async (req, res) => {
         res.status(500).json({ message: "Erreur récupération guichet agent" });
     }
 };
+
+// 8. Supprimer un guichet
+exports.deleteGuichet = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM guichet WHERE id_guichet = $1', [id]);
+        res.json({ message: "Guichet supprimé avec succès" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Erreur lors de la suppression du guichet" });
+    }
+};

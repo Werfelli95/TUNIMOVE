@@ -328,6 +328,14 @@ exports.getAdvancedStats = async (req, res) => {
         const peakHourResult = await db.query(peakHourQuery);
         const peakHour = peakHourResult.rows[0];
 
+        // 4. Recette du jour (NOUVEAU)
+        const todayRevenueResult = await db.query(`
+            SELECT COALESCE(SUM(montant_total), 0) as total 
+            FROM ticket 
+            WHERE date_emission >= CURRENT_DATE
+        `);
+        const todayRevenue = parseFloat(todayRevenueResult.rows[0].total);
+
         const stats = {
             topLine: topLine ? {
                 name: `Ligne ${topLine.num_ligne}`,
@@ -339,7 +347,8 @@ exports.getAdvancedStats = async (req, res) => {
             peakHour: peakHour ? {
                 time: String(peakHour.heure_depart).substring(0, 5),
                 count: parseInt(peakHour.count)
-            } : null
+            } : null,
+            todayRevenue: todayRevenue
         };
 
         console.log("Stats calculées avec succès:", stats);

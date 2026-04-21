@@ -23,7 +23,7 @@ const RoleBadge = ({ role }) => {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
       background: cfg.bg, color: cfg.color,
-      padding: '4px 12px', borderRadius: 99, fontSize: 11,
+      padding: '5px 14px', borderRadius: 99, fontSize: 13,
       fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em',
       border: `1.5px solid ${cfg.dot}40`,
     }}>
@@ -40,8 +40,8 @@ const InfoRow = ({ icon: Icon, label, value, color = '#6366F1' }) => (
       <Icon size={16} color={color} />
     </div>
     <div style={{ minWidth: 0 }}>
-      <p style={{ margin: 0, fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
-      <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 700, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</p>
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 700, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</p>
     </div>
   </div>
 );
@@ -270,8 +270,8 @@ const Users = () => {
             const active = selectedRole === tab.id;
             return (
               <button key={tab.id} onClick={() => setSelectedRole(tab.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px',
-                borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px',
+                borderRadius: 12, fontSize: 14.5, fontWeight: 700, cursor: 'pointer',
                 border: active ? '1.5px solid #6366F1' : '1.5px solid #E2E8F0',
                 background: active ? '#6366F1' : 'white',
                 color: active ? 'white' : '#64748B',
@@ -283,7 +283,7 @@ const Users = () => {
                 <span style={{
                   background: active ? 'rgba(255,255,255,0.25)' : '#F1F5F9',
                   color: active ? 'white' : '#64748B',
-                  fontSize: 11, fontWeight: 800,
+                  fontSize: 12.5, fontWeight: 800,
                   padding: '1px 7px', borderRadius: 99,
                 }}>{tab.count}</span>
               </button>
@@ -332,31 +332,29 @@ const Users = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                   <div style={{
                                     width: 40, height: 40, borderRadius: 12,
-                                    background: user.image_url ? `url(http://localhost:5000/${user.image_url})` : `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
-                                    backgroundSize: 'cover',
-                                    backgroundPosition: 'center',
+                                    background: `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
                                     border: `1.5px solid ${cfg.dot}40`,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: 13, fontWeight: 800, color: cfg.color, flexShrink: 0,
                                   }}>
-                                    {!user.image_url && `${user.nom?.charAt(0)}${user.prenom?.charAt(0)}`}
+                                    {user.nom?.charAt(0)}{user.prenom?.charAt(0)}
                                   </div>
                                   <div>
-                                    <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#0F172A' }}>
+                                    <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#0F172A' }}>
                                       {user.nom} {user.prenom}
                                     </p>
-                                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>
+                                    <p style={{ margin: '2px 0 0', fontSize: 14, color: '#94A3B8', fontWeight: 500 }}>
                                       {user.email || 'Email non renseigné'}
                                     </p>
                                   </div>
                                 </div>
                               </td>
-                              <td style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>
+                              <td style={{ fontSize: 15, color: '#475569', fontWeight: 600 }}>
                                 {user.num_tel || '—'}
                               </td>
                               <td>
                                 <code style={{
-                                  fontSize: 12, background: '#F1F5F9', color: '#475569',
+                                  fontSize: 14, background: '#F1F5F9', color: '#475569',
                                   padding: '3px 8px', borderRadius: 6, fontFamily: 'monospace', fontWeight: 700,
                                   border: '1px solid #E2E8F0',
                                 }}>
@@ -368,11 +366,11 @@ const Users = () => {
                               </td>
                               <td>
                                 {user.est_bloque ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#FEF2F2', color: '#DC2626', padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 800, border: '1px solid #FECACA' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#FEF2F2', color: '#DC2626', padding: '4px 12px', borderRadius: 99, fontSize: 12, fontWeight: 800, border: '1px solid #FECACA' }}>
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#DC2626', display: 'inline-block' }} />Bloqué
                                   </span>
                                 ) : (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#F0FDF4', color: '#15803D', padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 800, border: '1px solid #BBF7D0' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#F0FDF4', color: '#15803D', padding: '4px 12px', borderRadius: 99, fontSize: 12, fontWeight: 800, border: '1px solid #BBF7D0' }}>
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />Actif
                                   </span>
                                 )}
@@ -442,17 +440,15 @@ const Users = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{
                         width: 52, height: 52, borderRadius: 16,
-                        background: selectedUser.image_url ? `url(http://localhost:5000/${selectedUser.image_url})` : `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        background: `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
                         border: `2px solid ${getRoleCfg(selectedUser.role).dot}50`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 18, fontWeight: 900, color: getRoleCfg(selectedUser.role).color,
+                        fontSize: 20, fontWeight: 900, color: getRoleCfg(selectedUser.role).color,
                       }}>
-                        {!selectedUser.image_url && `${selectedUser.nom?.charAt(0)}${selectedUser.prenom?.charAt(0)}`}
+                        {selectedUser.nom?.charAt(0)}{selectedUser.prenom?.charAt(0)}
                       </div>
                       <div>
-                        <p style={{ margin: 0, fontWeight: 900, fontSize: 15, color: '#0F172A' }}>
+                        <p style={{ margin: 0, fontWeight: 900, fontSize: 17, color: '#0F172A' }}>
                           {selectedUser.prenom} {selectedUser.nom}
                         </p>
                         <RoleBadge role={selectedUser.role} />
