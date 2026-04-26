@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  Animated, Image
+  Image, Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bus, ScanLine, User, Lock, Eye, EyeOff, ChevronRight, AlertCircle } from 'lucide-react-native';
+import { Bus, ScanLine, User, Lock, Eye, EyeOff, ChevronRight, AlertCircle, Mail, X, CheckCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
-import { AUTH_API } from '../constants/api';
+import { AUTH_API, API_IP, API_PORT } from '../constants/api';
+
+const PASSWORD_RESET_API = AUTH_API.replace('/auth', '/password-reset');
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -20,6 +22,14 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [matriculeError, setMatriculeError] = useState('');
+
+  // Forgot password
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotMatricule, setForgotMatricule] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
 
   const isMatriculeValid = matricule.trim().length >= 3;
   const isPasswordValid = password.length >= 1;
@@ -47,12 +57,15 @@ export default function LoginScreen() {
         router.replace({
           pathname: '/(receveur)/dashboard',
           params: {
+            userId: user.id,
             nom: user.nom,
             prenom: user.prenom,
+            matricule: user.matricule,
             numero_bus: affectation?.numero_bus ?? '',
             ville_depart: affectation?.ville_depart ?? '',
             ville_arrivee: affectation?.ville_arrivee ?? '',
             num_ligne: affectation?.num_ligne ?? '',
+            login_time: Date.now().toString(),
           }
         });
       } else {
@@ -62,9 +75,13 @@ export default function LoginScreen() {
         router.replace({
           pathname: '/(controleur)/scanner',
           params: {
+            userId: user.id,
             nom: user.nom,
             prenom: user.prenom,
+            matricule: user.matricule,
+            image_url: user.image_url || '',
             numero_bus: affectation?.numero_bus ?? '',
+            login_time: Date.now().toString(),
           }
         });
       }
@@ -72,6 +89,35 @@ export default function LoginScreen() {
       setError(err.response?.data?.message || 'Identifiants incorrects. Veuillez réessayer.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotOpen = () => {
+    setForgotMatricule(matricule || '');
+    setForgotEmail('');
+    setForgotError('');
+    setForgotSuccess(false);
+    setShowForgot(true);
+  };
+
+  const handleForgotSubmit = async () => {
+    if (!forgotMatricule.trim() || !forgotEmail.trim()) {
+      setForgotError('Veuillez remplir tous les champs.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      await axios.post(`${PASSWORD_RESET_API}/request`, {
+        matricule: forgotMatricule.trim(),
+        email: forgotEmail.trim().toLowerCase(),
+        role: role 
+      });
+      setForgotSuccess(true);
+    } catch (err: any) {
+      setForgotError(err.response?.data?.message || 'Erreur lors de la demande. Réessayez.');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -208,6 +254,17 @@ export default function LoginScreen() {
               </View>
             )}
 
+            {/* ── Forgot Password Link ── */}
+            {role !== null && (
+              <TouchableOpacity
+                style={styles.forgotLink}
+                onPress={handleForgotOpen}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+              </TouchableOpacity>
+            )}
+
             {/* ── Login Button ── */}
             <TouchableOpacity
               style={[styles.loginBtn, !canSubmit && styles.loginBtnDisabled]}
@@ -232,6 +289,102 @@ export default function LoginScreen() {
           <Text style={styles.version}>TuniMove Field v2.0 · SNTRI</Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Forgot Password Modal ── */}
+      <Modal
+        visible={showForgot}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowForgot(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalIconWrap}>
+                  <Lock color={Colors.primary} size={22} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>Mot de passe oublié</Text>
+                  <Text style={styles.modalSub}>Demande de réinitialisation</Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowForgot(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X color={Colors.textMuted} size={22} />
+                </TouchableOpacity>
+              </View>
+
+              {forgotSuccess ? (
+                <View style={styles.successBox}>
+                  <CheckCircle color={Colors.success} size={44} />
+                  <Text style={styles.successTitle}>Demande envoyée !</Text>
+                  <Text style={styles.successSub}>
+                    Votre demande a été transmise à l'administrateur.{`\n`}Un nouveau mot de passe vous sera envoyé par e-mail dès qu'elle sera traitée.
+                  </Text>
+                  <TouchableOpacity style={styles.closeBtn} onPress={() => setShowForgot(false)}>
+                    <Text style={styles.closeBtnText}>Fermer</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.modalDesc}>
+                    Saisissez votre matricule et votre adresse e-mail. L'administrateur générera un nouveau mot de passe et vous l'enverra par e-mail.
+                  </Text>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Matricule</Text>
+                    <View style={styles.modalInput}>
+                      <User color={Colors.textMuted} size={16} />
+                      <TextInput
+                        style={styles.modalTextInput}
+                        placeholder="Ex: REC001"
+                        value={forgotMatricule}
+                        onChangeText={v => { setForgotMatricule(v); setForgotError(''); }}
+                        placeholderTextColor={Colors.textLight}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalLabel}>Adresse e-mail</Text>
+                    <View style={styles.modalInput}>
+                      <Mail color={Colors.textMuted} size={16} />
+                      <TextInput
+                        style={styles.modalTextInput}
+                        placeholder="votre@email.com"
+                        value={forgotEmail}
+                        onChangeText={v => { setForgotEmail(v); setForgotError(''); }}
+                        placeholderTextColor={Colors.textLight}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+
+                  {forgotError ? (
+                    <View style={styles.forgotErr}>
+                      <AlertCircle color={Colors.danger} size={14} />
+                      <Text style={styles.forgotErrText}>{forgotError}</Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={[styles.submitBtn, (!forgotMatricule || !forgotEmail) && styles.submitBtnDisabled]}
+                    onPress={handleForgotSubmit}
+                    disabled={forgotLoading || !forgotMatricule || !forgotEmail}
+                    activeOpacity={0.85}
+                  >
+                    {forgotLoading
+                      ? <ActivityIndicator color={Colors.white} size="small" />
+                      : <Text style={styles.submitBtnText}>Envoyer la demande</Text>
+                    }
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,10 +464,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, marginTop: Spacing.lg, ...Shadow.accent,
   },
-  loginBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  loginBtnDisabled: { backgroundColor: Colors.bgMid, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0, elevation: 0 } }) },
   loginBtnText: { fontSize: 18, fontWeight: '800', color: Colors.primary },
   loginBtnTextDisabled: { color: Colors.textMuted },
 
   // Footer
   version: { textAlign: 'center', fontSize: 13, color: Colors.textLight, marginTop: Spacing.lg, fontWeight: '600' },
+
+  // Forgot link
+  forgotLink: { alignSelf: 'flex-end', marginTop: 6, marginBottom: 2, paddingVertical: 4 },
+  forgotText: { fontSize: 14, color: Colors.primary, fontWeight: '700' },
+
+  // Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end', alignItems: 'center',
+  },
+  modalCard: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: Spacing.xl, width: '100%',
+    ...Shadow.strong,
+  },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: Spacing.md, marginBottom: Spacing.lg,
+  },
+  modalIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: Colors.primaryLight + '20',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
+  modalSub: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
+  modalDesc: { fontSize: 14, color: Colors.textMid, lineHeight: 20, marginBottom: Spacing.lg },
+  modalField: { marginBottom: Spacing.base },
+  modalLabel: {
+    fontSize: 13, fontWeight: '800', color: Colors.textMid,
+    marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  modalInput: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.bgLight, borderRadius: Radius.md,
+    borderWidth: 1.5, borderColor: Colors.border,
+    height: 50, paddingHorizontal: 14,
+  },
+  modalTextInput: { flex: 1, fontSize: 16, color: Colors.textDark, fontWeight: '600' },
+  forgotErr: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.dangerLight, borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.md,
+    borderWidth: 1, borderColor: Colors.danger + '30',
+  },
+  forgotErrText: { flex: 1, fontSize: 14, color: Colors.danger, fontWeight: '700' },
+  submitBtn: {
+    backgroundColor: Colors.primary, height: 52, borderRadius: Radius.lg,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: Spacing.md, ...Shadow.strong,
+  },
+  submitBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  submitBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
+  successBox: { alignItems: 'center', paddingVertical: Spacing.xl, gap: 12 },
+  successTitle: { fontSize: 22, fontWeight: '900', color: Colors.textDark },
+  successSub: { fontSize: 15, color: Colors.textMid, textAlign: 'center', lineHeight: 22 },
+  closeBtn: {
+    marginTop: Spacing.md, backgroundColor: Colors.primary,
+    paddingHorizontal: 32, paddingVertical: 12, borderRadius: Radius.lg,
+  },
+  closeBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

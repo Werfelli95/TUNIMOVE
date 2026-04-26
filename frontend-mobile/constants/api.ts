@@ -1,4 +1,18 @@
-export const API_IP = '192.168.1.187';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+// Automatically detect the IP address of your computer (the Expo server)
+const getHostIp = () => {
+  if (Platform.OS === 'web') return 'localhost';
+  const debuggerHost = Constants.expoConfig?.hostUri;
+  if (debuggerHost) {
+    return debuggerHost.split(':')[0];
+  }
+  // Fallback if not using Expo Go
+  return 'localhost';
+};
+
+export const API_IP = getHostIp();
 export const API_PORT = '5000';
 export const API_BASE_URL = `http://${API_IP}:${API_PORT}/api`;
 

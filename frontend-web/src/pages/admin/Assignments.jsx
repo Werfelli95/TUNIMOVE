@@ -4,6 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On réutilise vos styles premium
 
 const Assignments = () => {
+    const getLocalDateString = (dateVal) => {
+        const d = dateVal ? new Date(dateVal) : new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // États généraux
     const [activeTab, setActiveTab] = useState('bus');
     const [loading, setLoading] = useState(true);
@@ -102,8 +110,8 @@ const Assignments = () => {
             if (currentStaffId) {
                 setSelectedStaffId(currentStaffId);
                 if (activeTab === 'bus') {
-                    setDateDebut(item.date_debut_affectation ? new Date(item.date_debut_affectation).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-                    setDateFin(item.date_fin_affectation ? new Date(item.date_fin_affectation).toISOString().split('T')[0] : '');
+                    setDateDebut(item.date_debut_affectation ? getLocalDateString(item.date_debut_affectation) : getLocalDateString());
+                    setDateFin(item.date_fin_affectation ? getLocalDateString(item.date_fin_affectation) : '');
                 } else {
                     setSelectedLigne(item.num_ligne || '');
                     setStationDepart(item.station_depart || '');
@@ -111,7 +119,7 @@ const Assignments = () => {
             } else {
                 setSelectedStaffId('');
                 if (activeTab === 'bus') {
-                    setDateDebut(new Date().toISOString().split('T')[0]);
+                    setDateDebut(getLocalDateString());
                     setDateFin('');
                 } else {
                     setSelectedLigne('');
@@ -126,6 +134,10 @@ const Assignments = () => {
     };
 
     const handleAssign = async () => {
+        if (activeTab === 'bus' && dateFin && dateDebut > dateFin) {
+            alert("La date de fin ne peut pas être antérieure à la date de début.");
+            return;
+        }
         setIsSubmitting(true);
         try {
             const url = activeTab === 'bus'
@@ -399,7 +411,7 @@ const Assignments = () => {
                                                             <div className="flex items-center gap-2 mt-2">
                                                                 {item.date_debut_affectation && (
                                                                     <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200">
-                                                                        Du {new Date(item.date_debut_affectation).toLocaleDateString()}
+                                                                        {item.date_fin_affectation ? 'Du' : 'Depuis le'} {new Date(item.date_debut_affectation).toLocaleDateString()}
                                                                     </span>
                                                                 )}
                                                                 {item.date_fin_affectation && (
@@ -533,8 +545,14 @@ const Assignments = () => {
                                                         type="date"
                                                         className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
                                                         value={dateDebut}
-                                                        onChange={(e) => setDateDebut(e.target.value)}
-                                                        min={new Date().toISOString().split('T')[0]}
+                                                        onChange={(e) => {
+                                                            const newDebut = e.target.value;
+                                                            setDateDebut(newDebut);
+                                                            if (dateFin && newDebut > dateFin) {
+                                                                setDateFin(newDebut);
+                                                            }
+                                                        }}
+                                                        min={getLocalDateString()}
                                                         required
                                                     />
                                                 </div>

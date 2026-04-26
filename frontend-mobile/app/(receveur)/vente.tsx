@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Alert, ActivityIndicator, Dimensions
+  Modal, Alert, ActivityIndicator, Dimensions, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   MapPin, Clock, Ticket, User, X, CheckCircle,
   ChevronDown, ChevronRight, ChevronLeft, Printer
 } from 'lucide-react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
@@ -39,10 +40,12 @@ export default function VenteScreen() {
   const service_id  = params.service_id as string;
   const num_ligne   = params.num_ligne as string;
   const ville_dep   = params.ville_depart as string;
+  const station_actuelle = params.station_actuelle as string;
   const ville_arr   = params.ville_arrivee as string;
   const nom         = params.nom as string;
   const prenom      = params.prenom as string;
   const paramHoraire = params.horaire as string;
+  const matricule   = params.matricule as string;
 
   // ── Data
   const [ligne, setLigne]         = useState<Ligne | null>(null);
@@ -54,9 +57,12 @@ export default function VenteScreen() {
   const [step, setStep]           = useState(service_id && paramHoraire && ville_dep ? 1 : 0);
 
   // ── Step 1: Trajet
-  const [horaire, setHoraire]         = useState(paramHoraire || '');
+  const defaultHoraire = service_id 
+    ? new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : paramHoraire || '';
+  const [horaire, setHoraire]         = useState(defaultHoraire);
   const [showHoraire, setShowHoraire] = useState(false);
-  const [depart, setDepart]           = useState(ville_dep || '');
+  const [depart, setDepart]           = useState(station_actuelle || ville_dep || '');
   const [showDepart, setShowDepart]   = useState(false);
   const [arrivee, setArrivee]         = useState('');
   const [showArrivee, setShowArrivee] = useState(false);
@@ -114,12 +120,27 @@ export default function VenteScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────
   const stations = useMemo<Station[]>(() => {
     if (!ligne) return [];
-    const list = [...(ligne.stations || [])];
-    if (!list.some(s => s.arret.toLowerCase() === (ligne.ville_depart ?? '').toLowerCase()))
+    let list = [...(ligne.stations || [])];
+    const startName = (ligne.ville_depart ?? '').trim().toLowerCase();
+    
+    if (!list.some(s => (s.arret || '').trim().toLowerCase() === startName)) {
       list.push({ arret: ligne.ville_depart, distance_km: 0 });
-    if (!list.some(s => s.arret.toLowerCase() === (ligne.ville_arrivee ?? '').toLowerCase()))
-      list.push({ arret: ligne.ville_arrivee, distance_km: 999 });
-    return list.sort((a, b) => a.distance_km - b.distance_km);
+    }
+
+    // Sort first
+    list.sort((a, b) => a.distance_km - b.distance_km);
+
+    // Deduplicate by name
+    const unique: Station[] = [];
+    const seen = new Set();
+    for (const s of list) {
+      const name = (s.arret || '').trim().toLowerCase();
+      if (!seen.has(name)) {
+        seen.add(name);
+        unique.push(s);
+      }
+    }
+    return unique;
   }, [ligne]);
 
   const deptSt  = stations.find(s => s.arret === depart);
@@ -231,6 +252,7 @@ export default function VenteScreen() {
         date_emission: new Date().toISOString(),
         numero_bus, 
         num_ligne,
+        matricule,
       });
 
       setSeat(null);
@@ -283,7 +305,7 @@ export default function VenteScreen() {
             {/* Horaire */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}><Clock size={14} color={Colors.textMid} /> Horaire de départ</Text>
-              {service_id && paramHoraire ? (
+              {service_id ? (
                 <View style={[styles.picker, { backgroundColor: Colors.bgMid, opacity: 0.8 }]}>
                     <Text style={styles.pickerVal}>{horaire}</Text>
                     <Clock color={Colors.textMuted} size={16} />
@@ -586,10 +608,13 @@ export default function VenteScreen() {
                 <View style={styles.ticketDivider} />
                 <View style={styles.ticketGrid}>
                   {[
+                    ['Agent', lastTicket.matricule || '—'],
+                    ['Ligne', lastTicket.num_ligne ? `Ligne ${lastTicket.num_ligne} (${ligne?.ville_depart || ''} - ${ligne?.ville_arrivee || ''})` : '—'],
                     ['Bus', `N° ${lastTicket.numero_bus}`],
                     ['Siège', lastTicket.siege],
                     ['Départ', lastTicket.station_depart],
                     ['Arrivée', lastTicket.station_arrivee],
+                    ['Date', new Date(lastTicket.date_emission).toLocaleDateString('fr-FR')],
                     ['Heure', lastTicket.heure_depart],
                     ['Tarif', lastTicket.type_tarif],
                   ].map(([k, v]) => (
@@ -602,6 +627,14 @@ export default function VenteScreen() {
                 <View style={styles.ticketDivider} />
                 <View style={styles.ticketQR}>
                   <Text style={styles.qrLabel}>CODE DE VALIDATION</Text>
+                  <View style={{ marginVertical: 12, alignItems: 'center' }}>
+                    <QRCode
+                      value={lastTicket.code_ticket}
+                      size={120}
+                      color={Colors.textDark}
+                      backgroundColor={Colors.white}
+                    />
+                  </View>
                   <Text style={styles.qrCode}>{lastTicket.code_ticket}</Text>
                   <Text style={styles.qrHint}>À présenter au contrôleur lors du contrôle</Text>
                 </View>
@@ -761,7 +794,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, ...Shadow.accent,
   },
-  nextBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  nextBtnDisabled: { backgroundColor: Colors.bgMid, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0, elevation: 0 } }) },
   nextBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
   nextBtnTextDis: { color: Colors.textMuted },
   backBtn: {

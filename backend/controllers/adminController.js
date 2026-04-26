@@ -83,3 +83,27 @@ exports.getRolesOverview = async (req, res) => {
         res.status(500).json({ message: 'Erreur serveur' });
     }
 };
+
+/**
+ * GET /api/admin/notifications
+ * Returns counts of pending items for resets, incidents, and audits
+ */
+exports.getNotificationsCount = async (req, res) => {
+    try {
+        const [resets, incidents, audits] = await Promise.all([
+            db.query("SELECT COUNT(*) FROM demande_reinitialisation WHERE statut = 'En attente'"),
+            db.query("SELECT COUNT(*) FROM incident WHERE statut = 'En attente'"),
+            db.query("SELECT COUNT(*) FROM fiche_cloture_service WHERE statut = 'En attente'")
+        ]);
+
+        res.json({
+            resets: parseInt(resets.rows[0].count),
+            incidents: parseInt(incidents.rows[0].count),
+            audits: parseInt(audits.rows[0].count),
+            total: parseInt(resets.rows[0].count) + parseInt(incidents.rows[0].count) + parseInt(audits.rows[0].count)
+        });
+    } catch (err) {
+        console.error('Erreur getNotificationsCount:', err);
+        res.status(500).json({ message: 'Erreur notifications' });
+    }
+};

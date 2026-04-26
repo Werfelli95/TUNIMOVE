@@ -13,8 +13,28 @@ const initServiceTable = async () => {
             ADD COLUMN IF NOT EXISTS horaire VARCHAR(20),
             ADD COLUMN IF NOT EXISTS voyage_complet BOOLEAN DEFAULT FALSE
         `);
+        // Ensure fiche_cloture_service table exists
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS fiche_cloture_service (
+                id_fiche SERIAL PRIMARY KEY,
+                id_service INTEGER REFERENCES service(id_service),
+                id_responsable_cloture INTEGER REFERENCES utilisateur(id_utilisateur),
+                heure_cloture TIMESTAMPTZ DEFAULT NOW(),
+                total_collecte DECIMAL(10, 3) DEFAULT 0,
+                statut VARCHAR(20) DEFAULT 'En attente',
+                duree_minutes INTEGER,
+                motif_cloture VARCHAR(255)
+            );
+        `);
+
+        // Migration to add missing columns if table already existed
+        await db.query(`
+            ALTER TABLE fiche_cloture_service 
+            ADD COLUMN IF NOT EXISTS duree_minutes INTEGER,
+            ADD COLUMN IF NOT EXISTS motif_cloture VARCHAR(255)
+        `);
     } catch (err) {
-        // Columns may already exist, ignore
+        console.error('Migration error:', err);
     }
 };
 initServiceTable();
@@ -32,7 +52,7 @@ exports.startService = async (req, res) => {
     try {
         // Get bus + line info
         const busRes = await db.query(`
-            SELECT b.id_bus, b.num_ligne, l.ville_depart, l.ville_arrivee
+            SELECT b.id_bus, b.num_ligne, b.id_receveur, l.ville_depart, l.ville_arrivee
             FROM bus b
             LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
             WHERE b.numero_bus = $1
@@ -44,6 +64,7 @@ exports.startService = async (req, res) => {
         }
 
         const bus = busRes.rows[0];
+        const effectiveReceveurId = id_receveur || bus.id_receveur;
 
         // Close any currently open service for this bus first
         await db.query(`
@@ -56,7 +77,7 @@ exports.startService = async (req, res) => {
             INSERT INTO service (num_ligne, id_bus, date_service, statut, id_receveur, date_debut, station_actuelle, voyage_complet, horaire)
             VALUES ($1, $2, CURRENT_DATE, 'En cours', $3, NOW(), $4, FALSE, $5)
             RETURNING id_service, num_ligne, date_service, statut, date_debut, station_actuelle, voyage_complet, horaire
-        `, [bus.num_ligne, bus.id_bus, id_receveur || null, bus.ville_depart || null, horaire || null]);
+        `, [bus.num_ligne, bus.id_bus, effectiveReceveurId, bus.ville_depart || null, horaire || null]);
 
         const service = result.rows[0];
 
@@ -102,15 +123,47 @@ exports.closeService = async (req, res) => {
             });
         }
 
-        const motif = raison_incident ? `INCIDENT: ${raison_incident}` : 'Voyage terminé';
-        const result = await db.query(`
-            UPDATE service 
-            SET statut = 'Terminé', date_fin = NOW()
-            WHERE id_service = $1
-            RETURNING id_service, statut, date_fin
+        // 1. Fetch details for the report
+        const details = await db.query(`
+            SELECT s.*, 
+                   (SELECT COUNT(*) FROM ticket t WHERE t.id_service = s.id_service) as tickets_count,
+                   (SELECT COALESCE(SUM(t.montant_total), 0) FROM ticket t WHERE t.id_service = s.id_service) as total_recette
+            FROM service s
+            WHERE s.id_service = $1
         `, [id]);
 
-        res.json({ message: `Service clôturé — ${motif}`, service: result.rows[0] });
+        if (details.rows.length === 0) return res.status(404).json({ message: 'Service non trouvé' });
+        const serviceData = details.rows[0];
+
+        const motif = raison_incident ? `INCIDENT: ${raison_incident}` : 'Voyage terminé';
+        
+        // Calculate duration in minutes
+        const dateFin = new Date();
+        const dureeMinutes = Math.floor((dateFin.getTime() - new Date(serviceData.date_debut).getTime()) / 60000);
+
+        // 2. Mark service as finished
+        const result = await db.query(`
+            UPDATE service 
+            SET statut = 'Terminé', date_fin = $1
+            WHERE id_service = $2
+            RETURNING id_service, statut, date_fin
+        `, [dateFin, id]);
+
+        // 3. Create the closure fiche
+        await db.query(`
+            INSERT INTO fiche_cloture_service (id_service, id_responsable_cloture, total_collecte, duree_minutes, motif_cloture, statut, heure_cloture)
+            VALUES ($1, $2, $3, $4, $5, 'En attente', $6)
+        `, [id, serviceData.id_receveur, serviceData.total_recette, dureeMinutes, motif, dateFin]);
+
+        res.json({ 
+            message: `Service clôturé — ${motif}`, 
+            service: result.rows[0],
+            fiche: {
+                total_recette: serviceData.total_recette,
+                tickets_count: serviceData.tickets_count,
+                duree_minutes: dureeMinutes
+            }
+        });
     } catch (err) {
         console.error('Erreur closeService:', err);
         res.status(500).json({ message: 'Erreur lors de la clôture' });
@@ -124,6 +177,15 @@ exports.closeService = async (req, res) => {
 exports.getActiveService = async (req, res) => {
     const { numero_bus } = req.params;
     try {
+        // Auto-close any "En cours" service from previous days for this bus
+        await db.query(`
+            UPDATE service 
+            SET statut = 'Terminé', date_fin = NOW()
+            WHERE id_bus = (SELECT id_bus FROM bus WHERE numero_bus = $1 LIMIT 1)
+              AND statut = 'En cours' 
+              AND date_service < CURRENT_DATE
+        `, [numero_bus]);
+
         const result = await db.query(`
             SELECT s.id_service, s.num_ligne, s.date_service, s.statut, s.date_debut,
                    s.station_actuelle, s.voyage_complet, s.horaire,
@@ -163,6 +225,8 @@ exports.getServiceTickets = async (req, res) => {
                    t.date_emission, t.code_ticket
             FROM ticket t
             WHERE t.id_service = $1
+               OR (t.id_bus = (SELECT id_bus FROM service WHERE id_service = $1) 
+                   AND t.date_voyage = (SELECT date_service FROM service WHERE id_service = $1))
             ORDER BY t.date_emission DESC
         `, [id]);
 

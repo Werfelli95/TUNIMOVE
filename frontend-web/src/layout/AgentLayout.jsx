@@ -7,6 +7,7 @@ const AgentLayout = () => {
     const navigate = useNavigate();
     const [mode, setMode] = useState('Vente Directe'); // Vente Directe, Réservations, Historique
     const [agentInfo, setAgentInfo] = useState({ nom: 'Agent', prenom: '', matricule: '', image_url: null });
+    const [guichetNom, setGuichetNom] = useState(null);
 
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
@@ -45,6 +46,16 @@ const AgentLayout = () => {
                             }
                         })
                         .catch(err => console.error("Erreur sync agent profile:", err));
+                        
+                    // Récupérer le guichet assigné
+                    fetch(`http://localhost:5000/api/guichets/agent/${userId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.nom_guichet) {
+                                setGuichetNom(data.nom_guichet);
+                            }
+                        })
+                        .catch(err => console.error("Erreur sync guichet:", err));
                 }
             } catch(e) {}
         }
@@ -139,6 +150,11 @@ const AgentLayout = () => {
                             {agentInfo.prenom} {agentInfo.nom}
                         </div>
                         <div style={{ fontSize: '12px', opacity: 0.6 }}>Matricule: {agentInfo.matricule}</div>
+                        {guichetNom && (
+                            <div style={{ fontSize: '11px', opacity: 0.9, color: '#4ade80', fontWeight: '600', marginTop: '2px' }}>
+                                Guichet: {guichetNom}
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -32,7 +32,7 @@ const PasswordResets = () => {
     }, []);
 
     const handleApprove = async (id_demande) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet agent ? Un mail lui sera envoyé automatiquement.")) return;
+        if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet utilisateur ? Un mail lui sera envoyé automatiquement.")) return;
 
         setActionLoading(id_demande);
         try {
@@ -90,7 +90,7 @@ const PasswordResets = () => {
                         </div>
                         <h1 className="header-title">Réinitialisations</h1>
                     </div>
-                    <p className="header-subtitle">Gestion sécurisée des accès agents de guichet</p>
+                    <p className="header-subtitle">Gestion sécurisée des accès collaborateurs</p>
                 </div>
                 <button
                     onClick={fetchData}
@@ -178,7 +178,7 @@ const PasswordResets = () => {
                     <table className="premium-table">
                         <thead>
                             <tr>
-                                <th>Agent</th>
+                                <th>Collaborateur</th>
                                 <th>Matricule</th>
                                 <th>Contact Email</th>
                                 <th>Date de réception</th>
@@ -215,7 +215,11 @@ const PasswordResets = () => {
                                                     </div>
                                                     <div>
                                                         <div className="agent-name">{req.prenom} {req.nom}</div>
-                                                        <div className="agent-role">Agent de Guichet</div>
+                                                        <div className="agent-role">
+                                                            {req.role === 'RECEVEUR' ? 'Receveur' : 
+                                                             req.role === 'CONTROLEUR' ? 'Contrôleur' : 
+                                                             req.role === 'ADMIN' ? 'Administrateur' : 'Agent de Guichet'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>

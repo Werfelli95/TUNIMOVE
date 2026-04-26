@@ -54,10 +54,11 @@ const Audit = () => {
                                 <tr>
                                     <th>ID Fiche</th>
                                     <th>Receveur</th>
-                                    <th>Bus</th>
-                                    <th>Date de clôture</th>
+                                    <th>Ligne / Bus</th>
+                                    <th>Date & Durée</th>
                                     <th>Recette Totale</th>
                                     <th>Tickets</th>
+                                    <th>Motif</th>
                                     <th>Statut</th>
                                     <th style={{ textAlign: 'center' }}>Actions</th>
                                 </tr>
@@ -68,16 +69,38 @@ const Audit = () => {
                                         records.map(r => (
                                             <motion.tr key={r.id_fiche} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                                 <td style={{ fontWeight: 700, color: '#64748b', fontSize: '1.05rem' }}>#A{String(r.id_fiche).padStart(3, '0')}</td>
-                                                <td><div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>{r.receveur_prenom} {r.receveur_nom}</div></td>
                                                 <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}>
-                                                        <Bus size={18} color="#4f46e5" />
-                                                        <span style={{ fontWeight: 700 }}>N° {r.numero_bus}</span>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>
+                                                        {r.receveur_prenom} {r.receveur_nom}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+                                                        {r.receveur_matricule ? `Matricule: ${r.receveur_matricule}` : '—'}
                                                     </div>
                                                 </td>
-                                                <td style={{ fontSize: '1.05rem', fontWeight: 600 }}>{new Date(r.heure_cloture).toLocaleDateString()}</td>
+                                                <td>
+                                                    <div style={{ fontSize: '1rem', color: '#64748b' }}>
+                                                        <span style={{ fontWeight: 800, color: '#4f46e5' }}>Ligne {r.num_ligne}</span>
+                                                        <div style={{ fontSize: '0.85rem' }}>{r.ville_depart} ↔ {r.ville_arrivee}</div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                                            <Bus size={14} /> <span>N° {r.numero_bus}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontSize: '1.05rem', fontWeight: 600 }}>
+                                                        {r.heure_cloture ? new Date(r.heure_cloture).toLocaleDateString() : '—'}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.9rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <Clock size={14} /> {r.duree_minutes || 0} min
+                                                    </div>
+                                                </td>
                                                 <td><span style={{ fontWeight: 900, fontSize: '1.15rem' }}>{parseFloat(r.total_collecte || 0).toFixed(3)} TND</span></td>
                                                 <td><span className="user-matricule" style={{ fontSize: '1.05rem' }}>{r.tickets_count} tickets</span></td>
+                                                <td>
+                                                    <div style={{ fontSize: '0.9rem', color: r.motif_cloture?.includes('INCIDENT') ? '#ef4444' : '#64748b', fontWeight: 600 }}>
+                                                        {r.motif_cloture || '—'}
+                                                    </div>
+                                                </td>
                                                 <td>
                                                     <span className={`role-badge ${r.statut === 'Validé' ? 'badge-agent' : r.statut === 'Rejeté' ? 'badge-receveur' : ''}`}
                                                         style={!r.statut || r.statut === 'En attente' ? { backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7' } : {}}>
@@ -101,7 +124,7 @@ const Audit = () => {
                                             </motion.tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="8" className="empty-state">Aucune fiche trouvée.</td></tr>
+                                        <tr><td colSpan="9" className="empty-state">Aucune fiche trouvée.</td></tr>
                                     )}
                                 </AnimatePresence>
                             </tbody>

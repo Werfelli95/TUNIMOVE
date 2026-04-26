@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, Platform
+  ScrollView, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown } from 'lucide-react-native';
@@ -198,9 +198,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbbf24', height: 56,
     borderRadius: 16, alignItems: 'center', justifyContent: 'center',
     marginTop: 24,
-    shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    ...Platform.select({
+      web: { boxShadow: '0px 4px 8px rgba(251, 191, 36, 0.3)' },
+      default: { shadowColor: '#fbbf24', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    }),
   },
-  buttonDisabled: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
+  buttonDisabled: { backgroundColor: '#cbd5e1', ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0, elevation: 0 } }) },
   buttonText: { fontSize: 18, fontWeight: 'bold', color: '#1a3a52' },
 });

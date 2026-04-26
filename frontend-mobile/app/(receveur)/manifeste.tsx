@@ -137,7 +137,7 @@ export default function ManifesteScreen() {
         <View style={styles.summaryCard}>
           <View style={styles.summaryTop}>
             <View>
-              <Text style={styles.summaryTitle}>Manifeste du service</Text>
+              <Text style={styles.summaryTitle}>Liste des réservations</Text>
               {service_id
                 ? <Text style={styles.summarySubtitle}>Service #{service_id} · Bus {numero_bus}</Text>
                 : <Text style={styles.summarySubtitle}>Bus {numero_bus} · Aujourd'hui</Text>
@@ -194,11 +194,11 @@ export default function ManifesteScreen() {
             <View style={styles.emptyIcon}>
               <Users color={Colors.textLight} size={40} />
             </View>
-            <Text style={styles.emptyTitle}>Aucun passager</Text>
+            <Text style={styles.emptyTitle}>Aucune réservation</Text>
             <Text style={styles.emptySub}>
               {search
                 ? 'Aucun résultat pour cette recherche.'
-                : 'Le manifeste est vide. Émettez le premier billet.'}
+                : 'La liste est vide. Émettez le premier billet.'}
             </Text>
             {!search && service_id && (
               <TouchableOpacity

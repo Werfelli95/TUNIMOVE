@@ -4,16 +4,17 @@ const crypto = require('crypto');
 
 // 1. Demande de réinitialisation (Côté Agent)
 exports.requestReset = async (req, res) => {
-    const { matricule, email } = req.body;
+    const { matricule, email, role } = req.body;
     try {
         // Vérifier si l'utilisateur existe avec ce matricule et cet email
+        // On permet les rôles RECEVEUR, CONTROLEUR et AGENT (ou tout rôle non-admin par sécurité)
         const userResult = await db.query(
-            "SELECT id_utilisateur FROM utilisateur WHERE matricule = $1 AND email = $2 AND role = 'AGENT'",
-            [matricule, email]
+            "SELECT id_utilisateur FROM utilisateur WHERE matricule = $1 AND email = $2 AND (LOWER(role) = LOWER($3) OR LOWER(role) = 'agent')",
+            [matricule, email, role || '']
         );
 
         if (userResult.rows.length === 0) {
-            return res.status(404).json({ message: "Aucun agent trouvé avec ces informations." });
+            return res.status(404).json({ message: "Aucun utilisateur trouvé avec ces informations pour ce rôle." });
         }
 
         const userId = userResult.rows[0].id_utilisateur;
@@ -62,7 +63,7 @@ exports.getResetStats = async (req, res) => {
 exports.getPendingRequests = async (req, res) => {
     try {
         const result = await db.query(`
-            SELECT d.*, u.nom, u.prenom 
+            SELECT d.*, u.nom, u.prenom, u.role 
             FROM demande_reinitialisation d
             JOIN utilisateur u ON d.id_utilisateur = u.id_utilisateur
             WHERE d.statut = 'En attente'

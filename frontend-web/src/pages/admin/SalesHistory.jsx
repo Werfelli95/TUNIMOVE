@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, Search, Loader2, ShoppingCart } from 'lucide-react';
+import { Printer, Search, Loader2, ShoppingCart, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css';
 
@@ -28,11 +28,11 @@ const SalesHistory = () => {
 
     const filteredSales = sales.filter(sale => {
         const matchesSearch = sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              sale.ligne.toLowerCase().includes(searchTerm.toLowerCase());
-        
+            sale.ligne.toLowerCase().includes(searchTerm.toLowerCase());
+
         let matchesStart = true;
         let matchesEnd = true;
-        
+
         if (startDate || endDate) {
             const saleDate = new Date(sale.isoDate);
             if (!isNaN(saleDate.getTime())) {
@@ -48,7 +48,7 @@ const SalesHistory = () => {
                 }
             }
         }
-        
+
         return matchesSearch && matchesStart && matchesEnd;
     });
 
@@ -101,17 +101,17 @@ const SalesHistory = () => {
 
             <AnimatePresence>
                 {(startDate || endDate) && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: -10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, height: 0 }}
-                        style={{ 
-                            padding: '1.25rem 2rem', 
-                            background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', 
-                            borderRadius: '16px', 
-                            marginBottom: '1.5rem', 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
+                        style={{
+                            padding: '1.25rem 2rem',
+                            background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                            borderRadius: '16px',
+                            marginBottom: '1.5rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             border: '1px solid #c7d2fe',
                             boxShadow: '0 4px 15px rgba(79, 70, 229, 0.05)'
@@ -148,10 +148,11 @@ const SalesHistory = () => {
                         <table className="enterprise-table">
                             <thead>
                                 <tr>
-                                    <th>ID_Fiche</th>
+                                    <th>ID_Ticket</th>
                                     <th>Ligne</th>
                                     <th>Trajet</th>
                                     <th>Date</th>
+                                    <th>Horaire</th>
                                     <th style={{ textAlign: 'center' }}>Prix</th>
 
                                 </tr>
@@ -172,6 +173,18 @@ const SalesHistory = () => {
                                                 </td>
                                                 <td><span className="user-matricule" style={{ fontStyle: 'italic', fontSize: '1.05rem' }}>{sale.trajet}</span></td>
                                                 <td style={{ fontSize: '1.05rem', fontWeight: 600 }}>{sale.date}</td>
+                                                <td>
+                                                    <div style={{ 
+                                                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                                                        background: '#F1F5F9', color: '#475569',
+                                                        padding: '6px 12px', borderRadius: '10px',
+                                                        fontWeight: 800, fontSize: '0.95rem',
+                                                        border: '1px solid #E2E8F0'
+                                                    }}>
+                                                        <Clock size={14} color="#64748B" />
+                                                        {sale.horaire}
+                                                    </div>
+                                                </td>
                                                 <td style={{ textAlign: 'right', fontWeight: 900, color: '#0f172a', fontSize: '1.25rem' }}>{sale.prix}</td>
 
                                             </motion.tr>

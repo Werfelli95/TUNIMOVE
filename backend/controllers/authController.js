@@ -67,16 +67,22 @@ exports.loginReceveur = async (req, res) => {
             return res.status(403).json({ message: "Votre compte a été suspendu." });
         }
 
-        // Fetch assignment (bus and line)
+        // Fetch assignment (bus and line) with date validation
         const affectationResult = await db.query(`
             SELECT b.numero_bus, l.num_ligne, l.ville_depart, l.ville_arrivee
             FROM bus b
             LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
             WHERE b.id_receveur = $1
+            AND (b.date_debut_affectation IS NULL OR CURRENT_DATE >= b.date_debut_affectation::date)
+            AND (b.date_fin_affectation IS NULL OR CURRENT_DATE <= b.date_fin_affectation::date)
             LIMIT 1
         `, [user.id_utilisateur]);
 
-        const affectation = affectationResult.rows.length > 0 ? affectationResult.rows[0] : null;
+        if (affectationResult.rows.length === 0) {
+            return res.status(403).json({ message: "Aucune affectation valide trouvée pour aujourd'hui." });
+        }
+
+        const affectation = affectationResult.rows[0];
 
         const token = jwt.sign({ id: user.id_utilisateur, role: 'RECEVEUR' }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({ 
@@ -86,7 +92,8 @@ exports.loginReceveur = async (req, res) => {
                 matricule: user.matricule, 
                 nom: user.nom, 
                 prenom: user.prenom, 
-                role: 'RECEVEUR' 
+                role: 'RECEVEUR',
+                image_url: user.image_url
             },
             affectation
         });
@@ -113,7 +120,7 @@ exports.loginControleur = async (req, res) => {
             return res.status(403).json({ message: 'Votre compte a été suspendu.' });
         }
 
-        // Fetch bus assignment for controleur
+        // Affectation optionnelle — le contrôleur peut se connecter sans affectation
         let affectation = null;
         try {
             const affRes = await db.query(`
@@ -121,10 +128,16 @@ exports.loginControleur = async (req, res) => {
                 FROM bus b
                 LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
                 WHERE b.id_controleur = $1
+                AND (b.date_debut_affectation IS NULL OR CURRENT_DATE >= b.date_debut_affectation::date)
+                AND (b.date_fin_affectation IS NULL OR CURRENT_DATE <= b.date_fin_affectation::date)
                 LIMIT 1
             `, [user.id_utilisateur]);
-            if (affRes.rows.length > 0) affectation = affRes.rows[0];
-        } catch { /* column may not exist yet — ok */ }
+            if (affRes.rows.length > 0) {
+                affectation = affRes.rows[0];
+            }
+        } catch {
+            // Ignore DB errors on optional fetch
+        }
 
         const token = jwt.sign(
             { id: user.id_utilisateur, role: 'CONTROLEUR' },
@@ -139,7 +152,8 @@ exports.loginControleur = async (req, res) => {
                 matricule: user.matricule,
                 nom: user.nom,
                 prenom: user.prenom,
-                role: 'CONTROLEUR'
+                role: 'CONTROLEUR',
+                image_url: user.image_url
             },
             affectation
         });

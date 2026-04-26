@@ -39,6 +39,7 @@ export default function ServiceScreen() {
   const numero_bus  = params.numero_bus as string;
   const nom         = params.nom as string;
   const prenom      = params.prenom as string;
+  const userId      = params.userId as string;
   const ville_dep   = params.ville_depart as string;
   const ville_arr   = params.ville_arrivee as string;
   const num_ligne   = params.num_ligne as string;
@@ -73,12 +74,34 @@ export default function ServiceScreen() {
             if (!selHoraire && ligne.horaires?.length > 0) setSelHoraire(ligne.horaires[0]);
 
             // Stations
-            const list = [...(ligne.stations || [])].sort((a: any, b: any) => a.distance_km - b.distance_km);
-            if (!list.some((s: any) => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase()))
+            let list = [...(ligne.stations || [])].sort((a: any, b: any) => a.distance_km - b.distance_km);
+            
+            const startName = (ligne.ville_depart || '').trim().toLowerCase();
+            const endName = (ligne.ville_arrivee || '').trim().toLowerCase();
+
+            if (!list.some((s: any) => (s.arret || '').trim().toLowerCase() === startName)) {
               list.unshift({ arret: ligne.ville_depart, distance_km: 0 });
-            if (!list.some((s: any) => s.arret.toLowerCase() === ligne.ville_arrivee.toLowerCase()))
-              list.push({ arret: ligne.ville_arrivee, distance_km: 9999 });
-            setStations(list.map((s: any) => s.arret));
+            }
+            
+            if (!list.some((s: any) => (s.arret || '').trim().toLowerCase() === endName)) {
+              // Only add if not already there, and use a more sensible distance if possible, 
+              // but here we just follow the rule of not adding fake high distances if possible.
+              // However, for progression, we usually want the arrival city.
+              list.push({ arret: ligne.ville_arrivee, distance_km: list.length > 0 ? list[list.length-1].distance_km + 1 : 1 });
+            }
+
+            // Final deduplication by name to be safe
+            const uniqueList: any[] = [];
+            const seen = new Set();
+            for (const s of list) {
+              const name = (s.arret || '').trim().toLowerCase();
+              if (!seen.has(name)) {
+                seen.add(name);
+                uniqueList.push(s);
+              }
+            }
+            
+            setStations(uniqueList.map((s: any) => s.arret.trim()));
           }
         } catch { /**/ }
       }
@@ -121,7 +144,11 @@ export default function ServiceScreen() {
     const proceed = async () => {
       setStarting(true);
       try {
-        const r = await axios.post<any>(`${BASE}/start`, { numero_bus, horaire: selHoraire });
+        const r = await axios.post<any>(`${BASE}/start`, { 
+          numero_bus, 
+          horaire: selHoraire,
+          id_receveur: userId 
+        });
         const s = r.data.service as ActiveService;
         setSvc({ ...s, nb_tickets: 0, recette: 0 });
         if (Platform.OS === 'web') window.alert(`✅ Service #${s.id_service} démarré.`);

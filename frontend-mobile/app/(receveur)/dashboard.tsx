@@ -1,17 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Platform
+  ActivityIndicator, Alert, Platform, Image
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
   Play, Ticket, Users, AlertTriangle, Square, LogOut,
-  Bus, MapPin, Clock, TrendingUp, ChevronRight, Navigation
+  Bus, MapPin, Clock, TrendingUp, ChevronRight, Navigation, Menu
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
-import { RECEVEUR_SERVICE_API } from '../../constants/api';
+import { RECEVEUR_SERVICE_API, API_IP, API_PORT } from '../../constants/api';
+import SideDrawer from '../../components/SideDrawer';
 
 const BASE = RECEVEUR_SERVICE_API;
 
@@ -36,13 +37,19 @@ export default function ReceveurDashboard() {
   const ville_depart = params.ville_depart as string;
   const ville_arrivee = params.ville_arrivee as string;
   const num_ligne = params.num_ligne as string;
+  const login_time = params.login_time as string;
+  const matricule = params.matricule as string;
 
   const [activeService, setActiveService] = useState<ActiveService | null>(null);
   const [loadingSvc, setLoadingSvc] = useState(true);
+  const [now, setNow] = useState(Date.now());
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const userId = params.userId as string;
 
   const navParams = {
-    nom, prenom, numero_bus, ville_depart, ville_arrivee, num_ligne,
+    userId, nom, prenom, matricule, numero_bus, ville_depart, ville_arrivee, num_ligne,
     service_id: activeService ? String(activeService.id_service) : '',
+    login_time: login_time || '',
   };
 
   const fetchService = async () => {
@@ -54,10 +61,31 @@ export default function ReceveurDashboard() {
     finally { setLoadingSvc(false); }
   };
 
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get(`${RECEVEUR_SERVICE_API.replace('/receveur-service', '/users')}/${userId}`);
+        setUserData(res.data);
+      } catch (err) {
+        console.error('Fetch user error:', err);
+      }
+    };
+    if (userId) fetchUser();
+  }, [userId]);
+
+  const imageUrl = userData?.image_url || params.image_url;
+
   useFocusEffect(useCallback(() => { setLoadingSvc(true); fetchService(); }, []));
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const elapsed = activeService
-    ? Math.floor((Date.now() - new Date(activeService.date_debut).getTime()) / 60000)
+    ? Math.floor((now - new Date(activeService.date_debut).getTime()) / 60000)
     : 0;
   const elapsedLabel = elapsed >= 60
     ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}min`
@@ -86,7 +114,14 @@ export default function ReceveurDashboard() {
       Alert.alert('Service inactif', 'Démarrez un service avant d\'émettre un billet.');
       return;
     }
-    router.push({ pathname: '/(receveur)/vente', params: { ...navParams, service_id: String(activeService.id_service) } });
+    router.push({ 
+      pathname: '/(receveur)/vente', 
+      params: { 
+        ...navParams, 
+        service_id: String(activeService.id_service),
+        station_actuelle: activeService.station_actuelle || ''
+      } 
+    });
   };
   const goManifeste = () => {
     if (!activeService) {
@@ -100,14 +135,40 @@ export default function ReceveurDashboard() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <SideDrawer 
+        visible={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        nom={nom}
+        prenom={prenom}
+        matricule={matricule}
+        role="receveur"
+        userId={userId}
+        imageUrl={imageUrl as string}
+        onLogout={handleLogout}
+      />
       {/* ── Top Bar ── */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
-          <View style={styles.topAvatar}>
-            <Text style={styles.topAvatarText}>{(prenom?.[0] ?? 'R').toUpperCase()}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={() => setDrawerOpen(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Menu color={Colors.primary} size={22} />
+          </TouchableOpacity>
+          {imageUrl ? (
+            <Image
+              key={imageUrl as string}
+              source={{ uri: `http://${API_IP}:${API_PORT}/${imageUrl}` }}
+              style={styles.topAvatarImg}
+            />
+          ) : (
+            <View style={styles.topAvatar}>
+              <Text style={styles.topAvatarText}>{(prenom?.[0] ?? 'R').toUpperCase()}</Text>
+            </View>
+          )}
           <View>
-            <Text style={styles.topGreeting}>Bonjour,</Text>
+            <Text style={styles.topGreeting}>Bienvenue</Text>
             <Text style={styles.topName}>{prenom} {nom}</Text>
           </View>
         </View>
@@ -166,26 +227,24 @@ export default function ReceveurDashboard() {
           </View>
         )}
 
-        {/* ── Service KPIs (only when active) ── */}
-        {activeService && (
-          <View style={styles.kpiRow}>
-            <View style={styles.kpiCard}>
-              <Clock color={Colors.primary} size={18} />
-              <Text style={styles.kpiValue}>{elapsedLabel}</Text>
-              <Text style={styles.kpiLabel}>Durée</Text>
-            </View>
-            <View style={styles.kpiCard}>
-              <Ticket color={Colors.warning} size={18} />
-              <Text style={styles.kpiValue}>{activeService.nb_tickets}</Text>
-              <Text style={styles.kpiLabel}>Billets</Text>
-            </View>
-            <View style={styles.kpiCard}>
-              <TrendingUp color={Colors.success} size={18} />
-              <Text style={styles.kpiValue}>{parseFloat(String(activeService.recette)).toFixed(1)}</Text>
-              <Text style={styles.kpiLabel}>TND</Text>
-            </View>
+        {/* ── Session & Service KPIs ── */}
+        <View style={styles.kpiRow}>
+          <View style={styles.kpiCard}>
+            <Clock color={Colors.primary} size={18} />
+            <Text style={styles.kpiValue}>{elapsedLabel}</Text>
+            <Text style={styles.kpiLabel}>Durée</Text>
           </View>
-        )}
+          <View style={styles.kpiCard}>
+            <Ticket color={Colors.warning} size={18} />
+            <Text style={styles.kpiValue}>{activeService ? activeService.nb_tickets : 0}</Text>
+            <Text style={styles.kpiLabel}>Billets</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <TrendingUp color={Colors.success} size={18} />
+            <Text style={styles.kpiValue}>{activeService ? parseFloat(String(activeService.recette)).toFixed(1) : '0.0'}</Text>
+            <Text style={styles.kpiLabel}>TND</Text>
+          </View>
+        </View>
 
         {/* ── Current Stop Banner (active service) ── */}
         {activeService?.station_actuelle && (
@@ -251,7 +310,7 @@ export default function ReceveurDashboard() {
             <View style={[styles.actionIcon, { backgroundColor: Colors.infoLight }]}>
               <Users color={activeService ? Colors.info : Colors.textLight} size={24} />
             </View>
-            <Text style={[styles.actionTitle, !activeService && styles.actionTitleDisabled]}>Manifeste</Text>
+            <Text style={[styles.actionTitle, !activeService && styles.actionTitleDisabled]}>Liste des réservations</Text>
             <Text style={styles.actionSub}>
               {activeService ? `${activeService.nb_tickets} passager(s)` : 'Service requis'}
             </Text>
@@ -318,9 +377,18 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
+  topAvatarImg: {
+    width: 40, height: 40, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.divider,
+  },
   topAvatarText: { color: Colors.white, fontWeight: '800', fontSize: 18 },
   topGreeting: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
   topName: { fontSize: 17, fontWeight: '800', color: Colors.textDark },
+  menuBtn: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
+    marginRight: 4,
+  },
   logoutBtn: {
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',

@@ -1,4 +1,6 @@
 // ─── TuniMove Design System ────────────────────────────────────────────────
+import { Platform } from 'react-native';
+
 export const Colors = {
   // Brand
   primary: '#163A59',
@@ -63,25 +65,34 @@ export const Radius = {
 };
 
 export const Shadow = {
-  card: {
-    shadowColor: '#1E3A5F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  strong: {
-    shadowColor: '#163A59',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  accent: {
-    shadowColor: '#F5B700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
-  },
+  card: Platform.select({
+    web: { boxShadow: '0px 2px 12px rgba(30, 58, 95, 0.08)' },
+    default: {
+      shadowColor: '#1E3A5F',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+  }),
+  strong: Platform.select({
+    web: { boxShadow: '0px 6px 16px rgba(22, 58, 89, 0.15)' },
+    default: {
+      shadowColor: '#163A59',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+  }),
+  accent: Platform.select({
+    web: { boxShadow: '0px 4px 10px rgba(245, 183, 0, 0.3)' },
+    default: {
+      shadowColor: '#F5B700',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+  }),
 };

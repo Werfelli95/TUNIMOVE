@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Modal, Alert
+  TextInput, ActivityIndicator, Modal, Alert, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -353,9 +353,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.danger, height: 56, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, marginTop: Spacing.lg,
-    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+    ...Platform.select({
+      web: { boxShadow: '0px 4px 8px rgba(220, 38, 38, 0.25)' },
+      default: { shadowColor: Colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
+    }),
   },
-  submitBtnDisabled: { backgroundColor: Colors.bgMid, shadowOpacity: 0, elevation: 0 },
+  submitBtnDisabled: { backgroundColor: Colors.bgMid, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0, elevation: 0 } }) },
   submitBtnText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
 
   // Confirm Modal

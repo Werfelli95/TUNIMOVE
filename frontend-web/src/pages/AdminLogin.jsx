@@ -37,23 +37,23 @@ const AdminLogin = () => {
                 .auth-btn:hover:not(:disabled) { background-color: #1F4B6E; }
                 .auth-btn:disabled { opacity: 0.7; cursor: not-allowed; }
             `}</style>
-            
+
             {/* LÈFT PANEL - IMAGE & BRANDING */}
             <div style={{ flex: 1, position: 'relative', background: '#163A59', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '10%', color: 'white' }}>
                 <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url(/images/login_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(22,58,89,0.95), rgba(22,58,89,0.7))' }} />
-                
+
                 <div style={{ position: 'relative', zIndex: 1, maxWidth: '500px' }}>
                     <a href="/login" style={{ display: 'inline-block', background: 'white', padding: '16px 28px', borderRadius: '20px', marginBottom: '48px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
                         <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '80px', width: 'auto', display: 'block' }} />
                     </a>
-                    <motion.h1 
+                    <motion.h1
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, marginBottom: '24px', letterSpacing: '-0.02em' }}
                     >
                         Plateforme intelligente de gestion du transport public
                     </motion.h1>
-                    <motion.p 
+                    <motion.p
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
                         style={{ fontSize: '1.1rem', color: '#94A3B8', fontWeight: 500, lineHeight: 1.6 }}
                     >
@@ -64,7 +64,7 @@ const AdminLogin = () => {
 
             {/* RIGHT PANEL - LOGIN CARD */}
             <div style={{ flex: 1, background: '#F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}
                     style={{ width: '100%', maxWidth: '440px', background: 'white', borderRadius: '20px', padding: '48px', boxShadow: '0 10px 40px rgba(22,58,89,0.08)' }}
                 >
@@ -121,17 +121,13 @@ const AdminLogin = () => {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                            <input type="checkbox" id="remember" style={{ width: '16px', height: '16px', accentColor: '#163A59', cursor: 'pointer' }} />
-                            <label htmlFor="remember" style={{ fontSize: '0.85rem', color: '#64748B', cursor: 'pointer', userSelect: 'none' }}>Se souvenir de moi</label>
-                        </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isSubmitting}
                             className="auth-btn"
-                            style={{ 
-                                width: '100%', padding: '16px', background: '#163A59', color: 'white', border: 'none', borderRadius: '12px', 
+                            style={{
+                                width: '100%', padding: '16px', background: '#163A59', color: 'white', border: 'none', borderRadius: '12px',
                                 fontSize: '1rem', fontWeight: 700, marginTop: '8px', transition: 'all 0.2s',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                             }}

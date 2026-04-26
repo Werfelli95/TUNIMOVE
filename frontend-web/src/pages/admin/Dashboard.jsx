@@ -104,12 +104,13 @@ const Dashboard = () => {
   const [rolesData, setRolesData] = useState(null);
   const [avgPrice, setAvgPrice] = useState(0);
   const [advancedStats, setAdvancedStats] = useState({ topLine: null, avgOccupancy: 0, peakHour: null, todayRevenue: 0 });
+  const [busOccupancy, setBusOccupancy] = useState([]);
   const [period, setPeriod] = useState('week');
 
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const [userRes, busRes, lineRes, guichetRes, revenueRes, passRes, rolesRes, advRes] = await Promise.all([
+        const [userRes, busRes, lineRes, guichetRes, revenueRes, passRes, rolesRes, advRes, occRes] = await Promise.all([
           fetch('http://localhost:5000/api/users/count'),
           fetch('http://localhost:5000/api/buses/active-count'),
           fetch('http://localhost:5000/api/network/count'),
@@ -117,7 +118,8 @@ const Dashboard = () => {
           fetch(`http://localhost:5000/api/sales/stats/revenue?period=${period}`),
           fetch('http://localhost:5000/api/sales/stats/passengers'),
           fetch('http://localhost:5000/api/admin/roles-overview'),
-          fetch('http://localhost:5000/api/sales/stats/advanced').catch(() => null)
+          fetch('http://localhost:5000/api/sales/stats/advanced').catch(() => null),
+          fetch('http://localhost:5000/api/sales/stats/bus-occupancy').catch(() => null)
         ]);
 
         if (userRes.ok) setPersonnelCount((await userRes.json()).count);
@@ -126,7 +128,14 @@ const Dashboard = () => {
         if (guichetRes.ok) setActiveGuichetCount((await guichetRes.json()).activeCount);
         
         if (rolesRes.ok) setRolesData(await rolesRes.json());
-        if (advRes && advRes.ok) setAdvancedStats(await advRes.json());
+        if (advRes && advRes.ok) {
+          const advData = await advRes.json();
+          console.log("Données reçues de l'API (Advanced):", advData);
+          if (advData) {
+            setAdvancedStats(advData);
+          }
+        }
+        if (occRes && occRes.ok) setBusOccupancy(await occRes.json());
 
         if (revenueRes.ok) {
           const revData = await revenueRes.json();
@@ -199,7 +208,7 @@ const Dashboard = () => {
 
       {/* TOP 5 KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', marginBottom: '32px' }}>
-        <PremiumStatCard title="Recette du jour" value={`${(advancedStats.todayRevenue || 0).toFixed(3)} TND`} subtext="Chiffre d'affaires aujourd'hui" icon={<TrendingUp size={28} />} color="amber" />
+        <PremiumStatCard title="Recette du jour" value={`${(advancedStats?.todayRevenue || 0).toFixed(3)} TND`} subtext="Chiffre d'affaires aujourd'hui" icon={<TrendingUp size={28} />} color="amber" />
         <PremiumStatCard title="Guichets actifs" value={activeGuichetCount} subtext="Stations ouvertes à la vente" icon={<Store size={28} />} color="indigo" onClick={() => navigate('/admin-dashboard/assignments')} />
         <PremiumStatCard title="Flotte Active" value={activeBusCount} subtext="Véhicules en service" icon={<Bus size={28} />} color="green" onClick={() => navigate('/admin-dashboard/fleet')} />
         <PremiumStatCard title="Réseau" value={activeLineCount} subtext="Lignes couvertes" icon={<Network size={28} />} color="blue" onClick={() => navigate('/admin-dashboard/network')} />
@@ -255,36 +264,62 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* DISTRIBUTION TICKET CARD */}
         <div style={{ flex: 1, background: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 100%)', borderRadius: '24px', padding: '30px', color: 'white', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-40px', bottom: '-40px', opacity: 0.05, transform: 'rotate(-10deg)' }}>
-            <Users size={250} color="white" />
+            <Bus size={250} color="white" />
           </div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Volume Passagers</h2>
-          <p style={{ margin: '4px 0 30px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Mix tarifaire actuel</p>
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Occupation des Voyages</h2>
+          <p style={{ margin: '4px 0 30px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Taux de remplissage en temps réel</p>
           
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {passengerData.map((item, idx) => {
-              const bgColors = ['#818CF8', '#34D399', '#FBBF24', '#F87171'];
-              const col = item.color !== '#6366f1' ? item.color : bgColors[idx % bgColors.length];
-              const pct = totalTickets > 0 ? (item.value / totalTickets) * 100 : 0;
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {busOccupancy.length > 0 ? busOccupancy.map((trip, idx) => {
+              const pct = (trip.tickets_vendus / trip.capacite) * 100;
+              const isFull = pct >= 90;
               return (
-                <div key={idx}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#E2E8F0' }}>{item.name}</span>
-                    <span style={{ fontSize: '14px', fontWeight: 900 }}>{item.value}</span>
+                <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', background: isFull ? '#F87171' : '#4F46E5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Bus size={18} color="white" />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '14px', fontWeight: 900, display: 'block' }}>Bus {trip.numero_bus}</span>
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{trip.horaire_affecte.substring(0, 5)} • {trip.ville_depart}</span>
+                      </div>
+                    </div>
+                    <span style={{ 
+                      fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', 
+                      background: isFull ? 'rgba(248,113,113,0.2)' : 'rgba(16,185,129,0.2)',
+                      color: isFull ? '#F87171' : '#34D399',
+                      padding: '4px 8px', borderRadius: '6px'
+                    }}>
+                      {isFull ? 'Quasi Plein' : 'Disponible'}
+                    </span>
                   </div>
-                  <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: col, width: `${pct}%`, borderRadius: '99px', transition: 'width 1s ease' }} />
+                  <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
+                    <div style={{ height: '100%', background: isFull ? '#F87171' : '#4F46E5', width: `${pct}%`, borderRadius: '99px', transition: 'width 1s ease' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, color: '#94A3B8' }}>
+                    <span>{trip.tickets_vendus} sièges occupés</span>
+                    <span>{Math.round(pct)}%</span>
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8' }}>
+                Aucun voyage actif aujourd'hui.
+              </div>
+            )}
           </div>
 
-          <div style={{ marginTop: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', padding: '20px', minHeight: '90px' }}>
-            <p style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tickets émis (Période)</p>
-            <h3 style={{ margin: 0, fontSize: '42px', fontWeight: 900 }}>{totalTickets}</h3>
+          <div style={{ marginTop: '30px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+             <div style={{ width: '40px', height: '40px', background: '#4F46E5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={20} />
+             </div>
+             <div>
+                <p style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase' }}>Total Tickets Jour</p>
+                <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>{advancedStats?.todayTicketCount || 0}</h3>
+             </div>
           </div>
         </div>
       </div>

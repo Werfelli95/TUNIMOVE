@@ -332,12 +332,17 @@ const Users = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                   <div style={{
                                     width: 40, height: 40, borderRadius: 12,
-                                    background: `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
-                                    border: `1.5px solid ${cfg.dot}40`,
+                                    background: user.image_url ? 'none' : `linear-gradient(135deg, ${cfg.dot}30, ${cfg.dot}15)`,
+                                    border: user.image_url ? '1.5px solid #E2E8F0' : `1.5px solid ${cfg.dot}40`,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: 13, fontWeight: 800, color: cfg.color, flexShrink: 0,
+                                    overflow: 'hidden'
                                   }}>
-                                    {user.nom?.charAt(0)}{user.prenom?.charAt(0)}
+                                    {user.image_url ? (
+                                      <img src={`http://localhost:5000/${user.image_url}`} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      <>{user.nom?.charAt(0)}{user.prenom?.charAt(0)}</>
+                                    )}
                                   </div>
                                   <div>
                                     <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#0F172A' }}>
@@ -440,12 +445,17 @@ const Users = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{
                         width: 52, height: 52, borderRadius: 16,
-                        background: `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
-                        border: `2px solid ${getRoleCfg(selectedUser.role).dot}50`,
+                        background: selectedUser.image_url ? 'none' : `linear-gradient(135deg, ${getRoleCfg(selectedUser.role).dot}40, ${getRoleCfg(selectedUser.role).dot}20)`,
+                        border: selectedUser.image_url ? '2px solid #E2E8F0' : `2px solid ${getRoleCfg(selectedUser.role).dot}50`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 20, fontWeight: 900, color: getRoleCfg(selectedUser.role).color,
+                        overflow: 'hidden'
                       }}>
-                        {selectedUser.nom?.charAt(0)}{selectedUser.prenom?.charAt(0)}
+                        {selectedUser.image_url ? (
+                          <img src={`http://localhost:5000/${selectedUser.image_url}`} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <>{selectedUser.nom?.charAt(0)}{selectedUser.prenom?.charAt(0)}</>
+                        )}
                       </div>
                       <div>
                         <p style={{ margin: 0, fontWeight: 900, fontSize: 17, color: '#0F172A' }}>

@@ -354,6 +354,8 @@
     border-radius: 8px;
     border: 1px solid #e2e8f0;
     font-weight: 700;
+    white-space: nowrap;
+    display: inline-block;
 }
 
 /* Badges */

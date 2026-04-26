@@ -24,7 +24,13 @@ const Guichet = () => {
 
     // Form state
     const [selectedLigne, setSelectedLigne] = useState('');
-    const [dateVoyage, setDateVoyage] = useState(new Date().toISOString().split('T')[0]);
+    // Calcul de la date d'aujourd'hui et de demain au format YYYY-MM-DD
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const [dateVoyage, setDateVoyage] = useState(todayStr);
     const [horaire, setHoraire] = useState('');
     const [selectedBus, setSelectedBus] = useState('');
     const [arretDepart, setArretDepart] = useState('');
@@ -76,13 +82,13 @@ const Guichet = () => {
                 const tarifData = await tarifRes.json();
                 const tTarifData = await typeTarifRes.json();
                 const bagageData = await typeBagageRes.json();
-                
-                if(tTarifData && !tTarifData.message) {
+
+                if (tTarifData && !tTarifData.message) {
                     setTarifsDb(tTarifData.filter(t => t.actif));
                     const voyageurs = tTarifData.filter(t => t.actif && t.categorie === 'VOYAGEUR');
-                    if(voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification);
+                    if (voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification);
                 }
-                if(bagageData && !bagageData.message) setBagagesDb(bagageData.filter(b => b.actif));
+                if (bagageData && !bagageData.message) setBagagesDb(bagageData.filter(b => b.actif));
 
                 // 2. Si on a un utilisateur connecté, on récupère son guichet pour filtrer
                 // Note: AgentLogin.jsx utilise 'id' et non 'id_utilisateur'
@@ -178,6 +184,12 @@ const Guichet = () => {
     useEffect(() => {
         if (mode === 'Historique') {
             fetchDailySales();
+        } else if (mode === 'Réservations') {
+            // Pour les réservations, on force au moins demain
+            setDateVoyage(tomorrowStr);
+        } else if (mode === 'Vente Directe') {
+            // Pour la vente directe, c'est aujourd'hui
+            setDateVoyage(todayStr);
         }
     }, [mode]);
 
@@ -252,7 +264,7 @@ const Guichet = () => {
     if (tarifConfig && distance > 0 && currentTarif) {
         let basePrice = (distance * tarifConfig.prix_par_km) + parseFloat(tarifConfig.frais_fixes || 0);
         basePriceBreakdown = basePrice;
-        
+
         if (currentTarif.mode_calcul === 'PERCENT_RESTANT') {
             calculatedTotal = basePrice * (currentTarif.valeur / 100);
             reductionBreakdown = basePrice - calculatedTotal;
@@ -447,6 +459,7 @@ const Guichet = () => {
                                     type="date"
                                     className="g-input"
                                     value={dateVoyage}
+                                    min={tomorrowStr} // Empêche de choisir aujourd'hui ou le passé
                                     onChange={(e) => setDateVoyage(e.target.value)}
                                     disabled={activeLigne && !canProceed}
                                 />
@@ -575,16 +588,16 @@ const Guichet = () => {
                         </div>
 
                         {/* SECTION 5: Tarif & Bagage */}
-                        <div className="form-section mb-5 bg-indigo-50 border-indigo-100" style={{border: '1px solid #e0e7ff', padding: '15px', borderRadius: '8px'}}>
-                            <h3 style={{color: '#4f46e5'}}><User size={20} /> Tarification et Suppléments</h3>
-                            
+                        <div className="form-section mb-5 bg-indigo-50 border-indigo-100" style={{ border: '1px solid #e0e7ff', padding: '15px', borderRadius: '8px' }}>
+                            <h3 style={{ color: '#4f46e5' }}><User size={20} /> Tarification et Suppléments</h3>
+
                             <div className="flex-row">
                                 <div className="flex-1">
                                     <label>Catégorie *</label>
                                     <select className="g-select" value={selectedCategory} onChange={(e) => {
                                         setSelectedCategory(e.target.value);
                                         const ops = tarifsDb.filter(t => t.categorie === e.target.value);
-                                        if(ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification);
+                                        if (ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification);
                                         else setSelectedTarifId('');
                                     }}>
                                         <option value="VOYAGEUR">Voyageur (Réductions & Base)</option>
@@ -592,19 +605,19 @@ const Guichet = () => {
                                         <option value="EXPEDITION">Expéditions / Colis</option>
                                     </select>
                                 </div>
-                                
+
                                 <div className="flex-1">
                                     <label>Type de Tarif *</label>
                                     <select className="g-select" value={selectedTarifId} onChange={(e) => setSelectedTarifId(e.target.value)}>
                                         {tarifsDb.filter(t => t.categorie === selectedCategory).map(t => (
                                             <option key={t.id_type_tarification} value={t.id_type_tarification}>
-                                                {t.libelle} ({t.mode_calcul === 'PERCENT_RESTANT' ? t.valeur + '% à payer' : (t.valeur/1000).toFixed(3) + ' TND fix'})
+                                                {t.libelle} ({t.mode_calcul === 'PERCENT_RESTANT' ? t.valeur + '% à payer' : (t.valeur / 1000).toFixed(3) + ' TND fix'})
                                             </option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
-                            
+
                             <div className="flex-row mt-3">
                                 <div className="flex-1">
                                     <label>Bagages supplémentaires (Optionnel)</label>
@@ -612,7 +625,7 @@ const Guichet = () => {
                                         <option value="">-- Aucun supplément bagage --</option>
                                         {bagagesDb.map(b => (
                                             <option key={b.id_type_bagage} value={b.id_type_bagage}>
-                                                {b.libelle} (+ {(b.prix/1000).toFixed(3)} TND)
+                                                {b.libelle} (+ {(b.prix / 1000).toFixed(3)} TND)
                                             </option>
                                         ))}
                                     </select>
@@ -667,8 +680,8 @@ const Guichet = () => {
                                     <strong>{currentTarif ? currentTarif.libelle : '-'}</strong>
                                 </div>
                             </div>
-                            
-                            <div className="summary-breakdown" style={{borderTop: '1px solid #e2e8f0', margin: '15px 0', paddingTop: '15px'}}>
+
+                            <div className="summary-breakdown" style={{ borderTop: '1px solid #e2e8f0', margin: '15px 0', paddingTop: '15px' }}>
                                 <div className="row text-sm text-slate-600">
                                     <span>Prix de Base:</span>
                                     <span>{basePriceBreakdown.toFixed(3)} TND</span>
@@ -782,6 +795,7 @@ const Guichet = () => {
                         <div className="t-info-grid">
                             <span>N° Ticket:</span><strong>T{String(reprintTicket.id_ticket).padStart(3, '0')}</strong>
                             <span>Agent: </span><strong>{agentInfo.matricule}</strong>
+                            <span>Guichet: </span><strong>{myGuichet ? myGuichet.nom_guichet : '-'}</strong>
                             <span>Ligne:</span><strong>Ligne {reprintTicket.num_ligne} ({reprintTicket.ligne_depart} - {reprintTicket.ligne_arrivee})</strong>
                             <span>Départ:</span><strong>{reprintTicket.arret_depart}</strong>
                             <span>Arrivée:</span><strong>{reprintTicket.arret_arrivee}</strong>
@@ -802,11 +816,12 @@ const Guichet = () => {
                     /* Ticket standard après vente */
                     <div className="ticket-print-box">
                         <h1 className="t-logo">TuniMove</h1>
-                        <p className="t-subtitle">Société Nationale de Transport Routier Inter-Gouvernorats</p>
+
 
                         <div className="t-info-grid">
-                            <span>N° Ticket:</span><strong>T003</strong>
+                            <span>N° Ticket:</span><strong>{soldTicketInfo?.id_ticket ? `T${String(soldTicketInfo.id_ticket).padStart(3, '0')}` : '----'}</strong>
                             <span>Agent: </span><strong>{agentInfo.matricule}</strong>
+                            <span>Guichet: </span><strong>{myGuichet ? myGuichet.nom_guichet : '-'}</strong>
                             <span>Ligne:</span><strong>{activeLigne ? `${activeLigne.ville_depart} - ${activeLigne.ville_arrivee}` : ''}</strong>
                             <span>Départ:</span><strong>{arretDepart}</strong>
                             <span>Arrivée:</span><strong>{arretArrivee}</strong>
@@ -823,26 +838,26 @@ const Guichet = () => {
                             )}
                         </div>
 
-                        <div style={{borderBottom: '1px dashed #000', margin:'10px 0'}}></div>
-                        
-                        <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                        <div style={{ borderBottom: '1px dashed #000', margin: '10px 0' }}></div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                             <span>Prix de base:</span>
                             <span>{basePriceBreakdown.toFixed(3)} TND</span>
                         </div>
                         {reductionBreakdown > 0 && (
-                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                                 <span>Réduction:</span>
                                 <span>-{reductionBreakdown.toFixed(3)} TND</span>
                             </div>
                         )}
                         {bagageBreakdown > 0 && (
-                            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '10px'}}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                                 <span>Bagage:</span>
                                 <span>+{bagageBreakdown.toFixed(3)} TND</span>
                             </div>
                         )}
 
-                        <h2 className="t-price" style={{marginTop: '5px'}}>{calculatedTotal.toFixed(3)} TND</h2>
+                        <h2 className="t-price" style={{ marginTop: '5px' }}>{calculatedTotal.toFixed(3)} TND</h2>
 
                         <div className="t-qr" style={{ margin: '15px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
                             <QRCode

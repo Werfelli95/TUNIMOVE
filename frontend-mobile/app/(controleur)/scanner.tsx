@@ -7,12 +7,13 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   CheckCircle, XCircle, AlertCircle, Clock, Zap, ZapOff,
-  LogOut, ChevronDown, Ticket, MapPin, Calendar, History
+  LogOut, ChevronDown, Ticket, MapPin, Calendar, History, Menu
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
 import { SALES_API } from '../../constants/api';
+import SideDrawer from '../../components/SideDrawer';
 
 const { width, height } = Dimensions.get('window');
 const FRAME_SIZE = width * 0.68;
@@ -52,6 +53,8 @@ export default function ScannerScreen() {
   const params = useLocalSearchParams();
   const nom = params.nom as string;
   const prenom = params.prenom as string;
+  const matricule = params.matricule as string;
+  const userId = params.userId as string;
 
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
@@ -61,6 +64,23 @@ export default function ScannerScreen() {
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [history, setHistory] = useState<ScanResult[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get(`${SALES_API.replace('/sales', '/users')}/${userId}`);
+        setUserData(res.data);
+      } catch (err) {
+        console.error('Fetch user error:', err);
+      }
+    };
+    if (userId) fetchUser();
+  }, [userId]);
+
+  const imageUrl = userData?.image_url || params.image_url;
+
   const lastScanned = useRef<string>('');
   const cooldown = useRef(false);
 
@@ -72,7 +92,10 @@ export default function ScannerScreen() {
     setProcessing(true);
 
     try {
-      const res = await axios.post<any>(`${BASE}/scan`, { code_ticket: data });
+      const res = await axios.post<any>(`${BASE}/scan`, { 
+        code_ticket: data,
+        id_controleur: userId 
+      });
       const result: ScanResult = {
         status: 'valid',
         code: data,
@@ -167,6 +190,17 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.root}>
+      <SideDrawer 
+        visible={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        nom={nom}
+        prenom={prenom}
+        matricule={matricule}
+        role="controleur"
+        userId={userId}
+        imageUrl={imageUrl as string}
+        onLogout={handleLogout}
+      />
       {/* ── Camera Full Screen ── */}
       {!showHistory && (
         <CameraView
@@ -218,11 +252,17 @@ export default function ScannerScreen() {
           {/* ── Overlay Top Bar ── */}
           <SafeAreaView style={styles.overlayTop}>
             <View style={styles.scanTopBar}>
-              <View>
-                <Text style={styles.scanTitle}>Contrôle Billets</Text>
-                <Text style={styles.scanAgent}>{prenom} {nom}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                <TouchableOpacity style={styles.menuBtn} onPress={() => setDrawerOpen(true)}>
+                  <Menu color={Colors.white} size={24} />
+                </TouchableOpacity>
+                <View>
+                  <Text style={styles.scanTitle}>Contrôle Billets</Text>
+                  <Text style={styles.scanAgent}>{prenom} {nom}</Text>
+                </View>
               </View>
-              <View style={styles.scanTopActions}>
+
+              <View style={styles.headerRight}>
                 <TouchableOpacity
                   style={styles.iconBtn}
                   onPress={() => setShowHistory(true)}
@@ -233,14 +273,6 @@ export default function ScannerScreen() {
                       <Text style={styles.histBadgeText}>{history.length}</Text>
                     </View>
                   )}
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.iconBtn} 
-                  onPress={handleLogout}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  activeOpacity={0.7}
-                >
-                  <LogOut color={Colors.white} size={20} />
                 </TouchableOpacity>
               </View>
             </View>

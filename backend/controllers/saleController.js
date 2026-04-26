@@ -7,11 +7,14 @@ exports.getSalesHistory = async (req, res) => {
             SELECT 
                 t.id_ticket,
                 t.qr_code,
+                t.heure_depart,
                 t.montant_total as prix,
                 t.date_emission,
+                t.station_depart,
+                t.station_arrivee,
                 COALESCE(l.ville_depart, 'Inconnu') as ville_depart,
                 COALESCE(l.ville_arrivee, 'Inconnu') as ville_arrivee,
-                (COALESCE(l.ville_depart, 'N/A') || ' → ' || COALESCE(l.ville_arrivee, 'N/A')) as trajet
+                (COALESCE(t.station_depart, 'N/A') || ' → ' || COALESCE(t.station_arrivee, 'N/A')) as trajet
             FROM ticket t
             LEFT JOIN service s ON t.id_service = s.id_service
             LEFT JOIN ligne l ON COALESCE(s.num_ligne, t.num_ligne) = l.num_ligne
@@ -24,12 +27,14 @@ exports.getSalesHistory = async (req, res) => {
             id: 'T' + String(sale.id_ticket).padStart(3, '0'),
             ligne: `${sale.ville_depart} - ${sale.ville_arrivee}`,
             trajet: sale.trajet,
+            horaire: new Date(sale.date_emission).toLocaleString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }),
             date: new Date(sale.date_emission).toLocaleString('fr-FR', {
                 year: 'numeric',
                 month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
+                day: '2-digit'
             }),
             isoDate: sale.date_emission,
             prix: `${parseFloat(sale.prix).toFixed(3)} TND`
@@ -288,53 +293,71 @@ exports.getAdvancedStats = async (req, res) => {
     try {
         console.log("Calcul des stats avancées...");
         
-        // 1. Ligne la plus fréquentée (Géré avec CAST pour éviter les erreurs de type)
-        const topLineQuery = `
-            SELECT 
-                CAST(l.num_ligne AS VARCHAR) as num_ligne, 
-                l.ville_depart, 
-                l.ville_arrivee, 
-                COUNT(t.id_ticket) as ticket_count
-            FROM ticket t
-            JOIN ligne l ON CAST(t.num_ligne AS VARCHAR) = CAST(l.num_ligne AS VARCHAR)
-            GROUP BY l.num_ligne, l.ville_depart, l.ville_arrivee
-            ORDER BY ticket_count DESC LIMIT 1
-        `;
-        const topLineResult = await db.query(topLineQuery);
-        const topLine = topLineResult.rows[0];
-
-        // 2. Taux de remplissage moyen
-        const occupancyQuery = `
-            SELECT AVG(occ_rate) as avg_rate FROM (
+        // 1. Recette du jour et Nombre de tickets (PRIORITÉ)
+        let todayRevenue = 0;
+        let todayTicketCount = 0;
+        try {
+            const todayStatsResult = await db.query(`
                 SELECT 
-                    COUNT(t.id_ticket)::float / NULLIF(b.capacite, 0) * 100 as occ_rate
+                    COALESCE(SUM(montant_total), 0) as total,
+                    COUNT(*) as count
+                FROM ticket 
+                WHERE date_emission >= CURRENT_DATE
+            `);
+            todayRevenue = parseFloat(todayStatsResult.rows[0].total || 0);
+            todayTicketCount = parseInt(todayStatsResult.rows[0].count || 0);
+        } catch (e) {
+            console.error("Erreur calcul todayStats:", e);
+        }
+
+        // 2. Ligne la plus fréquentée
+        let topLine = null;
+        try {
+            const topLineQuery = `
+                SELECT 
+                    CAST(l.num_ligne AS VARCHAR) as num_ligne, 
+                    l.ville_depart, 
+                    l.ville_arrivee, 
+                    COUNT(t.id_ticket) as ticket_count
                 FROM ticket t
-                JOIN bus b ON t.id_bus = b.id_bus
-                GROUP BY t.id_bus, t.num_ligne, t.date_voyage, t.heure_depart, b.capacite
-            ) as subquery
-        `;
-        const occupancyResult = await db.query(occupancyQuery);
-        const avgOccupancy = occupancyResult.rows[0]?.avg_rate || 0;
+                JOIN ligne l ON CAST(t.num_ligne AS VARCHAR) = CAST(l.num_ligne AS VARCHAR)
+                GROUP BY l.num_ligne, l.ville_depart, l.ville_arrivee
+                ORDER BY ticket_count DESC LIMIT 1
+            `;
+            const topLineResult = await db.query(topLineQuery);
+            topLine = topLineResult.rows[0];
+        } catch (e) { console.error("Erreur topLine:", e); }
 
-        // 3. Horaire le plus demandé
-        const peakHourQuery = `
-            SELECT 
-                heure_depart, 
-                COUNT(*) as count
-            FROM ticket
-            GROUP BY heure_depart
-            ORDER BY count DESC LIMIT 1
-        `;
-        const peakHourResult = await db.query(peakHourQuery);
-        const peakHour = peakHourResult.rows[0];
+        // 3. Taux de remplissage moyen
+        let avgOccupancy = 0;
+        try {
+            const occupancyQuery = `
+                SELECT AVG(occ_rate) as avg_rate FROM (
+                    SELECT 
+                        COUNT(t.id_ticket)::float / NULLIF(b.capacite, 0) * 100 as occ_rate
+                    FROM ticket t
+                    JOIN bus b ON t.id_bus = b.id_bus
+                    GROUP BY t.id_bus, t.num_ligne, t.date_voyage, t.heure_depart, b.capacite
+                ) as subquery
+            `;
+            const occupancyResult = await db.query(occupancyQuery);
+            avgOccupancy = occupancyResult.rows[0]?.avg_rate || 0;
+        } catch (e) { console.error("Erreur occupancy:", e); }
 
-        // 4. Recette du jour (NOUVEAU)
-        const todayRevenueResult = await db.query(`
-            SELECT COALESCE(SUM(montant_total), 0) as total 
-            FROM ticket 
-            WHERE date_emission >= CURRENT_DATE
-        `);
-        const todayRevenue = parseFloat(todayRevenueResult.rows[0].total);
+        // 4. Horaire le plus demandé
+        let peakHour = null;
+        try {
+            const peakHourQuery = `
+                SELECT 
+                    heure_depart, 
+                    COUNT(*) as count
+                FROM ticket
+                GROUP BY heure_depart
+                ORDER BY count DESC LIMIT 1
+            `;
+            const peakHourResult = await db.query(peakHourQuery);
+            peakHour = peakHourResult.rows[0];
+        } catch (e) { console.error("Erreur peakHour:", e); }
 
         const stats = {
             topLine: topLine ? {
@@ -343,15 +366,16 @@ exports.getAdvancedStats = async (req, res) => {
                 count: parseInt(topLine.ticket_count),
                 distance: 0
             } : null,
-            avgOccupancy: Math.round(parseFloat(avgOccupancy)),
+            avgOccupancy: Math.round(parseFloat(avgOccupancy || 0)),
             peakHour: peakHour ? {
                 time: String(peakHour.heure_depart).substring(0, 5),
                 count: parseInt(peakHour.count)
             } : null,
-            todayRevenue: todayRevenue
+            todayRevenue: todayRevenue,
+            todayTicketCount: todayTicketCount
         };
 
-        console.log("Stats calculées avec succès:", stats);
+        console.log("Stats envoyées au dashboard:", stats);
         res.json(stats);
     } catch (err) {
         console.error('Erreur CRITIQUE getAdvancedStats:', err);
@@ -363,6 +387,7 @@ exports.getAdvancedStats = async (req, res) => {
 exports.scanTicket = async (req, res) => {
     // Supporter à la fois qr_code et code_ticket pour la compatibilité mobile
     const inputCode = req.body.qr_code || req.body.code_ticket;
+    const { id_controleur } = req.body;
     
     if (!inputCode) {
         return res.status(400).json({ message: "Code QR manquant" });
@@ -472,11 +497,11 @@ exports.scanTicket = async (req, res) => {
         // 3. Marquage comme scanné
         const updateQuery = `
             UPDATE ticket 
-            SET est_scanne = TRUE, date_scan = NOW() 
+            SET est_scanne = TRUE, date_scan = NOW(), id_controleur = $2
             WHERE id_ticket = $1
             RETURNING date_scan
         `;
-        const updated = await db.query(updateQuery, [ticket.id_ticket]);
+        const updated = await db.query(updateQuery, [ticket.id_ticket, id_controleur || null]);
         ticketInfo.est_scanne = true;
         ticketInfo.date_scan = updated.rows[0].date_scan;
 
@@ -493,6 +518,42 @@ exports.scanTicket = async (req, res) => {
             error: err.message,
             stack: err.stack
         });
+    }
+};
+
+// Récupérer les scans du jour pour un contrôleur spécifique
+exports.getControleurDailyScans = async (req, res) => {
+    const { controleurId } = req.params;
+    try {
+        const query = `
+            SELECT 
+                t.id_ticket,
+                t.num_ligne,
+                t.id_bus,
+                b.numero_bus,
+                t.date_voyage,
+                t.heure_depart as heure,
+                t.siege,
+                t.montant_total as prix,
+                t.station_depart as arret_depart,
+                t.station_arrivee as arret_arrivee,
+                t.type_tarif,
+                t.date_scan,
+                t.qr_code,
+                l.ville_depart as ligne_depart,
+                l.ville_arrivee as ligne_arrivee
+            FROM ticket t
+            LEFT JOIN bus b ON t.id_bus = b.id_bus
+            LEFT JOIN ligne l ON t.num_ligne::text = l.num_ligne::text
+            WHERE t.id_controleur = $1 
+            AND t.date_scan::date = NOW()::date
+            ORDER BY t.date_scan DESC
+        `;
+        const result = await db.query(query, [controleurId]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getControleurDailyScans:', err);
+        res.status(500).json({ message: 'Erreur lors de la récupération des scans du jour' });
     }
 };
 
@@ -514,7 +575,7 @@ exports.getManifeste = async (req, res) => {
             FROM ticket t
             JOIN bus b ON t.id_bus = b.id_bus
             WHERE b.numero_bus = $1
-              AND t.date_emission::date = NOW()::date
+              AND t.date_voyage::date = CURRENT_DATE
             ORDER BY t.date_emission DESC
         `;
         const result = await db.query(query, [numero_bus]);
@@ -522,5 +583,31 @@ exports.getManifeste = async (req, res) => {
     } catch (err) {
         console.error('Erreur getManifeste:', err);
         res.status(500).json({ message: 'Erreur lors de la récupération du manifeste' });
+    }
+};
+// Récupérer le taux d'occupation des bus pour aujourd'hui
+exports.getBusOccupancy = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                b.numero_bus, 
+                b.capacite,
+                l.ville_depart, 
+                l.ville_arrivee,
+                b.horaire_affecte,
+                (SELECT COUNT(*) FROM ticket t 
+                 WHERE t.id_bus = b.id_bus 
+                 AND t.date_voyage::date = CURRENT_DATE) as tickets_vendus
+            FROM bus b
+            JOIN ligne l ON b.num_ligne = l.num_ligne
+            WHERE b.etat = 'En service'
+            ORDER BY b.horaire_affecte ASC
+            LIMIT 5;
+        `;
+        const result = await db.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getBusOccupancy:', err);
+        res.status(500).json({ message: 'Erreur stats occupation' });
     }
 };
