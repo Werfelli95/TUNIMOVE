@@ -344,7 +344,8 @@ const Guichet = () => {
                 type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
                 id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
                 id_type_bagage: currentBagage ? currentBagage.id_type_bagage : null,
-                prix_bagage: bagageBreakdown
+                prix_bagage: bagageBreakdown,
+                type_ticket: mode
             };
 
             const res = await fetch('http://localhost:5000/api/Sales/tickets/vendre', {
@@ -527,7 +528,7 @@ const Guichet = () => {
                                 </div>
                             </div>
                             <div className="info-bar bg-blue-light">
-                                Sièges disponibles: <strong>{selectedBus ? Math.max(0, capaciteBus - 0) : 0} / {capaciteBus}</strong>
+                                Sièges disponibles: <strong>{selectedBus ? Math.max(0, capaciteBus - occupiedSeats.length) : 0} / {capaciteBus}</strong>
                             </div>
                         </div>
 
@@ -549,7 +550,7 @@ const Guichet = () => {
                                             {activeStations
                                                 .filter(s => s.arret !== arretDepart) // On ne peut pas arriver là où on part
                                                 .map(s => (
-                                                    <option key={s.arret} value={s.arret}>{s.arret} ({s.distance_km} km)</option>
+                                                    <option key={s.arret} value={s.arret}>{s.arret}</option>
                                                 ))}
                                         </select>
                                     </div>
@@ -740,6 +741,7 @@ const Guichet = () => {
                                             <th>Heure</th>
                                             <th>Bus</th>
                                             <th>Siège</th>
+                                            <th>Type</th>
                                             <th>Trajet (Arrêts)</th>
                                             <th>Tarif</th>
                                             <th>Prix</th>
@@ -760,6 +762,20 @@ const Guichet = () => {
                                                 <td><span className="time-badge">{t.heure.substring(0, 5)}</span></td>
                                                 <td><span className="bus-badge">Bus {t.numero_bus}</span></td>
                                                 <td><span className="seat-badge">{t.siege}</span></td>
+                                                <td>
+                                                    <span style={{ 
+                                                        padding: '4px 10px', 
+                                                        borderRadius: '8px', 
+                                                        fontSize: '0.8rem', 
+                                                        fontWeight: 700,
+                                                        background: t.type_ticket === 'Directe' ? '#ecfdf5' : '#eff6ff',
+                                                        color: t.type_ticket === 'Directe' ? '#059669' : '#2563eb',
+                                                        border: `1px solid ${t.type_ticket === 'Directe' ? '#10b981' : '#3b82f6'}`,
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {t.type_ticket}
+                                                    </span>
+                                                </td>
                                                 <td className="text-sm font-medium text-slate-600">
                                                     <div className="flex items-center gap-2">
                                                         <span className="opacity-60">{t.arret_depart}</span>

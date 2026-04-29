@@ -46,6 +46,7 @@ export default function VenteScreen() {
   const prenom      = params.prenom as string;
   const paramHoraire = params.horaire as string;
   const matricule   = params.matricule as string;
+  const userId      = params.userId as string;
 
   // ── Data
   const [ligne, setLigne]         = useState<Ligne | null>(null);
@@ -229,7 +230,7 @@ export default function VenteScreen() {
         prix, 
         arret_depart: depart, 
         arret_arrivee: arrivee,
-        agent_id: null, 
+        agent_id: userId ? parseInt(userId) : null, 
         type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
         id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
         id_type_bagage: currentBagage ? currentBagage.id_type_bagage : null,

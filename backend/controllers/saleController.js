@@ -14,7 +14,9 @@ exports.getSalesHistory = async (req, res) => {
                 t.station_arrivee,
                 COALESCE(l.ville_depart, 'Inconnu') as ville_depart,
                 COALESCE(l.ville_arrivee, 'Inconnu') as ville_arrivee,
-                (COALESCE(t.station_depart, 'N/A') || ' → ' || COALESCE(t.station_arrivee, 'N/A')) as trajet
+                (COALESCE(t.station_depart, 'N/A') || ' → ' || COALESCE(t.station_arrivee, 'N/A')) as trajet,
+                t.type_ticket,
+                t.date_voyage
             FROM ticket t
             LEFT JOIN service s ON t.id_service = s.id_service
             LEFT JOIN ligne l ON COALESCE(s.num_ligne, t.num_ligne) = l.num_ligne
@@ -37,7 +39,10 @@ exports.getSalesHistory = async (req, res) => {
                 day: '2-digit'
             }),
             isoDate: sale.date_emission,
-            prix: `${parseFloat(sale.prix).toFixed(3)} TND`
+            prix: `${parseFloat(sale.prix).toFixed(3)} TND`,
+            type: (sale.type_ticket === 'Directe' || sale.type_ticket === 'Vente Directe') ? 'Directe' : 
+                  (sale.type_ticket === 'Réservations' || sale.type_ticket === 'Réservation') ? 'Réservations' :
+                  (new Date(sale.date_voyage).toDateString() === new Date(sale.date_emission).toDateString() ? 'Directe' : 'Réservations')
         }));
 
         res.json(formattedSales);
@@ -61,16 +66,22 @@ exports.sellTicket = async (req, res) => {
         type_tarif,
         id_type_tarification,
         id_type_bagage,
-        prix_bagage
+        prix_bagage,
+        type_ticket,
+        id_service: provided_id_service
     } = req.body;
 
     try {
-        // 1. Tenter de trouver un service correspondant pour lier le ticket
-        const serviceLookup = await db.query(
-            "SELECT id_service FROM service WHERE num_ligne = $1 AND date_service = $2 AND id_bus = (SELECT id_bus FROM bus WHERE numero_bus = $3 LIMIT 1) LIMIT 1",
-            [num_ligne, date_voyage, bus]
-        );
-        const id_service = serviceLookup.rows.length > 0 ? serviceLookup.rows[0].id_service : null;
+        let id_service = provided_id_service;
+
+        // 1. Si l'id_service n'est pas fourni, tenter de trouver un service correspondant
+        if (!id_service) {
+            const serviceLookup = await db.query(
+                "SELECT id_service FROM service WHERE num_ligne = $1 AND date_service = $2 AND id_bus = (SELECT id_bus FROM bus WHERE numero_bus = $3 LIMIT 1) AND statut = 'En cours' LIMIT 1",
+                [num_ligne, date_voyage, bus]
+            );
+            id_service = serviceLookup.rows.length > 0 ? serviceLookup.rows[0].id_service : null;
+        }
 
         const code_ticket = 'TKT' + Math.floor(Math.random() * 1000000);
         const qr_code = code_ticket; // Utiliser le code ticket comme QR code unique
@@ -80,13 +91,15 @@ exports.sellTicket = async (req, res) => {
                 num_ligne, id_bus, date_voyage, heure_depart, siege, montant_total,
                 station_depart, station_arrivee, id_agent, type_tarif, date_emission, 
                 code_ticket, qr_code, id_service,
-                id_type_tarification, id_type_bagage, prix_bagage
+                id_type_tarification, id_type_bagage, prix_bagage,
+                type_ticket
             ) VALUES (
                 $1, 
                 (SELECT id_bus FROM bus WHERE numero_bus = $2 LIMIT 1), 
                 $3, $4, $5, $6, $7, $8, $9, $10, NOW(), 
                 $11, $12, $13,
-                $14, $15, $16
+                $14, $15, $16,
+                $17
             )
             RETURNING id_ticket
         `;
@@ -107,7 +120,8 @@ exports.sellTicket = async (req, res) => {
             id_service,
             id_type_tarification || null,
             id_type_bagage || null,
-            prix_bagage || 0
+            prix_bagage || 0,
+            type_ticket || 'Vente Directe'
         ]);
 
         res.status(201).json({ 
@@ -273,7 +287,8 @@ exports.getAgentDailySales = async (req, res) => {
                 t.date_emission,
                 t.qr_code,
                 l.ville_depart as ligne_depart,
-                l.ville_arrivee as ligne_arrivee
+                l.ville_arrivee as ligne_arrivee,
+                t.type_ticket
             FROM ticket t
             LEFT JOIN bus b ON t.id_bus = b.id_bus
             LEFT JOIN ligne l ON t.num_ligne = l.num_ligne
@@ -282,7 +297,15 @@ exports.getAgentDailySales = async (req, res) => {
             ORDER BY t.date_emission DESC
         `;
         const result = await db.query(query, [agentId]);
-        res.json(result.rows);
+        
+        const formattedSales = result.rows.map(t => ({
+            ...t,
+            type_ticket: (t.type_ticket === 'Directe' || t.type_ticket === 'Vente Directe') ? 'Directe' : 
+                         (t.type_ticket === 'Réservations' || t.type_ticket === 'Réservation') ? 'Réservations' :
+                         (new Date(t.date_voyage).toDateString() === new Date(t.date_emission).toDateString() ? 'Directe' : 'Réservations')
+        }));
+        
+        res.json(formattedSales);
     } catch (err) {
         console.error('Erreur getAgentDailySales:', err);
         res.status(500).json({ message: 'Erreur lors de la récupération des ventes du jour' });

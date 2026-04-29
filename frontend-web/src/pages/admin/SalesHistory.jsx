@@ -9,6 +9,7 @@ const SalesHistory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [filterType, setFilterType] = useState('ALL'); // ALL, DIRECTE, RESERVATION
 
     useEffect(() => {
         fetchSales();
@@ -18,7 +19,12 @@ const SalesHistory = () => {
         try {
             const response = await fetch('http://localhost:5000/api/sales');
             const data = await response.json();
-            setSales(data);
+            if (Array.isArray(data)) {
+                setSales(data);
+            } else {
+                console.error('Format de données invalide:', data);
+                setSales([]);
+            }
         } catch (error) {
             console.error('Erreur:', error);
         } finally {
@@ -28,7 +34,8 @@ const SalesHistory = () => {
 
     const filteredSales = sales.filter(sale => {
         const matchesSearch = sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            sale.ligne.toLowerCase().includes(searchTerm.toLowerCase());
+            sale.ligne.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            sale.type.toLowerCase().includes(searchTerm.toLowerCase());
 
         let matchesStart = true;
         let matchesEnd = true;
@@ -49,12 +56,17 @@ const SalesHistory = () => {
             }
         }
 
-        return matchesSearch && matchesStart && matchesEnd;
+        const matchesFilter = filterType === 'ALL' || 
+            (filterType === 'DIRECTE' && sale.type === 'Directe') ||
+            (filterType === 'RESERVATION' && sale.type === 'Réservations');
+            
+        return matchesSearch && matchesStart && matchesEnd && matchesFilter;
     });
 
     // Calcul du revenu total
     const totalRevenue = filteredSales.reduce((sum, sale) => {
-        const prixNum = parseFloat(sale.prix.replace(' TND', ''));
+        const prixStr = sale.prix ? String(sale.prix) : '0';
+        const prixNum = parseFloat(prixStr.replace(' TND', ''));
         return sum + (isNaN(prixNum) ? 0 : prixNum);
     }, 0);
 
@@ -86,17 +98,79 @@ const SalesHistory = () => {
                             onChange={(e) => setEndDate(e.target.value)}
                         />
                     </div>
-                    <div className="search-wrapper">
-                        <Search className="search-icon" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Rechercher un ticket (ID, Ligne...)"
-                            className="search-input"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
                 </div>
+            </div>
+
+            {/* SEARCH BAR */}
+            <div style={{ marginBottom: 16 }}>
+                <div className="search-wrapper search-wrapper--light" style={{ width: '100%' }}>
+                    <Search className="search-icon" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Rechercher un ticket (ID, Ligne, Type...)"
+                        className="search-input"
+                        style={{ width: '100%' }}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem' }}>
+                <button 
+                    onClick={() => setFilterType('ALL')}
+                    style={{
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        transition: 'all 0.2s',
+                        cursor: 'pointer',
+                        background: filterType === 'ALL' ? '#4f46e5' : 'white',
+                        color: filterType === 'ALL' ? 'white' : '#64748b',
+                        border: '1px solid',
+                        borderColor: filterType === 'ALL' ? '#4f46e5' : '#e2e8f0',
+                        boxShadow: filterType === 'ALL' ? '0 4px 12px rgba(79, 70, 229, 0.2)' : 'none'
+                    }}
+                >
+                    Tous les tickets
+                </button>
+                <button 
+                    onClick={() => setFilterType('DIRECTE')}
+                    style={{
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        transition: 'all 0.2s',
+                        cursor: 'pointer',
+                        background: filterType === 'DIRECTE' ? '#10b981' : 'white',
+                        color: filterType === 'DIRECTE' ? 'white' : '#64748b',
+                        border: '1px solid',
+                        borderColor: filterType === 'DIRECTE' ? '#10b981' : '#e2e8f0',
+                        boxShadow: filterType === 'DIRECTE' ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
+                    }}
+                >
+                    Vente Directe
+                </button>
+                <button 
+                    onClick={() => setFilterType('RESERVATION')}
+                    style={{
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        transition: 'all 0.2s',
+                        cursor: 'pointer',
+                        background: filterType === 'RESERVATION' ? '#3b82f6' : 'white',
+                        color: filterType === 'RESERVATION' ? 'white' : '#64748b',
+                        border: '1px solid',
+                        borderColor: filterType === 'RESERVATION' ? '#3b82f6' : '#e2e8f0',
+                        boxShadow: filterType === 'RESERVATION' ? '0 4px 12px rgba(59, 130, 246, 0.2)' : 'none'
+                    }}
+                >
+                    Réservations
+                </button>
             </div>
 
             <AnimatePresence>
@@ -151,6 +225,7 @@ const SalesHistory = () => {
                                     <th>ID_Ticket</th>
                                     <th>Ligne</th>
                                     <th>Trajet</th>
+                                    <th>Type</th>
                                     <th>Date</th>
                                     <th>Horaire</th>
                                     <th style={{ textAlign: 'center' }}>Prix</th>
@@ -172,6 +247,19 @@ const SalesHistory = () => {
                                                     <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1.1rem' }}>{sale.ligne}</div>
                                                 </td>
                                                 <td><span className="user-matricule" style={{ fontStyle: 'italic', fontSize: '1.05rem' }}>{sale.trajet}</span></td>
+                                                <td>
+                                                    <span style={{ 
+                                                        padding: '4px 10px', 
+                                                        borderRadius: '8px', 
+                                                        fontSize: '0.85rem', 
+                                                        fontWeight: 700,
+                                                        background: sale.type === 'Directe' ? '#ecfdf5' : '#eff6ff',
+                                                        color: sale.type === 'Directe' ? '#059669' : '#2563eb',
+                                                        border: `1px solid ${sale.type === 'Directe' ? '#10b981' : '#3b82f6'}`
+                                                    }}>
+                                                        {sale.type}
+                                                    </span>
+                                                </td>
                                                 <td style={{ fontSize: '1.05rem', fontWeight: 600 }}>{sale.date}</td>
                                                 <td>
                                                     <div style={{ 
@@ -191,7 +279,7 @@ const SalesHistory = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="6" className="empty-state">Aucune vente trouvée.</td>
+                                            <td colSpan="7" className="empty-state">Aucune vente trouvée.</td>
                                         </tr>
                                     )}
                                 </AnimatePresence>

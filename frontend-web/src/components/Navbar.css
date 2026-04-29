@@ -579,3 +579,38 @@
   font-weight: 600 !important;
   color: #94a3b8 !important;
 }
+
+/* Global Print Styles for Admin Layout */
+@media print {
+  /* Masquer Sidebar et Header global */
+  .sidebar, header, .navbar, .notif-badge, .notif-dropdown, .fixed {
+    display: none !important;
+  }
+
+  /* Réinitialiser le layout principal */
+  .admin-layout {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .main-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .content-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Forcer l'affichage de la page courante */
+  body, html {
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+}

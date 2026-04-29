@@ -28,10 +28,9 @@ const AdminLayout = () => {
         const res = await fetch('http://localhost:5000/api/admin/notifications');
         if (res.ok) {
           const data = await res.json();
-          // Si le nombre total augmente, on joue un son
+          // Si le nombre total augmente
           if (data.total > prevTotalRef.current) {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play().catch(() => {/* Bloqué par le navigateur */});
+            // Notification logic here if needed (e.g. visual toast)
           }
           setNotifs(data);
           prevTotalRef.current = data.total;

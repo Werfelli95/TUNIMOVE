@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Plus, Edit2, Trash2, Loader2, X, Search, Eye, MapPin, Clock, ShieldCheck, ChevronRight, Users } from 'lucide-react';
+import { Bus, Plus, Edit2, Trash2, Loader2, X, Search, Eye, MapPin, Clock, ShieldCheck, ChevronRight, Users, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css';
 
@@ -117,6 +117,43 @@ const Fleet = () => {
 
   const stat = { total: buses.length, active: buses.filter(b => b.etat?.toLowerCase() === 'en service').length, maintenance: buses.filter(b => b.etat?.toLowerCase() === 'maintenance').length };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    const tableHtml = document.querySelector('.enterprise-table').outerHTML;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Liste de la Flotte - TuniMove</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { color: #1e293b; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+            th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+            .user-info-cell { display: flex; align-items: center; gap: 10px; }
+            .user-avatar { display: none; }
+            .row-actions, .btn-add-user, .search-wrapper, .action-btn { display: none !important; }
+            .role-badge { border: 1px solid #ccc; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>État de la Flotte TuniMove</h1>
+          <p>Généré le : ${new Date().toLocaleString()}</p>
+          <p>Statistiques : ${stat.total} bus au total | ${stat.active} en service</p>
+          ${tableHtml}
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <>
       <style>{`
@@ -134,15 +171,24 @@ const Fleet = () => {
             <p>{stat.total} véhicules · {stat.active} en service · {stat.maintenance} en maintenance</p>
           </div>
           <div className="header-actions">
-            <div className="search-wrapper">
-              <Search className="search-icon" size={16} />
-              <input type="text" placeholder="Rechercher numéro ou état..." className="search-input"
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-            </div>
+            <button className="btn-add-user" style={{ background: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }} onClick={handlePrint}>
+              <Printer size={16} />
+              <span>Imprimer Liste</span>
+            </button>
             <button className="btn-add-user" onClick={handleOpenAdd}>
               <Plus size={16} />
               <span>Ajouter Bus</span>
             </button>
+          </div>
+        </div>
+
+        {/* SEARCH BAR */}
+        <div style={{ marginBottom: 16 }}>
+          <div className="search-wrapper search-wrapper--light" style={{ width: '100%' }}>
+            <Search className="search-icon" size={16} />
+            <input type="text" placeholder="Rechercher par numéro ou état..." className="search-input"
+              style={{ width: '100%' }}
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
         </div>
 

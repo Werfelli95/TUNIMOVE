@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Edit2, Trash2, UserPlus, Loader2, Search, Lock, Unlock, X,
   ShieldCheck, User, Users as UsersIcon, Store, Eye,
-  Mail, Phone, Hash, ChevronRight
+  Mail, Phone, Hash, ChevronRight, Printer
 } from 'lucide-react';
 import './Users.css';
 
@@ -234,6 +234,43 @@ const Users = () => {
     { id: 'CONTROLEUR', label: 'Contrôleurs', icon: <Eye size={14} />, count: users.filter(u => u.role?.toUpperCase() === 'CONTROLEUR').length },
   ];
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    const tableHtml = document.querySelector('.enterprise-table').outerHTML;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Liste des Utilisateurs - TuniMove</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { color: #1e293b; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+            th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+            .user-info-cell { display: flex; align-items: center; gap: 10px; }
+            .user-avatar { display: none; }
+            .row-actions, .btn-add-user, .search-wrapper { display: none !important; }
+            .role-badge { border: 1px solid #ccc; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+            .user-matricule { font-family: monospace; background: #f1f5f9; padding: 2px 4px; }
+          </style>
+        </head>
+        <body>
+          <h1>Liste des Collaborateurs - TuniMove</h1>
+          <p>Généré le : ${new Date().toLocaleString()}</p>
+          ${tableHtml}
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <>
       <style>{`
@@ -252,15 +289,29 @@ const Users = () => {
             <p>Interface d'administration des accès et profils utilisateurs</p>
           </div>
           <div className="header-actions">
-            <div className="search-wrapper">
-              <Search className="search-icon" size={16} />
-              <input type="text" placeholder="Rechercher par nom, email, matricule..." className="search-input"
-                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
+            <button className="btn-add-user" style={{ background: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }} onClick={handlePrint}>
+              <Printer size={16} />
+              <span>Imprimer</span>
+            </button>
             <button className="btn-add-user" onClick={handleOpenModal}>
               <UserPlus size={16} />
               <span>Ajouter</span>
             </button>
+          </div>
+        </div>
+
+        {/* SEARCH BAR */}
+        <div style={{ marginBottom: 16 }}>
+          <div className="search-wrapper search-wrapper--light" style={{ maxWidth: '100%', width: '100%' }}>
+            <Search className="search-icon" size={16} />
+            <input
+              type="text"
+              placeholder="Rechercher par nom, email, matricule..."
+              className="search-input"
+              style={{ width: '100%' }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
 

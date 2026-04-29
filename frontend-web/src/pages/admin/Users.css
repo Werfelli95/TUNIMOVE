@@ -187,6 +187,33 @@
     color: rgba(255,255,255,0.8);
 }
 
+/* Light variant (outside dark header) */
+.search-wrapper--light .search-icon {
+    color: #94A3B8;
+}
+
+.search-wrapper--light .search-input {
+    background: #F8FAFC;
+    border: 1.5px solid #E2E8F0;
+    color: #1E293B;
+    backdrop-filter: none;
+}
+
+.search-wrapper--light .search-input::placeholder {
+    color: #94A3B8;
+}
+
+.search-wrapper--light .search-input:focus {
+    background: #ffffff;
+    border-color: #6366F1;
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+    outline: none;
+}
+
+.search-wrapper--light:focus-within .search-icon {
+    color: #6366F1;
+}
+
 /* Date Filters */
 .date-filter {
     display: flex;
@@ -1229,4 +1256,60 @@ tr:hover .row-actions {
 
 .btn-danger-premium:active {
     transform: scale(0.95);
+}
+
+/* Print Styles */
+@media print {
+    /* Masquer uniquement la navigation et les boutons */
+    .sidebar, 
+    header, 
+    .header-actions, 
+    .search-wrapper, 
+    .row-actions,
+    .btn-add-user,
+    .btn-modifier,
+    .btn-danger-premium,
+    .modal-overlay {
+        display: none !important;
+    }
+
+    /* Ajuster les marges pour le layout */
+    .admin-layout, .main-wrapper, .content-area {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .users-container {
+        padding: 10px !important;
+        max-width: 100% !important;
+        animation: none !important;
+    }
+
+    /* Style simple pour le tableau */
+    .users-table-card {
+        box-shadow: none !important;
+        border: 1px solid #eee !important;
+    }
+
+    .enterprise-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    .enterprise-table th, 
+    .enterprise-table td {
+        border-bottom: 1px solid #eee !important;
+        padding: 8px !important;
+        font-size: 10pt !important;
+    }
+
+    /* Forcer le texte en noir */
+    * {
+        color: black !important;
+        text-shadow: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
 }

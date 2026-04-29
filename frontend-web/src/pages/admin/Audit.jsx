@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, Loader2, History, Bus, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Loader2, History, Bus, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On utilise tes styles existants
 
 const Audit = () => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchRecords = async () => {
         try {
@@ -41,6 +42,21 @@ const Audit = () => {
                 </div>
             </div>
 
+            {/* SEARCH BAR */}
+            <div style={{ marginBottom: 16 }}>
+                <div className="search-wrapper search-wrapper--light" style={{ width: '100%' }}>
+                    <Search className="search-icon" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Rechercher par receveur, ligne, bus..."
+                        className="search-input"
+                        style={{ width: '100%' }}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
+            </div>
+
             <div className="users-table-card">
                 {loading ? (
                     <div className="loading-state" style={{ padding: '5rem', textAlign: 'center' }}>
@@ -65,8 +81,12 @@ const Audit = () => {
                             </thead>
                             <tbody>
                                 <AnimatePresence mode='popLayout'>
-                                    {records.length > 0 ? (
-                                        records.map(r => (
+                                    {(records.filter(r =>
+                                        `${r.receveur_prenom} ${r.receveur_nom} ${r.num_ligne} ${r.numero_bus} ${r.ville_depart} ${r.ville_arrivee}`.toLowerCase().includes(searchQuery.toLowerCase())
+                                    )).length > 0 ? (
+                                        records.filter(r =>
+                                            `${r.receveur_prenom} ${r.receveur_nom} ${r.num_ligne} ${r.numero_bus} ${r.ville_depart} ${r.ville_arrivee}`.toLowerCase().includes(searchQuery.toLowerCase())
+                                        ).map(r => (
                                             <motion.tr key={r.id_fiche} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                                 <td style={{ fontWeight: 700, color: '#64748b', fontSize: '1.05rem' }}>#A{String(r.id_fiche).padStart(3, '0')}</td>
                                                 <td>

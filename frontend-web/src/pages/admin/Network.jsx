@@ -9,6 +9,7 @@ import './Users.css';
 const Network = () => {
     const [lines, setLines] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
@@ -84,6 +85,10 @@ const Network = () => {
         setFormData({ ...formData, horaires: newH });
     };
 
+    const filteredLines = lines.filter(l =>
+        `${l.ville_depart} ${l.ville_arrivee} ${l.num_ligne}`.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
         <div className="users-container">
             <div className="users-header-card">
@@ -94,6 +99,21 @@ const Network = () => {
                 <button className="btn-add-user" onClick={() => handleOpenModal()}>
                     <Plus size={20} /> Nouvelle Ligne
                 </button>
+            </div>
+
+            {/* SEARCH BAR */}
+            <div style={{ marginBottom: 16 }}>
+                <div className="search-wrapper search-wrapper--light" style={{ width: '100%' }}>
+                    <Search className="search-icon" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Rechercher par ville départ, arrivée ou numéro..."
+                        className="search-input"
+                        style={{ width: '100%' }}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
             </div>
 
             <div className="users-table-card">
@@ -111,7 +131,7 @@ const Network = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {lines.map(line => (
+                            {filteredLines.map(line => (
                                 <tr key={line.num_ligne}>
                                     <td>
                                         <div className="user-info-cell">
