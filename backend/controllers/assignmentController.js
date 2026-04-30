@@ -43,15 +43,25 @@ exports.getAssignments = async (req, res) => {
     }
 };
 
-// 3. Liste des receveurs disponibles (Ne change pas)
+// 3. Liste des receveurs disponibles (Ne change pas pour l'ancien tab, mais supporte all=true pour le nouveau)
 exports.getAvailableReceivers = async (req, res) => {
     try {
-        const query = `
-            SELECT id_utilisateur, nom, prenom 
-            FROM utilisateur 
-            WHERE LOWER(role) = 'receveur' 
-            AND id_utilisateur NOT IN (SELECT id_receveur FROM bus WHERE id_receveur IS NOT NULL)
-        `;
+        const { all } = req.query;
+        let query;
+        if (all === 'true') {
+            query = `
+                SELECT id_utilisateur, nom, prenom 
+                FROM utilisateur 
+                WHERE LOWER(role) = 'receveur'
+            `;
+        } else {
+            query = `
+                SELECT id_utilisateur, nom, prenom 
+                FROM utilisateur 
+                WHERE LOWER(role) = 'receveur' 
+                AND id_utilisateur NOT IN (SELECT id_receveur FROM bus WHERE id_receveur IS NOT NULL)
+            `;
+        }
         const result = await db.query(query);
         res.json(result.rows);
     } catch (err) {

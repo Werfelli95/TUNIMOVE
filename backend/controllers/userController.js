@@ -138,6 +138,58 @@ exports.getUserById = async (req, res) => {
 };
 
 // Mettre à jour un utilisateur (Profil)
+/**
+ * PATCH /api/users/:id/role
+ * Change the role of a user (Admin only).
+ * Blocked if user has an active service.
+ */
+exports.updateUserRole = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role } = req.body;
+
+        const validRoles = ['ADMIN', 'RECEVEUR', 'AGENT', 'CONTROLEUR'];
+        if (!role || !validRoles.includes(role.toUpperCase())) {
+            return res.status(400).json({ message: `Rôle invalide. Valeurs acceptées : ${validRoles.join(', ')}` });
+        }
+
+        // Check user exists
+        const userCheck = await db.query(
+            'SELECT id_utilisateur, nom, prenom, role FROM utilisateur WHERE id_utilisateur = $1',
+            [id]
+        );
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Utilisateur introuvable.' });
+        }
+
+        // Check for active service — wrapped in its own try/catch in case the column doesn't exist yet
+        try {
+            const activeService = await db.query(
+                `SELECT id_service FROM service WHERE id_receveur = $1 AND statut = 'En cours' LIMIT 1`,
+                [id]
+            );
+            if (activeService.rows.length > 0) {
+                return res.status(409).json({
+                    message: 'Impossible de changer le rôle : cet utilisateur a un service actif en cours.'
+                });
+            }
+        } catch (svcErr) {
+            // If the service table / column doesn't exist yet, log and continue
+            console.warn('updateUserRole: service check skipped -', svcErr.message);
+        }
+
+        const result = await db.query(
+            'UPDATE utilisateur SET role = $1 WHERE id_utilisateur = $2 RETURNING id_utilisateur, nom, prenom, role',
+            [role.toUpperCase(), id]
+        );
+
+        res.json({ message: 'Rôle mis à jour avec succès.', user: result.rows[0] });
+    } catch (error) {
+        console.error('Erreur updateUserRole:', error);
+        res.status(500).json({ message: 'Erreur serveur lors du changement de rôle.' });
+    }
+};
+
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;

@@ -23,3 +23,4 @@ export const NETWORK_API = `${API_BASE_URL}/network`;
 export const INCIDENTS_API = `${API_BASE_URL}/incidents`;
 export const TARIFS_API = `${API_BASE_URL}/tarifs`;
 export const TARIFICATION_API = `${API_BASE_URL}/tarification`;
+export const AFFECTATIONS_API = `${API_BASE_URL}/affectations`;

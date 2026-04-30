@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Edit2, Trash2, UserPlus, Loader2, Search, Lock, Unlock, X,
   ShieldCheck, User, Users as UsersIcon, Store, Eye,
-  Mail, Phone, Hash, ChevronRight, Printer
+  Mail, Phone, Hash, ChevronRight, Printer, RefreshCw
 } from 'lucide-react';
 import './Users.css';
 
@@ -47,6 +47,13 @@ const InfoRow = ({ icon: Icon, label, value, color = '#6366F1' }) => (
 );
 
 /* ══════════════ MAIN COMPONENT ═══════════════════════════════ */
+const ROLE_OPTIONS = [
+  { value: 'ADMIN',        label: 'Administrateur' },
+  { value: 'AGENT',        label: 'Agent de Guichet' },
+  { value: 'RECEVEUR',    label: 'Receveur'         },
+  { value: 'CONTROLEUR',  label: 'Contrôleur'       },
+];
+
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +63,7 @@ const Users = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [selectedUser, setSelectedUser] = useState(null); 
+  const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({
     nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: 'AGENT', mot_de_passe: ''
   });
@@ -66,6 +73,12 @@ const Users = () => {
   const [editForm, setEditForm] = useState({
     nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: '', image_url: null
   });
+  // Role change state
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState(null);
+  const [newRoleValue, setNewRoleValue] = useState('');
+  const [roleChangeError, setRoleChangeError] = useState(null);
+  const [roleChangeLoading, setRoleChangeLoading] = useState(false);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -207,14 +220,55 @@ const Users = () => {
     } catch (err) { alert(err.message); }
   };
 
+  // Open role change modal
+  const handleOpenRoleModal = (user, e) => {
+    e.stopPropagation();
+    setRoleChangeTarget(user);
+    setNewRoleValue(user.role?.toUpperCase() || '');
+    setRoleChangeError(null);
+    setIsRoleModalOpen(true);
+  };
+
+  const handleConfirmRoleChange = async () => {
+    if (!newRoleValue || newRoleValue === roleChangeTarget?.role?.toUpperCase()) {
+      setRoleChangeError('Veuillez choisir un rôle différent du rôle actuel.');
+      return;
+    }
+    setRoleChangeLoading(true);
+    setRoleChangeError(null);
+    try {
+      const res = await fetch(`http://localhost:5000/api/users/${roleChangeTarget.id_utilisateur}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRoleValue }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Erreur lors du changement de rôle');
+      // Update users list locally
+      setUsers(prev => prev.map(u =>
+        u.id_utilisateur === roleChangeTarget.id_utilisateur ? { ...u, role: newRoleValue } : u
+      ));
+      if (selectedUser?.id_utilisateur === roleChangeTarget.id_utilisateur) {
+        setSelectedUser(prev => ({ ...prev, role: newRoleValue }));
+      }
+      setIsRoleModalOpen(false);
+    } catch (err) {
+      setRoleChangeError(err.message);
+    } finally {
+      setRoleChangeLoading(false);
+    }
+  };
+
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/users');
       const data = await response.json();
-      setUsers(data);
+      if (!response.ok) throw new Error(data.message || 'Erreur API');
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) { 
       setError(err.message);
+      setUsers([]);
     } finally { setLoading(false); }
   };
 
@@ -436,6 +490,14 @@ const Users = () => {
                                   <button title="Modifier" className="action-btn btn-edit" onClick={() => handleEditClick(user)}>
                                     <Edit2 size={15} />
                                   </button>
+                                  <button
+                                    title="Changer le rôle"
+                                    className="action-btn"
+                                    style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}
+                                    onClick={(e) => handleOpenRoleModal(user, e)}
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
                                   <button title={user.est_bloque ? 'Débloquer' : 'Restreindre'}
                                     className="action-btn btn-lock"
                                     onClick={() => handleToggleBlock(user.id_utilisateur, user.est_bloque)}>
@@ -544,29 +606,42 @@ const Users = () => {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
                     <button
-                      onClick={() => handleToggleBlock(selectedUser.id_utilisateur, selectedUser.est_bloque)}
+                      onClick={(e) => handleOpenRoleModal(selectedUser, e)}
                       style={{
-                        flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', border: '1.5px solid #E2E8F0',
-                        background: selectedUser.est_bloque ? '#FEF2F2' : '#FFFBEB',
-                        color: selectedUser.est_bloque ? '#DC2626' : '#D97706',
-                        transition: 'all 0.15s',
+                        width: '100%', padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                        cursor: 'pointer', border: '1.5px solid rgba(99,102,241,0.3)',
+                        background: 'rgba(99,102,241,0.08)', color: '#4F46E5',
+                        transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                       }}
                     >
-                      {selectedUser.est_bloque ? '🔓 Débloquer' : '🔒 Bloquer'}
+                      <RefreshCw size={14} /> Changer le rôle
                     </button>
-                    <button
-                      onClick={() => handleDeleteUser(selectedUser.id_utilisateur)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', border: '1.5px solid #FECACA',
-                        background: '#FEF2F2', color: '#DC2626', transition: 'all 0.15s',
-                      }}
-                    >
-                      🗑️ Supprimer
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleToggleBlock(selectedUser.id_utilisateur, selectedUser.est_bloque)}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', border: '1.5px solid #E2E8F0',
+                          background: selectedUser.est_bloque ? '#FEF2F2' : '#FFFBEB',
+                          color: selectedUser.est_bloque ? '#DC2626' : '#D97706',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {selectedUser.est_bloque ? '🔓 Débloquer' : '🔒 Bloquer'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(selectedUser.id_utilisateur)}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', border: '1.5px solid #FECACA',
+                          background: '#FEF2F2', color: '#DC2626', transition: 'all 0.15s',
+                        }}
+                      >
+                        🗑️ Supprimer
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -731,6 +806,79 @@ const Users = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ─── ROLE CHANGE CONFIRMATION MODAL ──────────────────── */}
+      <AnimatePresence>
+        {isRoleModalOpen && roleChangeTarget && (
+          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onPointerDown={() => setIsRoleModalOpen(false)}>
+            <motion.div
+              className="modal-content"
+              style={{ maxWidth: 420 }}
+              initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+              onPointerDown={e => e.stopPropagation()}
+            >
+              <div className="modal-header" style={{
+                background: 'linear-gradient(135deg,#312E81,#6366F1)',
+                borderBottom: 'none', padding: '20px 24px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <RefreshCw size={18} color="white" />
+                  </div>
+                  <h2 style={{ color: 'white', margin: 0, fontSize: 16, fontWeight: 900 }}>Changer le rôle</h2>
+                </div>
+                <button type="button" className="btn-close" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }} onClick={() => setIsRoleModalOpen(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 14, background: '#F8FAFC', border: '1px solid #E2E8F0', marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={18} color="#6366F1" />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: '#0F172A' }}>{roleChangeTarget.prenom} {roleChangeTarget.nom}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 13, color: '#94A3B8' }}>Rôle actuel : <strong>{getRoleCfg(roleChangeTarget.role).label}</strong></p>
+                  </div>
+                </div>
+
+                {roleChangeError && (
+                  <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
+                    ⚠️ {roleChangeError}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>Nouveau rôle</label>
+                  <select
+                    className="form-select"
+                    value={newRoleValue}
+                    onChange={e => setNewRoleValue(e.target.value)}
+                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1.5px solid #E2E8F0', fontSize: 15, fontWeight: 600, background: '#F8FAFC', outline: 'none' }}
+                  >
+                    <option value="">Sélectionner un rôle...</option>
+                    {ROLE_OPTIONS.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn-cancel" onClick={() => setIsRoleModalOpen(false)} disabled={roleChangeLoading}>Annuler</button>
+                <button
+                  type="button"
+                  className="btn-submit"
+                  onClick={handleConfirmRoleChange}
+                  disabled={roleChangeLoading || !newRoleValue || newRoleValue === roleChangeTarget?.role?.toUpperCase()}
+                >
+                  {roleChangeLoading ? <Loader2 className="animate-spin" size={16} /> : 'Confirmer le changement'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

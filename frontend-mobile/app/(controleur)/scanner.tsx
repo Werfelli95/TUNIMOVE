@@ -436,6 +436,14 @@ const styles = StyleSheet.create({
   scanTitle: { color: Colors.white, fontSize: 20, fontWeight: '800' },
   scanAgent: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 1 },
   scanTopActions: { flexDirection: 'row', gap: Spacing.sm },
+  menuBtn: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row', alignItems: 'center',
+  },
   iconBtn: {
     width: 40, height: 40, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.15)',

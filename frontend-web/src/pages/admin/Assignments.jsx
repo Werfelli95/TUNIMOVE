@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2 } from 'lucide-react';
+import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2, Clock, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On réutilise vos styles premium
 
@@ -18,7 +18,19 @@ const Assignments = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // États pour les Bus
+    // États pour les Bus    // Services Journaliers state
+    const [servicesJournaliers, setServicesJournaliers] = useState([]);
+    const [sjStats, setSjStats] = useState({ total: 0, today: 0 });
+    const [isNewSJModalOpen, setIsNewSJModalOpen] = useState(false);
+    const [sjForm, setSjForm] = useState({
+        id_utilisateur: '', id_bus: '', num_ligne: '', horaire: '',
+        date_affectation: getLocalDateString(), heure_debut: '', heure_fin: ''
+    });
+    const [availableReceveurs, setAvailableReceveurs] = useState([]);
+    const [allBuses, setAllBuses] = useState([]);
+    const [allLignes, setAllLignes] = useState([]);
+    const [sjError, setSjError] = useState(null);
+
     const [assignments, setAssignments] = useState([]);
     const [stats, setStats] = useState({ withReceiver: 0, withoutReceiver: 0, availableReceivers: 0 });
 
@@ -69,12 +81,38 @@ const Assignments = () => {
         }
     };
 
+    const fetchServicesJournaliers = async () => {
+        try {
+            const [sjRes, recRes, busRes, lignesRes] = await Promise.all([
+                fetch('http://localhost:5000/api/affectations'),
+                fetch('http://localhost:5000/api/assignments/available-receivers?all=true'),
+                fetch('http://localhost:5000/api/buses'),
+                fetch('http://localhost:5000/api/network'),
+            ]);
+            const sj = await sjRes.json();
+            const recs = await recRes.json();
+            const buses = await busRes.json();
+            const lignes = await lignesRes.json();
+            setServicesJournaliers(Array.isArray(sj) ? sj : []);
+            setAvailableReceveurs(Array.isArray(recs) ? recs : []);
+            setAllBuses(Array.isArray(buses) ? buses : []);
+            setAllLignes(Array.isArray(lignes) ? lignes : []);
+            const today = getLocalDateString();
+            const todayCount = (Array.isArray(sj) ? sj : []).filter(s => s.date_affectation?.startsWith(today)).length;
+            setSjStats({ total: sj.length, today: todayCount });
+        } catch (error) {
+            console.error("Erreur chargement services journaliers:", error);
+        }
+    };
+
     const fetchData = async () => {
         setLoading(true);
         if (activeTab === 'bus') {
             await fetchBusData();
-        } else {
+        } else if (activeTab === 'guichet') {
             await fetchGuichetData();
+        } else {
+            await fetchServicesJournaliers();
         }
         setLoading(false);
     };
@@ -87,7 +125,7 @@ const Assignments = () => {
         setSelectedItem(item);
         try {
             const endpoint = activeTab === 'bus'
-                ? 'http://localhost:5000/api/assignments/available-receivers'
+                ? 'http://localhost:5000/api/assignments/available-receivers?all=true'
                 : 'http://localhost:5000/api/guichets/available-agents';
 
             const res = await fetch(endpoint);
@@ -259,6 +297,41 @@ const Assignments = () => {
         }
     };
 
+    const handleCreateSJ = async () => {
+        setSjError(null);
+        if (!sjForm.id_utilisateur || !sjForm.id_bus || !sjForm.date_affectation || !sjForm.heure_debut) {
+            setSjError('Receveur, bus, date et heure de début sont obligatoires.');
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('http://localhost:5000/api/affectations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(sjForm)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Erreur lors de la création');
+            await fetchServicesJournaliers();
+            setIsNewSJModalOpen(false);
+            setSjForm({ id_utilisateur: '', id_bus: '', num_ligne: '', horaire: '', date_affectation: getLocalDateString(), heure_debut: '', heure_fin: '' });
+        } catch (err) {
+            setSjError(err.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteSJ = async (id) => {
+        if (!window.confirm('Supprimer cette affectation ?')) return;
+        try {
+            await fetch(`http://localhost:5000/api/affectations/${id}`, { method: 'DELETE' });
+            await fetchServicesJournaliers();
+        } catch (err) {
+            alert('Erreur lors de la suppression');
+        }
+    };
+
     const filteredBus = assignments.filter(a =>
         a.numero_bus.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (a.receveur_nom && a.receveur_nom.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -271,32 +344,28 @@ const Assignments = () => {
 
     return (
         <div className="users-container">
-            {/* TABS SELECTOR - Premium Style */}
+            {/* TABS SELECTOR */}
             <div className="flex justify-between items-center mb-8">
                 <div className="tabs-container mb-0">
-                    <button
-                        onClick={() => setActiveTab('bus')}
-                        className={`tab-button ${activeTab === 'bus' ? 'active' : ''}`}
-                    >
-                        <Bus size={20} />
-                        <span>Affectation Bus</span>
+                    <button onClick={() => setActiveTab('bus')} className={`tab-button ${activeTab === 'bus' ? 'active' : ''}`}>
+                        <Bus size={20} /><span>Affectation Bus</span>
                     </button>
-                    <button
-                        onClick={() => setActiveTab('guichet')}
-                        className={`tab-button ${activeTab === 'guichet' ? 'active' : ''}`}
-                    >
-                        <Store size={20} />
-                        <span>Agents Guichet</span>
+                    <button onClick={() => setActiveTab('guichet')} className={`tab-button ${activeTab === 'guichet' ? 'active' : ''}`}>
+                        <Store size={20} /><span>Agents Guichet</span>
+                    </button>
+                    <button onClick={() => setActiveTab('services')} className={`tab-button ${activeTab === 'services' ? 'active' : ''}`}>
+                        <Calendar size={20} /><span>Services Journaliers</span>
                     </button>
                 </div>
 
                 {activeTab === 'guichet' && (
-                    <button
-                        onClick={() => setIsAddGuichetModalOpen(true)}
-                        className="btn-add-user"
-                    >
-                        <Plus size={18} />
-                        <span>Ajouter un Guichet</span>
+                    <button onClick={() => setIsAddGuichetModalOpen(true)} className="btn-add-user">
+                        <Plus size={18} /><span>Ajouter un Guichet</span>
+                    </button>
+                )}
+                {activeTab === 'services' && (
+                    <button onClick={() => { setSjError(null); setIsNewSJModalOpen(true); }} className="btn-add-user">
+                        <Plus size={18} /><span>Nouvelle Affectation</span>
                     </button>
                 )}
             </div>
@@ -306,43 +375,34 @@ const Assignments = () => {
                 {activeTab === 'bus' ? (
                     <>
                         <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Bus avec receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withReceiver}</h3></div>
-                                <CheckCircle className="text-indigo-500" size={32} />
-                            </div>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Bus avec receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withReceiver}</h3></div><CheckCircle className="text-indigo-500" size={32} /></div>
                         </motion.div>
                         <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Bus sans receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withoutReceiver}</h3></div>
-                                <XCircle className="text-orange-500" size={32} />
-                            </div>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Bus sans receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withoutReceiver}</h3></div><XCircle className="text-orange-500" size={32} /></div>
                         </motion.div>
                         <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Receveurs disponibles</p><h3 className="text-3xl font-bold text-slate-800">{stats.availableReceivers}</h3></div>
-                                <Users className="text-emerald-500" size={32} />
-                            </div>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Receveurs disponibles</p><h3 className="text-3xl font-bold text-slate-800">{stats.availableReceivers}</h3></div><Users className="text-emerald-500" size={32} /></div>
+                        </motion.div>
+                    </>
+                ) : activeTab === 'guichet' ? (
+                    <>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Guichets avec agent</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withAgent}</h3></div><CheckCircle className="text-indigo-500" size={32} /></div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Guichets inoccupés</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withoutAgent}</h3></div><XCircle className="text-orange-500" size={32} /></div>
+                        </motion.div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Agents dispos</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.availableAgents}</h3></div><Users className="text-emerald-500" size={32} /></div>
                         </motion.div>
                     </>
                 ) : (
                     <>
                         <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Guichets avec agent</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withAgent}</h3></div>
-                                <CheckCircle className="text-indigo-500" size={32} />
-                            </div>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Total affectations</p><h3 className="text-3xl font-bold text-slate-800">{sjStats.total}</h3></div><Calendar className="text-indigo-500" size={32} /></div>
                         </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Guichets inoccupés</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withoutAgent}</h3></div>
-                                <XCircle className="text-orange-500" size={32} />
-                            </div>
-                        </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Agents dispos</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.availableAgents}</h3></div>
-                                <Users className="text-emerald-500" size={32} />
-                            </div>
+                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                            <div className="flex justify-between items-center"><div><p className="text-slate-500 text-sm">Aujourd'hui</p><h3 className="text-3xl font-bold text-slate-800">{sjStats.today}</h3></div><Clock className="text-emerald-500" size={32} /></div>
                         </motion.div>
                     </>
                 )}
@@ -368,6 +428,59 @@ const Assignments = () => {
 
                 {loading ? (
                     <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto mb-4" size={40} /><p>Chargement...</p></div>
+                ) : activeTab === 'services' ? (
+                    <div className="table-responsive">
+                        <table className="enterprise-table">
+                            <thead>
+                                <tr>
+                                    <th>Receveur</th>
+                                    <th>Bus</th>
+                                    <th>Ligne</th>
+                                    <th>Date</th>
+                                    <th>Horaire</th>
+                                    <th>Statut</th>
+                                    <th className="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {servicesJournaliers
+                                    .filter(s =>
+                                        !searchQuery ||
+                                        s.receveur_nom?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        s.numero_bus?.toLowerCase().includes(searchQuery.toLowerCase())
+                                    )
+                                    .map(s => (
+                                        <tr key={s.id_affectation}>
+                                            <td className="font-bold text-slate-700">{s.receveur_prenom} {s.receveur_nom}</td>
+                                            <td>Bus N° {s.numero_bus}</td>
+                                            <td>{s.num_ligne || '—'}<br/><span className="text-slate-400 text-xs">{s.ville_depart} → {s.ville_arrivee}</span></td>
+                                            <td>{s.date_affectation ? new Date(s.date_affectation).toLocaleDateString('fr-FR') : '—'}</td>
+                                            <td>
+                                                <span className="flex items-center gap-1">
+                                                    <Clock size={13} className="text-indigo-400" />
+                                                    {s.heure_debut?.slice(0,5)}{s.heure_fin ? ` – ${s.heure_fin.slice(0,5)}` : ''}
+                                                    {s.horaire && <span className="text-slate-400 ml-1">({s.horaire})</span>}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span className={`role-badge ${s.statut === 'Planifié' ? 'badge-agent' : s.statut === 'En cours' ? 'badge-receveur' : ''}`}>
+                                                    {s.statut}
+                                                </span>
+                                            </td>
+                                            <td className="text-center">
+                                                <button className="btn-danger-premium" onClick={() => handleDeleteSJ(s.id_affectation)} title="Supprimer">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                }
+                                {servicesJournaliers.length === 0 && (
+                                    <tr><td colSpan={7} className="empty-state">Aucune affectation journalière. Cliquez sur "Nouvelle Affectation" pour commencer.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 ) : (
                     <div className="table-responsive">
                         <table className="enterprise-table">
@@ -633,6 +746,72 @@ const Assignments = () => {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            {/* CREATE SJ MODAL */}
+            <AnimatePresence>
+                {isNewSJModalOpen && (
+                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="modal-content" style={{ maxWidth: 520 }} initial={{ y: 50 }} animate={{ y: 0 }} exit={{ y: 50 }}>
+                            <div className="modal-header" style={{ background: 'linear-gradient(135deg,#1e1b4b,#4f46e5)', borderBottom: 'none', padding: '20px 24px' }}>
+                                <div className="flex items-center gap-3">
+                                    <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Calendar size={18} color="white" />
+                                    </div>
+                                    <h2 style={{ color: 'white', margin: 0, fontSize: 16, fontWeight: 900 }}>Nouvelle Affectation Journalière</h2>
+                                </div>
+                                <button className="btn-close" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }} onClick={() => setIsNewSJModalOpen(false)}><X size={18} /></button>
+                            </div>
+                            <div className="modal-body">
+                                {sjError && <div className="form-error" style={{ marginBottom: 16 }}>⚠️ {sjError}</div>}
+                                <div className="form-group">
+                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Receveur *</label>
+                                    <select className="form-select w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.id_utilisateur} onChange={e => setSjForm({...sjForm, id_utilisateur: e.target.value})}>
+                                        <option value="">Sélectionner un receveur...</option>
+                                        {availableReceveurs.map(r => <option key={r.id_utilisateur} value={r.id_utilisateur}>{r.prenom} {r.nom}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Bus *</label>
+                                    <select className="form-select w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.id_bus}
+                                        onChange={e => {
+                                            const bus = allBuses.find(b => String(b.id_bus) === e.target.value);
+                                            setSjForm({...sjForm, id_bus: e.target.value, num_ligne: bus?.num_ligne || ''});
+                                        }}>
+                                        <option value="">Sélectionner un bus...</option>
+                                        {allBuses.map(b => <option key={b.id_bus} value={b.id_bus}>Bus N° {b.numero_bus} — {b.ville_depart || ''}{b.ville_arrivee ? ` → ${b.ville_arrivee}` : ''}</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="form-group mb-0">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Date *</label>
+                                        <input type="date" className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.date_affectation} onChange={e => setSjForm({...sjForm, date_affectation: e.target.value})} />
+                                    </div>
+                                    <div className="form-group mb-0">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Horaire (label)</label>
+                                        <input type="text" placeholder="ex: 08:00" className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.horaire} onChange={e => setSjForm({...sjForm, horaire: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="form-group mb-0">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Heure début *</label>
+                                        <input type="time" className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.heure_debut} onChange={e => setSjForm({...sjForm, heure_debut: e.target.value})} />
+                                    </div>
+                                    <div className="form-group mb-0">
+                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Heure fin</label>
+                                        <input type="time" className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none" value={sjForm.heure_fin} onChange={e => setSjForm({...sjForm, heure_fin: e.target.value})} />
+                                    </div>
+                                </div>
+                                <button
+                                    className="btn-submit w-full py-4 justify-center mt-4"
+                                    onClick={handleCreateSJ}
+                                    disabled={isSubmitting}
+                                >
+                                    {isSubmitting ? 'Enregistrement...' : 'Créer l\'affectation'}
+                                </button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

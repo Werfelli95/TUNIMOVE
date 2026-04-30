@@ -38,6 +38,6 @@ router.delete('/:id', userController.deleteUser);
 router.put('/:id/block', userController.toggleBlockUser);
 router.get('/:id', userController.getUserById);
 router.put('/:id', upload.single('image'), userController.updateUser);
-
+router.patch('/:id/role', userController.updateUserRole);
 
 module.exports = router;

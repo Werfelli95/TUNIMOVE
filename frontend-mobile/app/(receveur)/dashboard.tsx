@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
-import { RECEVEUR_SERVICE_API, API_IP, API_PORT } from '../../constants/api';
+import { RECEVEUR_SERVICE_API, API_IP, API_PORT, AFFECTATIONS_API } from '../../constants/api';
 import SideDrawer from '../../components/SideDrawer';
 
 const BASE = RECEVEUR_SERVICE_API;
@@ -26,6 +26,19 @@ interface ActiveService {
   ville_arrivee: string;
   nb_tickets: number;
   recette: number;
+}
+
+interface DailyAssignment {
+  id_affectation: number;
+  id_bus: number;
+  numero_bus: string;
+  num_ligne: string;
+  horaire: string | null;
+  heure_debut: string;
+  heure_fin: string | null;
+  ville_depart: string | null;
+  ville_arrivee: string | null;
+  statut: string;
 }
 
 export default function ReceveurDashboard() {
@@ -46,19 +59,61 @@ export default function ReceveurDashboard() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const userId = params.userId as string;
 
+  // Daily assignments from affectation_service
+  const [dailyAssignments, setDailyAssignments] = useState<DailyAssignment[]>([]);
+  const [selectedAssignment, setSelectedAssignment] = useState<DailyAssignment | null>(null);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+
+  // Resolved assignment details: prefer selectedAssignment, fall back to login params
+  const resolvedBus = selectedAssignment?.numero_bus || numero_bus;
+  const resolvedLigne = selectedAssignment?.num_ligne || num_ligne;
+  const resolvedDepart = selectedAssignment?.ville_depart || ville_depart;
+  const resolvedArrivee = selectedAssignment?.ville_arrivee || ville_arrivee;
+  const resolvedHoraire = selectedAssignment?.horaire || '';
+
   const navParams = {
-    userId, nom, prenom, matricule, numero_bus, ville_depart, ville_arrivee, num_ligne,
+    userId, nom, prenom, matricule,
+    numero_bus: resolvedBus,
+    ville_depart: resolvedDepart,
+    ville_arrivee: resolvedArrivee,
+    num_ligne: resolvedLigne,
+    horaire: resolvedHoraire,
     service_id: activeService ? String(activeService.id_service) : '',
     login_time: login_time || '',
   };
 
-  const fetchService = async () => {
-    if (!numero_bus) { setLoadingSvc(false); return; }
+  const fetchService = async (busNumber?: string) => {
+    const bus = busNumber || resolvedBus;
+    if (!bus) { setLoadingSvc(false); return; }
     try {
-      const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(numero_bus)}`);
+      const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(bus)}`);
       setActiveService(r.data);
     } catch { setActiveService(null); }
     finally { setLoadingSvc(false); }
+  };
+
+  const fetchDailyAssignments = async () => {
+    if (!userId) { setLoadingAssignments(false); return; }
+    try {
+      const r = await axios.get<DailyAssignment[]>(`${AFFECTATIONS_API}/receveur/${userId}/today`);
+      const data = r.data || [];
+      setDailyAssignments(data);
+      if (data.length === 1) {
+        setSelectedAssignment(data[0]);
+        // Fetch service for the auto-selected bus
+        fetchService(data[0].numero_bus);
+      } else if (data.length === 0) {
+        // No affectation_service entries, fall back to login params
+        setSelectedAssignment(null);
+        fetchService();
+      }
+      // If multiple, user must select — don't auto-fetch service yet
+    } catch {
+      setDailyAssignments([]);
+      fetchService();
+    } finally {
+      setLoadingAssignments(false);
+    }
   };
 
   const [userData, setUserData] = useState<any>(null);
@@ -77,7 +132,11 @@ export default function ReceveurDashboard() {
 
   const imageUrl = userData?.image_url || params.image_url;
 
-  useFocusEffect(useCallback(() => { setLoadingSvc(true); fetchService(); }, []));
+  useFocusEffect(useCallback(() => {
+    setLoadingSvc(true);
+    setLoadingAssignments(true);
+    fetchDailyAssignments();
+  }, [userId]));
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000);
@@ -131,7 +190,7 @@ export default function ReceveurDashboard() {
     router.push({ pathname: '/(receveur)/manifeste', params: { ...navParams, service_id: String(activeService.id_service) } });
   };
 
-  const hasAssignment = !!numero_bus;
+  const hasAssignment = !!(resolvedBus || selectedAssignment);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -184,16 +243,64 @@ export default function ReceveurDashboard() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* ── Assignment Card ── */}
-        {hasAssignment ? (
+        {/* ── Daily Assignments ── */}
+        {loadingAssignments ? (
+          <View style={styles.noAssignCard}>
+            <ActivityIndicator color={Colors.primary} />
+            <Text style={[styles.noAssignSub, { marginTop: 8 }]}>Chargement des affectations...</Text>
+          </View>
+        ) : dailyAssignments.length > 1 && !selectedAssignment ? (
+          // Multiple assignments — show picker
+          <View style={[styles.noAssignCard, { alignItems: 'stretch', paddingHorizontal: 0 }]}>
+            <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 }}>
+              <Text style={[styles.assignBusLabel, { color: Colors.primary, fontSize: 13, marginBottom: 4 }]}>🗓️ MES SERVICES DU JOUR</Text>
+              <Text style={styles.noAssignSub}>Sélectionnez le service à démarrer :</Text>
+            </View>
+            {dailyAssignments.map((aff) => (
+              <TouchableOpacity
+                key={aff.id_affectation}
+                style={styles.affectationRow}
+                onPress={() => {
+                  setSelectedAssignment(aff);
+                  setLoadingSvc(true);
+                  fetchService(aff.numero_bus);
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.affectationIcon}>
+                  <Bus color={Colors.white} size={18} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.affectationBus}>Bus N° {aff.numero_bus}</Text>
+                  <Text style={styles.affectationRoute}>
+                    {aff.ville_depart || '?'} → {aff.ville_arrivee || '?'} · Ligne {aff.num_ligne || '?'}
+                  </Text>
+                  <Text style={styles.affectationTime}>
+                    🕐 {aff.heure_debut?.slice(0, 5)}{aff.heure_fin ? ` – ${aff.heure_fin.slice(0, 5)}` : ''}
+                  </Text>
+                </View>
+                <ChevronRight color={Colors.primary} size={20} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : hasAssignment ? (
+          // Single / selected assignment card
           <View style={styles.assignCard}>
+            {dailyAssignments.length > 1 && (
+              <TouchableOpacity
+                onPress={() => setSelectedAssignment(null)}
+                style={{ alignSelf: 'flex-end', marginBottom: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: Colors.white + '20' }}
+              >
+                <Text style={{ color: Colors.white, fontSize: 12, fontWeight: '700' }}>◀ Changer</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.assignTop}>
               <View style={styles.assignIcon}>
                 <Bus color={Colors.white} size={20} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.assignBusLabel}>BUS AFFECTÉ</Text>
-                <Text style={styles.assignBus}>N° {numero_bus}</Text>
+                <Text style={styles.assignBus}>N° {resolvedBus}</Text>
               </View>
               <View style={[styles.statusBadge, activeService ? styles.statusActive : styles.statusIdle]}>
                 <View style={[styles.statusDot, { backgroundColor: activeService ? Colors.success : Colors.textMuted }]} />
@@ -202,19 +309,26 @@ export default function ReceveurDashboard() {
                 </Text>
               </View>
             </View>
+            {selectedAssignment && (
+              <View style={{ marginTop: 4, paddingHorizontal: 4 }}>
+                <Text style={[styles.assignBusLabel, { color: Colors.accent, fontSize: 12 }]}>
+                  🕐 {selectedAssignment.heure_debut?.slice(0, 5)}{selectedAssignment.heure_fin ? ` – ${selectedAssignment.heure_fin.slice(0, 5)}` : ''}
+                </Text>
+              </View>
+            )}
             <View style={styles.assignDivider} />
             <View style={styles.assignRow}>
               <View style={styles.assignItem}>
                 <Navigation color={Colors.primaryLight} size={14} />
                 <Text style={styles.assignItemLabel}>Ligne</Text>
-                <Text style={styles.assignItemValue}>{num_ligne || '—'}</Text>
+                <Text style={styles.assignItemValue}>{resolvedLigne || '—'}</Text>
               </View>
               <View style={styles.assignSep} />
               <View style={styles.assignItem}>
                 <MapPin color={Colors.primaryLight} size={14} />
                 <Text style={styles.assignItemLabel}>Trajet</Text>
                 <Text style={styles.assignItemValue} numberOfLines={1}>
-                  {ville_depart || '—'} → {ville_arrivee || '—'}
+                  {resolvedDepart || '—'} → {resolvedArrivee || '—'}
                 </Text>
               </View>
             </View>
@@ -487,4 +601,19 @@ const styles = StyleSheet.create({
     padding: Spacing.md, borderWidth: 1, borderColor: Colors.warning + '40',
   },
   helperText: { flex: 1, fontSize: 14, color: Colors.warning, fontWeight: '700', lineHeight: 18 },
+
+  // Affectation list items (for multi-assignment picker)
+  affectationRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderTopWidth: 1, borderTopColor: Colors.divider,
+  },
+  affectationIcon: {
+    width: 42, height: 42, borderRadius: 12,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    ...Shadow.card,
+  },
+  affectationBus: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  affectationRoute: { fontSize: 13, color: Colors.textMuted, fontWeight: '600', marginTop: 2 },
+  affectationTime: { fontSize: 12, color: Colors.primary, fontWeight: '700', marginTop: 3 },
 });
