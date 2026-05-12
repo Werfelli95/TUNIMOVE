@@ -36,7 +36,7 @@ const SQL_QUERIES = [
         ('PLEIN', 'Tarif normal (Plein rapide)', 'VOYAGEUR', 'PERCENT_RESTANT', 100),
         ('RED_25', '25% rédu.', 'VOYAGEUR', 'PERCENT_RESTANT', 75),
         ('RED_50', '50% rédu.', 'VOYAGEUR', 'PERCENT_RESTANT', 50),
-        ('HAND_75', '75% Hand.', 'VOYAGEUR', 'PERCENT_RESTANT', 25),
+        ('HAND_75', '75% PMR (personne mobilité réduite)', 'VOYAGEUR', 'PERCENT_RESTANT', 25),
         ('GN_75', '75% G. Nationale', 'VOYAGEUR', 'PERCENT_RESTANT', 25),
         ('RED_10', '10% rédu.', 'VOYAGEUR', 'PERCENT_RESTANT', 90),
         ('RED_20', '20% rédu.', 'VOYAGEUR', 'PERCENT_RESTANT', 80),

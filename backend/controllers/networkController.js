@@ -48,8 +48,8 @@ exports.createLineWithTrajets = async (req, res) => {
         if (stations && stations.length > 0) {
             for (let st of stations) {
                 if (st.arret) {
-                    await db.query("INSERT INTO trajet (arret, distance_km, num_ligne) VALUES ($1, $2, $3)",
-                        [st.arret, parseFloat(st.distance_km) || 0, num_ligne]);
+                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne) VALUES ($1, $2, $3, $4)",
+                        [st.arret, parseFloat(st.distance_km) || 0, parseInt(st.duree_minutes) || 0, num_ligne]);
                 }
             }
         }
@@ -82,8 +82,8 @@ exports.updateLine = async (req, res) => {
         if (stations && stations.length > 0) {
             for (let st of stations) {
                 if (st.arret) {
-                    await db.query("INSERT INTO trajet (arret, distance_km, num_ligne) VALUES ($1, $2, $3)",
-                        [st.arret, parseFloat(st.distance_km) || 0, id]);
+                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne) VALUES ($1, $2, $3, $4)",
+                        [st.arret, parseFloat(st.distance_km) || 0, parseInt(st.duree_minutes) || 0, id]);
                 }
             }
         }

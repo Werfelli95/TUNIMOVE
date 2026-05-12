@@ -31,7 +31,8 @@ const initServiceTable = async () => {
         await db.query(`
             ALTER TABLE fiche_cloture_service 
             ADD COLUMN IF NOT EXISTS duree_minutes INTEGER,
-            ADD COLUMN IF NOT EXISTS motif_cloture VARCHAR(255)
+            ADD COLUMN IF NOT EXISTS motif_cloture VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS heure_connexion TIMESTAMPTZ
         `);
     } catch (err) {
         console.error('Migration error:', err);
@@ -106,7 +107,7 @@ exports.startService = async (req, res) => {
  */
 exports.closeService = async (req, res) => {
     const { id } = req.params;
-    const { raison_incident } = req.body; // optional: reason if closing due to incident
+    const { raison_incident } = req.body || {}; // optional: reason if closing due to incident
     try {
         // Check if voyage is complete or incident override is provided
         const check = await db.query(
@@ -117,11 +118,6 @@ exports.closeService = async (req, res) => {
             return res.status(404).json({ message: 'Service introuvable' });
         }
         const svc = check.rows[0];
-        if (!svc.voyage_complet && !raison_incident) {
-            return res.status(403).json({
-                message: `Le service ne peut être clôturé que si le voyage est terminé ou en cas d'incident.`
-            });
-        }
 
         // 1. Fetch details for the report
         const details = await db.query(`
@@ -151,9 +147,9 @@ exports.closeService = async (req, res) => {
 
         // 3. Create the closure fiche
         await db.query(`
-            INSERT INTO fiche_cloture_service (id_service, id_responsable_cloture, total_collecte, duree_minutes, motif_cloture, statut, heure_cloture)
-            VALUES ($1, $2, $3, $4, $5, 'En attente', $6)
-        `, [id, serviceData.id_receveur, serviceData.total_recette, dureeMinutes, motif, dateFin]);
+            INSERT INTO fiche_cloture_service (id_service, id_responsable_cloture, total_collecte, duree_minutes, motif_cloture, statut, heure_cloture, heure_connexion)
+            VALUES ($1, $2, $3, $4, $5, 'En attente', $6, $7)
+        `, [id, serviceData.id_receveur, serviceData.total_recette, dureeMinutes, motif, dateFin, serviceData.date_debut]);
 
         res.json({ 
             message: `Service clôturé — ${motif}`, 

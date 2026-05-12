@@ -14,18 +14,18 @@ import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
 import { INCIDENTS_API, RECEVEUR_SERVICE_API } from '../../constants/api';
 
 const CATEGORIES = [
-  { key: 'panne_mecanique',    label: 'Panne mécanique',   icon: Wrench,        color: Colors.warning },
-  { key: 'accident',           label: 'Accident',          icon: Car,           color: Colors.danger  },
-  { key: 'malaise_passager',   label: 'Malaise passager',  icon: Heart,         color: '#E11D48'      },
-  { key: 'probleme_securite',  label: 'Problème sécurité', icon: Shield,        color: '#7C3AED'      },
-  { key: 'retard',             label: 'Retard',            icon: Clock,         color: Colors.info    },
-  { key: 'autre',              label: 'Autre',             icon: HelpCircle,    color: Colors.textMuted },
+  { key: 'panne_mecanique', label: 'Panne mécanique', icon: Wrench, color: Colors.warning },
+  { key: 'accident', label: 'Accident', icon: Car, color: Colors.danger },
+  { key: 'malaise_passager', label: 'Malaise passager', icon: Heart, color: '#E11D48' },
+  { key: 'probleme_securite', label: 'Problème sécurité', icon: Shield, color: '#7C3AED' },
+  { key: 'retard', label: 'Retard', icon: Clock, color: Colors.info },
+  { key: 'autre', label: 'Autre', icon: HelpCircle, color: Colors.textMuted },
 ];
 
 const SEVERITY = [
-  { key: 'faible',   label: 'Faible',    sub: 'Signalement informatif',   color: Colors.success },
-  { key: 'moyenne',  label: 'Moyenne',   sub: 'Intervention recommandée', color: Colors.warning },
-  { key: 'critique', label: 'Critique',  sub: 'Intervention immédiate',   color: Colors.danger  },
+  { key: 'faible', label: 'Faible', sub: 'Signalement informatif', color: Colors.success },
+  { key: 'moyenne', label: 'Moyenne', sub: 'Intervention recommandée', color: Colors.warning },
+  { key: 'critique', label: 'Critique', sub: 'Intervention immédiate', color: Colors.danger },
 ];
 
 export default function IncidentScreen() {
@@ -47,7 +47,7 @@ export default function IncidentScreen() {
   const [confirmModal, setConfirmModal] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
 
-  const isValid = category && severity && description.trim().length >= 10;
+  const isValid = category && severity && description.trim().length > 0;
   const isCritical = severity === 'critique';
 
   const handleSubmit = () => {
@@ -170,7 +170,7 @@ export default function IncidentScreen() {
         <View style={styles.descWrap}>
           <TextInput
             style={styles.descInput}
-            placeholder="Décrivez l'incident en détail (minimum 10 caractères)..."
+            placeholder="Décrivez l'incident en détail..."
             value={description}
             onChangeText={setDescription}
             multiline

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight } from 'lucide-react';
+import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Tarifs.css';
 
@@ -15,6 +15,36 @@ const Tarifs = () => {
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState({});
+
+    // Modal states for Tarifs
+    const [showModal, setShowModal] = useState(false);
+    const [isEdit, setIsEdit] = useState(false);
+    const [formData, setFormData] = useState({
+        id_type_tarification: null,
+        code: '',
+        libelle: '',
+        categorie: 'VOYAGEUR',
+        mode_calcul: 'PERCENT_RESTANT',
+        valeur: ''
+    });
+
+    // Modal states for Bagages
+    const [showBagageModal, setShowBagageModal] = useState(false);
+    const [isEditBagage, setIsEditBagage] = useState(false);
+    const [bagageFormData, setBagageFormData] = useState({
+        id_type_bagage: null,
+        code: '',
+        libelle: '',
+        prix: ''
+    });
+
+    const toggleGroup = (key) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
 
     const fetchData = async () => {
         try {
@@ -47,7 +77,7 @@ const Tarifs = () => {
             const res = await fetch('http://localhost:5000/api/tarifs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config) // On envoie les valeurs de base
+                body: JSON.stringify(config)
             });
             if (res.ok) {
                 setMessage('✅ Configuration mise à jour !');
@@ -57,13 +87,90 @@ const Tarifs = () => {
         setLoading(false);
     };
 
-    const toggleTarification = async (id, currentStatus) => {
+    // Tarif Form Handlers
+    const openAddModal = () => {
+        setFormData({ id_type_tarification: null, code: '', libelle: '', categorie: 'VOYAGEUR', mode_calcul: 'PERCENT_RESTANT', valeur: '' });
+        setIsEdit(false);
+        setShowModal(true);
+    };
+
+    const openEditModal = (item) => {
+        setFormData({ ...item });
+        setIsEdit(true);
+        setShowModal(true);
+    };
+
+    const handleSubmitTarif = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        const url = isEdit 
+            ? `http://localhost:5000/api/tarification/${formData.id_type_tarification}`
+            : 'http://localhost:5000/api/tarification';
+        const method = isEdit ? 'PUT' : 'POST';
+
         try {
-            await fetch(`http://localhost:5000/api/tarification/${id}/toggle`, {
-                method: 'PUT',
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actif: !currentStatus })
+                body: JSON.stringify(formData)
             });
+            if (res.ok) {
+                setShowModal(false);
+                fetchData();
+                setMessage(isEdit ? '✅ Mis à jour !' : '✅ Ajouté !');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        } catch (err) { console.error(err); }
+        setLoading(false);
+    };
+
+    // Bagage Form Handlers
+    const openAddBagageModal = () => {
+        setBagageFormData({ id_type_bagage: null, code: '', libelle: '', prix: '' });
+        setIsEditBagage(false);
+        setShowBagageModal(true);
+    };
+
+    const openEditBagageModal = (item) => {
+        setBagageFormData({ ...item });
+        setIsEditBagage(true);
+        setShowBagageModal(true);
+    };
+
+    const handleSubmitBagage = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        const url = isEditBagage 
+            ? `http://localhost:5000/api/tarification/bagages/${bagageFormData.id_type_bagage}`
+            : 'http://localhost:5000/api/tarification/bagages';
+        const method = isEditBagage ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bagageFormData)
+            });
+            if (res.ok) {
+                setShowBagageModal(false);
+                fetchData();
+                setMessage(isEditBagage ? '✅ Règle mise à jour !' : '✅ Règle ajoutée !');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        } catch (err) { console.error(err); }
+        setLoading(false);
+    };
+
+    const toggleTarification = async (ids, currentStatus) => {
+        const idArray = Array.isArray(ids) ? ids : [ids];
+        try {
+            await Promise.all(idArray.map(id =>
+                fetch(`http://localhost:5000/api/tarification/${id}/toggle`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ actif: !currentStatus })
+                })
+            ));
             fetchData();
         } catch (err) { console.error(err); }
     };
@@ -79,15 +186,10 @@ const Tarifs = () => {
         } catch (err) { console.error(err); }
     };
 
-    // Variantes d'animation
+    // Animation variants
     const containerVariants = {
         hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
-        }
+        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
     };
 
     const itemVariants = {
@@ -121,11 +223,7 @@ const Tarifs = () => {
                 </div>
             </motion.div>
 
-            <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-            >
+            <motion.div variants={containerVariants} initial="hidden" animate="visible">
                 {/* ═══ 1. BASE PRICING ══════════════════════════════════ */}
                 <motion.div className="tarifs-section-card" variants={itemVariants}>
                     <h3 className="tarifs-section-title">
@@ -197,12 +295,12 @@ const Tarifs = () => {
 
                 {/* ═══ 2. DYNAMIC TARIFS ═══════════════════════════════ */}
                 <motion.div className="tarifs-section-card" variants={itemVariants}>
-                    <div className="flex justify-between items-center mb-8">
-                        <h3 className="tarifs-section-title !mb-0">
-                            <Briefcase size={20} className="text-indigo-600" />
-                            2. Types de Tarifs (Réductions & Conventions)
-                        </h3>
-                        <button className="btn-action-premium flex items-center gap-2" disabled>
+                    <div className="section-header">
+                        <div className="section-title">
+                            <Percent className="icon-blue" />
+                            <h2>2. Types de Tarifs (Réductions & Conventions)</h2>
+                        </div>
+                        <button className="btn-add-premium" onClick={openAddModal}>
                             <Plus size={18} /> Ajouter un Type
                         </button>
                     </div>
@@ -221,60 +319,163 @@ const Tarifs = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {tarifications.map((t, idx) => (
-                                    <motion.tr
-                                        key={t.id_type_tarification}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.05 }}
-                                    >
-                                        <td><span className="code-tag-premium">{t.code}</span></td>
-                                        <td>
-                                            <div className="font-bold text-slate-800">{t.libelle}</div>
+                                {(() => {
+                                    const groups = {};
+                                    tarifications.forEach(t => {
+                                        const key = `${t.mode_calcul}-${t.valeur}`;
+                                        if (!groups[key]) {
+                                            groups[key] = {
+                                                key,
+                                                valeur: t.valeur,
+                                                mode_calcul: t.mode_calcul,
+                                                items: [t],
+                                                actif: t.actif
+                                            };
+                                        } else {
+                                            groups[key].items.push(t);
+                                        }
+                                    });
 
-                                        </td>
-                                        <td>
-                                            <span
-                                                className="category-badge-premium"
-                                                style={{
-                                                    backgroundColor: t.categorie === 'VOYAGEUR' ? '#eef2ff' : t.categorie === 'CONVENTION' ? '#fdf2f8' : '#fff7ed',
-                                                    color: t.categorie === 'VOYAGEUR' ? '#6366f1' : t.categorie === 'CONVENTION' ? '#db2777' : '#ea580c'
-                                                }}
-                                            >
-                                                {t.categorie === 'VOYAGEUR' && <TrendingUp size={10} />}
-                                                {t.categorie === 'CONVENTION' && <Briefcase size={10} />}
-                                                {t.categorie === 'EXPEDITION' && <Package size={10} />}
-                                                {t.categorie}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                                                {t.mode_calcul === 'PERCENT_RESTANT' ? <Percent size={14} className="text-indigo-500" /> : <Calculator size={14} className="text-amber-500" />}
-                                                {t.mode_calcul === 'PERCENT_RESTANT' ? '% Restant à payer' : 'Forfait Fixe'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="text-lg font-black text-indigo-700">
-                                                {t.mode_calcul === 'PERCENT_RESTANT' ? `${t.valeur}%` : `${(t.valeur / 1000).toFixed(3)}`}
-                                                <span className="text-xs font-normal ml-1 text-slate-400">
-                                                    {t.mode_calcul === 'PERCENT_RESTANT' ? '' : 'TND'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div
-                                                className={`status-badge-premium ${t.actif ? 'active-premium' : 'inactive-premium'}`}
-                                                onClick={() => toggleTarification(t.id_type_tarification, t.actif)}
-                                            >
-                                                {t.actif ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                                                {t.actif ? 'Opérationnel' : 'Suspendu'}
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <button className="btn-action-premium" disabled>Éditer</button>
-                                        </td>
-                                    </motion.tr>
-                                ))}
+                                    return Object.values(groups)
+                                        .sort((a, b) => b.valeur - a.valeur)
+                                        .map((group, idx) => {
+                                            const isExpanded = expandedGroups[group.key];
+                                            const hasMultiple = group.items.length > 1;
+
+                                            return (
+                                                <React.Fragment key={group.key}>
+                                                    <motion.tr
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: idx * 0.05 }}
+                                                        className={hasMultiple ? 'cursor-pointer hover:bg-slate-50' : ''}
+                                                        onClick={() => hasMultiple && toggleGroup(group.key)}
+                                                    >
+                                                        <td>
+                                                            <div className="flex items-center gap-3">
+                                                                {hasMultiple && (
+                                                                    <div className="p-1 rounded-md bg-indigo-50 text-indigo-600">
+                                                                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex flex-wrap gap-1 max-w-[180px]">
+                                                                    <span className="code-tag-premium !py-0.5 !px-2 !text-[10px]">{group.items[0].code}</span>
+                                                                    {hasMultiple && (
+                                                                        <span className="text-[10px] font-bold text-indigo-500">+{group.items.length - 1} autres</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="max-w-[300px]">
+                                                            <div className="font-bold text-slate-800 text-[13px]">
+                                                                {hasMultiple ? (
+                                                                    <span>{group.items[0].libelle} <span className="text-slate-400 font-normal">et {group.items.length - 1} autres types</span></span>
+                                                                ) : (
+                                                                    group.items[0].libelle
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {Array.from(new Set(group.items.map(i => i.categorie))).map(cat => (
+                                                                    <span
+                                                                        key={cat}
+                                                                        className="category-badge-premium !py-0.5 !px-2"
+                                                                        style={{
+                                                                            backgroundColor: cat === 'VOYAGEUR' ? '#eef2ff' : cat === 'CONVENTION' ? '#fdf2f8' : '#fff7ed',
+                                                                            color: cat === 'VOYAGEUR' ? '#6366f1' : cat === 'CONVENTION' ? '#db2777' : '#ea580c'
+                                                                        }}
+                                                                    >
+                                                                        {cat}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="flex items-center gap-2 text-slate-500 text-[11px] font-bold whitespace-nowrap">
+                                                                {group.mode_calcul === 'PERCENT_RESTANT' ? <Percent size={12} className="text-indigo-500" /> : <Calculator size={12} className="text-amber-500" />}
+                                                                {group.mode_calcul === 'PERCENT_RESTANT' ? '% Restant' : 'Forfait Fixe'}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="text-lg font-black text-indigo-700 whitespace-nowrap">
+                                                                {group.mode_calcul === 'PERCENT_RESTANT' ? `${group.valeur}%` : `${(group.valeur / 1000).toFixed(3)}`}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div
+                                                                className={`status-badge-premium ${group.actif ? 'active-premium' : 'inactive-premium'}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleTarification(group.items.map(i => i.id_type_tarification), group.actif);
+                                                                }}
+                                                            >
+                                                                {group.actif ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                                                                {group.actif ? 'Opérationnel' : 'Suspendu'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="text-center">
+                                                            <button 
+                                                                className="btn-action-premium" 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (hasMultiple) toggleGroup(group.key);
+                                                                    else openEditModal(group.items[0]);
+                                                                }}
+                                                            >
+                                                                {hasMultiple ? (isExpanded ? 'Fermer' : 'Gérer') : 'Éditer'}
+                                                            </button>
+                                                        </td>
+                                                    </motion.tr>
+
+                                                    <AnimatePresence>
+                                                        {isExpanded && (
+                                                            <tr>
+                                                                <td colSpan="7" className="!p-0 border-none">
+                                                                    <motion.div
+                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                        className="overflow-hidden bg-slate-50/50 rounded-xl m-2 border border-dashed border-slate-200"
+                                                                    >
+                                                                        <table className="w-full text-left text-[11px]">
+                                                                            <thead>
+                                                                                <tr className="text-slate-400 uppercase tracking-widest font-black">
+                                                                                    <th className="py-2 px-8">Code</th>
+                                                                                    <th className="py-2">Désignation</th>
+                                                                                    <th className="py-2">Catégorie</th>
+                                                                                    <th className="py-2 text-center">Action</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {group.items.map((item) => (
+                                                                                    <tr key={item.id_type_tarification} className="border-t border-slate-100">
+                                                                                        <td className="py-2 px-8"><span className="code-tag-premium !text-[9px]">{item.code}</span></td>
+                                                                                        <td className="py-2 font-medium text-slate-600">{item.libelle}</td>
+                                                                                        <td className="py-2">
+                                                                                            <span className="text-[10px] font-bold text-slate-400">{item.categorie}</span>
+                                                                                        </td>
+                                                                                        <td className="py-2 text-center">
+                                                                                            <button 
+                                                                                                className="text-indigo-600 font-bold hover:underline"
+                                                                                                onClick={() => openEditModal(item)}
+                                                                                            >
+                                                                                                Éditer
+                                                                                            </button>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </motion.div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </React.Fragment>
+                                            );
+                                        });
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -282,12 +483,12 @@ const Tarifs = () => {
 
                 {/* ═══ 3. BAGGAGE SUPPLEMENTS ═════════════════════════ */}
                 <motion.div className="tarifs-section-card" variants={itemVariants}>
-                    <div className="flex justify-between items-center mb-8">
-                        <h3 className="tarifs-section-title !mb-0">
+                    <div className="section-header">
+                        <div className="section-title">
                             <Package size={20} className="text-indigo-600" />
-                            3. Suppléments Bagages & Encombrements
-                        </h3>
-                        <button className="btn-action-premium flex items-center gap-2" disabled>
+                            <h2>3. Suppléments Bagages & Encombrements</h2>
+                        </div>
+                        <button className="btn-add-premium" onClick={openAddBagageModal}>
                             <Plus size={18} /> Ajouter une règle
                         </button>
                     </div>
@@ -332,7 +533,12 @@ const Tarifs = () => {
                                             </div>
                                         </td>
                                         <td className="text-center">
-                                            <button className="btn-action-premium" disabled>Paramétrer</button>
+                                            <button 
+                                                className="btn-action-premium"
+                                                onClick={() => openEditBagageModal(b)}
+                                            >
+                                                Paramétrer
+                                            </button>
                                         </td>
                                     </motion.tr>
                                 ))}
@@ -342,11 +548,163 @@ const Tarifs = () => {
                 </motion.div>
             </motion.div>
 
-            <div className="mt-8 text-center text-slate-400 text-sm pb-10">
+            <motion.div className="mt-8 text-center text-slate-400 text-sm pb-10">
                 <div className="flex items-center justify-center gap-2">
                     <ShieldCheck size={14} /> Sécurisé par le moteur TuniMove Central Pricing Engine v1.2
                 </div>
-            </div>
+            </motion.div>
+
+            {/* Modal Tarifs */}
+            <AnimatePresence>
+                {showModal && (
+                    <div className="modal-overlay-premium">
+                        <motion.div 
+                            className="modal-content-premium"
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                        >
+                            <div className="modal-header">
+                                <h3>{isEdit ? 'Modifier le Type de Tarif' : 'Nouveau Type de Tarif'}</h3>
+                                <button className="btn-close" onClick={() => setShowModal(false)}><XCircle size={24} /></button>
+                            </div>
+
+                            <form onSubmit={handleSubmitTarif} className="modal-form">
+                                <div className="form-group">
+                                    <label>Code (ex: RED_25, PLEIN)</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={formData.code} 
+                                        onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
+                                        placeholder="CODE_UNIQUE"
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Libellé / Désignation</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={formData.libelle} 
+                                        onChange={e => setFormData({...formData, libelle: e.target.value})}
+                                        placeholder="Ex: 25% Réduction Étudiant"
+                                    />
+                                </div>
+
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label>Catégorie</label>
+                                        <select 
+                                            value={formData.categorie} 
+                                            onChange={e => setFormData({...formData, categorie: e.target.value})}
+                                        >
+                                            <option value="VOYAGEUR">VOYAGEUR</option>
+                                            <option value="CONVENTION">CONVENTION</option>
+                                            <option value="EXPEDITION">EXPEDITION</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Mode de calcul</label>
+                                        <select 
+                                            value={formData.mode_calcul} 
+                                            onChange={e => setFormData({...formData, mode_calcul: e.target.value})}
+                                        >
+                                            <option value="PERCENT_RESTANT">% Restant à payer</option>
+                                            <option value="FIXE">Forfait Fixe (TND)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Valeur ({formData.mode_calcul === 'PERCENT_RESTANT' ? '%' : 'Millimes'})</label>
+                                    <input 
+                                        type="number" 
+                                        required 
+                                        value={formData.valeur} 
+                                        onChange={e => setFormData({...formData, valeur: e.target.value})}
+                                        placeholder={formData.mode_calcul === 'PERCENT_RESTANT' ? "75 pour payer 75%" : "3000 pour 3 DT"}
+                                    />
+                                    <p className="form-hint">
+                                        {formData.mode_calcul === 'PERCENT_RESTANT' 
+                                            ? "Entrez le pourcentage du prix final (ex: 75 pour 25% de réduction)" 
+                                            : "Entrez la valeur en millimes (ex: 5000 pour 5 TND)"}
+                                    </p>
+                                </div>
+
+                                <div className="modal-footer">
+                                    <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Annuler</button>
+                                    <button type="submit" className="btn-save" disabled={loading}>
+                                        {loading ? 'Enregistrement...' : 'Confirmer'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal Bagages */}
+            <AnimatePresence>
+                {showBagageModal && (
+                    <div className="modal-overlay-premium">
+                        <motion.div 
+                            className="modal-content-premium"
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                        >
+                            <div className="modal-header">
+                                <h3>{isEditBagage ? 'Modifier la Règle Bagage' : 'Nouvelle Règle Bagage'}</h3>
+                                <button className="btn-close" onClick={() => setShowBagageModal(false)}><XCircle size={24} /></button>
+                            </div>
+
+                            <form onSubmit={handleSubmitBagage} className="modal-form">
+                                <div className="form-group">
+                                    <label>Code Flux (ex: BAG_30)</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={bagageFormData.code} 
+                                        onChange={e => setBagageFormData({...bagageFormData, code: e.target.value.toUpperCase()})}
+                                        placeholder="BAG_CODE"
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Description du Bagage</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={bagageFormData.libelle} 
+                                        onChange={e => setBagageFormData({...bagageFormData, libelle: e.target.value})}
+                                        placeholder="Ex: Bagage volumineux > 30kg"
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Tarif Additionnel (Millimes)</label>
+                                    <input 
+                                        type="number" 
+                                        required 
+                                        value={bagageFormData.prix} 
+                                        onChange={e => setBagageFormData({...bagageFormData, prix: e.target.value})}
+                                        placeholder="Ex: 2000 pour 2 DT"
+                                    />
+                                    <p className="form-hint">Entrez la valeur en millimes (ex: 1500 pour 1.500 TND)</p>
+                                </div>
+
+                                <div className="modal-footer">
+                                    <button type="button" className="btn-cancel" onClick={() => setShowBagageModal(false)}>Annuler</button>
+                                    <button type="submit" className="btn-save" disabled={loading}>
+                                        {loading ? 'Enregistrement...' : 'Confirmer'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
@@ -356,4 +714,3 @@ const ShieldCheck = ({ size }) => (
 );
 
 export default Tarifs;
-

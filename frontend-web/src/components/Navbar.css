@@ -542,6 +542,59 @@
   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.02) !important;
 }
 
+.notif-item-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.notif-item-wrapper:hover {
+  background: #f8fafc;
+}
+
+.notif-delete-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #ef4444;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 5;
+}
+
+.notif-item-wrapper:hover .notif-delete-btn {
+  opacity: 1;
+}
+
+.notif-delete-btn:hover {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.notif-item-wrapper .notif-dot {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  transition: opacity 0.2s ease;
+}
+
+.notif-item-wrapper:hover .notif-dot {
+  opacity: 0;
+}
+
 .notif-footer {
   padding: 14px !important;
   text-align: center !important;

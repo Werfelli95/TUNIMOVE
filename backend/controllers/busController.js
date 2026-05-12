@@ -19,6 +19,28 @@ exports.getBuses = async (req, res) => {
     }
 };
 
+exports.getBusByNumero = async (req, res) => {
+    try {
+        const { numero_bus } = req.params;
+        const query = `
+            SELECT b.id_bus, b.numero_bus, b.capacite, b.etat, b.num_ligne,
+                   l.ville_depart, l.ville_arrivee 
+            FROM bus b 
+            LEFT JOIN ligne l ON b.num_ligne = l.num_ligne 
+            WHERE b.numero_bus = $1
+            LIMIT 1
+        `;
+        const result = await db.query(query, [numero_bus]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Bus introuvable' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Erreur getBusByNumero:', err);
+        res.status(500).json({ message: 'Erreur lors de la récupération des détails du bus' });
+    }
+};
+
 
 // Ajouter un nouveau bus
 exports.createBus = async (req, res) => {
@@ -115,4 +137,33 @@ exports.getActiveBusCount = async (req, res) => {
     }
 };
 
-
+// Récupérer les données de suivi en temps réel (Bus + Service + Ligne)
+exports.getTrackingData = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                b.id_bus, b.numero_bus, b.image_url,
+                s.id_service, s.station_actuelle, s.date_debut, s.horaire,
+                l.num_ligne, l.ville_depart, l.ville_arrivee,
+                COALESCE(
+                    (SELECT json_agg(t.* ORDER BY t.id_trajet) 
+                     FROM trajet t 
+                     WHERE t.num_ligne = l.num_ligne
+                    ), '[]'
+                ) as stations,
+                u.nom as receveur_nom, u.prenom as receveur_prenom,
+                (SELECT COUNT(*) FROM ticket t WHERE t.id_service = s.id_service) as tickets_count
+            FROM bus b
+            JOIN service s ON b.id_bus = s.id_bus
+            JOIN ligne l ON b.num_ligne = l.num_ligne
+            LEFT JOIN utilisateur u ON s.id_receveur = u.id_utilisateur
+            WHERE s.statut = 'En cours'
+            ORDER BY s.date_debut DESC
+        `;
+        const result = await db.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erreur getTrackingData:', err);
+        res.status(500).json({ message: 'Erreur lors de la récupération des données de suivi' });
+    }
+};

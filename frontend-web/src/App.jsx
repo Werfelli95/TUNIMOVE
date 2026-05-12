@@ -16,6 +16,7 @@ import Audit from './pages/admin/Audit';
 import SalesHistory from './pages/admin/SalesHistory';
 import PasswordResets from './pages/admin/PasswordResets';
 import Incidents from './pages/admin/Incidents';
+import Tracking from './pages/admin/Tracking';
 import Guichet from './pages/agent/Guichet';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
                         <Route path="sales-history" element={<SalesHistory />} />
                         <Route path="password-resets" element={<PasswordResets />} />
                         <Route path="incidents" element={<Incidents />} />
+                        <Route path="tracking" element={<Tracking />} />
                     </Route>
                 </Route>
 

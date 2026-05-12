@@ -1,7 +1,6 @@
-const db = require('../config/db');
+const db = require('./config/db');
 
-// Récupérer toutes les fiches de clôture avec les détails (Bus, Receveur, Tickets)
-exports.getAuditRecords = async (req, res) => {
+async function test() {
     try {
         const query = `
             SELECT 
@@ -57,27 +56,13 @@ exports.getAuditRecords = async (req, res) => {
             
             ORDER BY heure_cloture DESC;
         `;
-        const result = await db.query(query);
-        res.json(result.rows);
+        const res = await db.query(query);
+        console.log("SUCCESS:", res.rows.length, "rows");
+        process.exit(0);
     } catch (err) {
-        console.error('Erreur getAuditRecords:', err);
-        res.status(500).json({ message: 'Erreur lors de la récupération des audits' });
+        console.error("FAILURE:", err.message);
+        process.exit(1);
     }
-};
+}
 
-// Valider ou Rejeter une fiche
-exports.updateAuditStatus = async (req, res) => {
-    const { id } = req.params;
-    const { statut } = req.body; // 'Validé' ou 'Rejeté'
-
-    try {
-        const result = await db.query(
-            'UPDATE fiche_cloture_service SET statut = $1 WHERE id_fiche = $2 RETURNING *',
-            [statut, id]
-        );
-        if (result.rows.length === 0) return res.status(404).json({ message: 'Fiche introuvable' });
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ message: 'Erreur lors de la mise à jour' });
-    }
-};
+test();

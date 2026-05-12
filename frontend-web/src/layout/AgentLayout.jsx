@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Ticket, UserCircle, Calendar, History } from 'lucide-react';
+import { LogOut, Ticket, UserCircle, Calendar, History, CheckCircle } from 'lucide-react';
 import ProfileModal from '../components/ProfileModal';
 
 const AgentLayout = () => {
@@ -62,6 +62,7 @@ const AgentLayout = () => {
     }, []);
 
     const handleLogout = () => {
+        localStorage.clear();
         navigate('/login');
     };
 
@@ -173,6 +174,11 @@ const AgentLayout = () => {
                         <li style={{ listStyle: 'none' }}>
                             <button onClick={() => setMode('Historique')} style={getBtnStyle(mode === 'Historique')}>
                                 <History size={20} /> Historique
+                            </button>
+                        </li>
+                        <li style={{ listStyle: 'none' }}>
+                            <button onClick={() => setMode('Clôture')} style={getBtnStyle(mode === 'Clôture')}>
+                                <CheckCircle size={20} /> Clôturer Service
                             </button>
                         </li>
                     </ul>

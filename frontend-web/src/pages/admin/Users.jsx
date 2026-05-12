@@ -9,10 +9,10 @@ import './Users.css';
 
 /* ─── Role config ─────────────────────────────────────────── */
 const ROLE_CFG = {
-  ADMIN:      { bg: 'rgba(59,130,246,0.1)',  color: '#1D4ED8', dot: '#3B82F6', icon: ShieldCheck, label: 'Administrateur' },
-  AGENT:      { bg: 'rgba(16,185,129,0.1)',  color: '#065F46', dot: '#10B981', icon: Store,       label: 'Agent de Guichet' },
-  RECEVEUR:   { bg: 'rgba(245,158,11,0.12)', color: '#92400E', dot: '#F59E0B', icon: User,        label: 'Receveur'        },
-  CONTROLEUR: { bg: 'rgba(139,92,246,0.12)', color: '#5B21B6', dot: '#8B5CF6', icon: Eye,         label: 'Contrôleur'      },
+  ADMIN: { bg: 'rgba(59,130,246,0.1)', color: '#1D4ED8', dot: '#3B82F6', icon: ShieldCheck, label: 'Administrateur' },
+  AGENT: { bg: 'rgba(16,185,129,0.1)', color: '#065F46', dot: '#10B981', icon: Store, label: 'Agent de Guichet' },
+  RECEVEUR: { bg: 'rgba(245,158,11,0.12)', color: '#92400E', dot: '#F59E0B', icon: User, label: 'Receveur' },
+  CONTROLEUR: { bg: 'rgba(139,92,246,0.12)', color: '#5B21B6', dot: '#8B5CF6', icon: Eye, label: 'Contrôleur' },
 };
 
 const getRoleCfg = (role = '') => ROLE_CFG[role.toUpperCase()] || ROLE_CFG.AGENT;
@@ -56,7 +56,7 @@ const Users = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [selectedUser, setSelectedUser] = useState(null); 
+  const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({
     nom: '', prenom: '', email: '', matricule: '', num_tel: '', role: 'AGENT', mot_de_passe: ''
   });
@@ -213,7 +213,7 @@ const Users = () => {
       const response = await fetch('http://localhost:5000/api/users');
       const data = await response.json();
       setUsers(data);
-    } catch (err) { 
+    } catch (err) {
       setError(err.message);
     } finally { setLoading(false); }
   };
@@ -237,7 +237,7 @@ const Users = () => {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     const tableHtml = document.querySelector('.enterprise-table').outerHTML;
-    
+
     printWindow.document.write(`
       <html>
         <head>
@@ -246,11 +246,11 @@ const Users = () => {
             body { font-family: sans-serif; padding: 20px; }
             h1 { color: #1e293b; border-bottom: 2px solid #eee; padding-bottom: 10px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; white-space: nowrap; }
             th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
             .user-info-cell { display: flex; align-items: center; gap: 10px; }
             .user-avatar { display: none; }
-            .row-actions, .btn-add-user, .search-wrapper { display: none !important; }
+            .row-actions, .btn-add-user, .search-wrapper, .actions-col { display: none !important; }
             .role-badge { border: 1px solid #ccc; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
             .user-matricule { font-family: monospace; background: #f1f5f9; padding: 2px 4px; }
           </style>
@@ -361,7 +361,7 @@ const Users = () => {
                         <th>Matricule</th>
                         <th>Rôle</th>
                         <th>Statut</th>
-                        <th style={{ textAlign: 'center' }}>Actions</th>
+                        <th style={{ textAlign: 'center' }} className="actions-col">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -431,7 +431,7 @@ const Users = () => {
                                   </span>
                                 )}
                               </td>
-                              <td onClick={e => e.stopPropagation()}>
+                              <td className="actions-col" onClick={e => e.stopPropagation()}>
                                 <div className="row-actions" style={{ opacity: 1 }}>
                                   <button title="Modifier" className="action-btn btn-edit" onClick={() => handleEditClick(user)}>
                                     <Edit2 size={15} />
@@ -441,10 +441,7 @@ const Users = () => {
                                     onClick={() => handleToggleBlock(user.id_utilisateur, user.est_bloque)}>
                                     {user.est_bloque ? <Unlock size={15} color="#EF4444" /> : <Lock size={15} />}
                                   </button>
-                                  <button title="Supprimer" className="action-btn btn-trash"
-                                    onClick={() => handleDeleteUser(user.id_utilisateur)}>
-                                    <Trash2 size={15} />
-                                  </button>
+
                                 </div>
                               </td>
                             </motion.tr>
@@ -557,16 +554,7 @@ const Users = () => {
                     >
                       {selectedUser.est_bloque ? '🔓 Débloquer' : '🔒 Bloquer'}
                     </button>
-                    <button
-                      onClick={() => handleDeleteUser(selectedUser.id_utilisateur)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', border: '1.5px solid #FECACA',
-                        background: '#FEF2F2', color: '#DC2626', transition: 'all 0.15s',
-                      }}
-                    >
-                      🗑️ Supprimer
-                    </button>
+                   
                   </div>
                 </div>
               </motion.div>

@@ -19,7 +19,8 @@ const AdminLayout = () => {
 
 
   const [notifs, setNotifs] = useState({ resets: 0, incidents: 0, audits: 0, total: 0 });
-  const prevTotalRef = React.useRef(0);
+  const [dismissed, setDismissed] = useState({ resets: false, incidents: false, audits: false });
+  const prevNotifsRef = React.useRef({ resets: 0, incidents: 0, audits: 0 });
 
   // Charger les notifications
   React.useEffect(() => {
@@ -28,12 +29,15 @@ const AdminLayout = () => {
         const res = await fetch('http://localhost:5000/api/admin/notifications');
         if (res.ok) {
           const data = await res.json();
-          // Si le nombre total augmente
-          if (data.total > prevTotalRef.current) {
-            // Notification logic here if needed (e.g. visual toast)
-          }
+          
+          setDismissed(prev => ({
+            resets: data.resets > prevNotifsRef.current.resets ? false : prev.resets,
+            incidents: data.incidents > prevNotifsRef.current.incidents ? false : prev.incidents,
+            audits: data.audits > prevNotifsRef.current.audits ? false : prev.audits
+          }));
+
           setNotifs(data);
-          prevTotalRef.current = data.total;
+          prevNotifsRef.current = { resets: data.resets, incidents: data.incidents, audits: data.audits };
         }
       } catch (error) {
         console.error("Erreur notifications:", error);
@@ -86,9 +90,10 @@ const AdminLayout = () => {
     { icon: <ClipboardList />, label: 'Affectations', path: '/admin-dashboard/assignments' },
     { icon: <Route />, label: 'Réseau', path: '/admin-dashboard/network' },
     { icon: <Tags />, label: 'Tarifs', path: '/admin-dashboard/tarifs' },
-    { icon: <FileCheck />, label: 'Audit', path: '/admin-dashboard/audit' },
+    { icon: <FileCheck />, label: 'Fiches de Service', path: '/admin-dashboard/audit' },
     { icon: <Receipt />, label: 'Historique des Ventes', path: '/admin-dashboard/sales-history' },
     { icon: <Siren />, label: 'Incidents', path: '/admin-dashboard/incidents' },
+    { icon: <Route />, label: 'Suivi en Direct', path: '/admin-dashboard/tracking' },
   ];
 
   const handleLogout = () => {
@@ -98,10 +103,21 @@ const AdminLayout = () => {
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
+  const handleDismiss = (e, type) => {
+    e.stopPropagation();
+    setDismissed(prev => ({ ...prev, [type]: true }));
+  };
+
+  const visibleNotifsCount = [
+    !dismissed.resets && notifs.resets > 0,
+    !dismissed.audits && notifs.audits > 0,
+    !dismissed.incidents && notifs.incidents > 0
+  ].filter(Boolean).length;
+
   return (
     <div className="admin-layout">
       <aside className="sidebar">
-        <div className="flex items-center justify-center mb-10 px-2 mt-4">
+        <div className="flex items-center justify-center mb-4 px-2 mt-1">
           <NavLink to="/admin-dashboard" className="cursor-pointer transition-transform hover:scale-105 inline-block">
             <img src="/images/tunimovebus.png" alt="TuniMove Logo" style={{ height: '140px', width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
           </NavLink>
@@ -139,12 +155,12 @@ const AdminLayout = () => {
           <div className="flex items-center gap-6">
             {/* CLOCHE DE NOTIFICATION */}
             <div className="relative" style={{ zIndex: 1001, height: '52px', width: '52px' }}>
-              <button 
+              <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
                 className={`transition-all flex items-center justify-center`}
-                style={{ 
-                  height: '52px', 
-                  width: '52px', 
+                style={{
+                  height: '52px',
+                  width: '52px',
                   borderRadius: '50%',
                   position: 'relative',
                   backgroundColor: isNotifOpen ? '#eef2ff' : '#fff',
@@ -155,9 +171,9 @@ const AdminLayout = () => {
                 }}
               >
                 <Bell size={28} />
-                {notifs.total > 0 && (
+                {visibleNotifsCount > 0 && (
                   <span className="notif-badge">
-                    {notifs.total}
+                    {visibleNotifsCount}
                   </span>
                 )}
               </button>
@@ -165,12 +181,12 @@ const AdminLayout = () => {
               <AnimatePresence>
                 {isNotifOpen && (
                   <div key="notif-portal-fix">
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, scale: 0.9, y: 10, transformOrigin: 'top right' }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.9, y: 10 }}
                       className="notif-dropdown"
-                      style={{ 
+                      style={{
                         position: 'absolute',
                         top: '60px',
                         right: '0',
@@ -179,11 +195,10 @@ const AdminLayout = () => {
                     >
                       <div className="notif-header">
                         <h3>Notifications</h3>
-                        <span className="notif-status-tag">Action requise</span>
                       </div>
-                      
+
                       <div className="notif-list">
-                        {notifs.total === 0 ? (
+                        {visibleNotifsCount === 0 ? (
                           <div className="notif-empty">
                             <div className="notif-empty-icon">
                               <Bell size={28} />
@@ -192,66 +207,81 @@ const AdminLayout = () => {
                           </div>
                         ) : (
                           <>
-                            {notifs.resets > 0 && (
-                              <button 
-                                onClick={() => { navigate('/admin-dashboard/password-resets'); setIsNotifOpen(false); }}
-                                className="notif-item"
-                              >
-                                <div className="notif-icon-box" style={{ background: '#fef2f2', color: '#ef4444' }}>
-                                  <Key size={22} />
-                                </div>
-                                <div className="notif-content">
-                                  <span className="notif-title">Réinitialisations</span>
-                                  <span className="notif-desc">{notifs.resets} demande{notifs.resets > 1 ? 's' : ''} en attente</span>
-                                </div>
+                            {notifs.resets > 0 && !dismissed.resets && (
+                              <div className="notif-item-wrapper">
+                                <button
+                                  onClick={() => { navigate('/admin-dashboard/password-resets'); setIsNotifOpen(false); }}
+                                  className="notif-item"
+                                >
+                                  <div className="notif-icon-box" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                                    <Key size={22} />
+                                  </div>
+                                  <div className="notif-content">
+                                    <span className="notif-title">Réinitialisations</span>
+                                    <span className="notif-desc">{notifs.resets} demande{notifs.resets > 1 ? 's' : ''} en attente</span>
+                                  </div>
+                                </button>
+                                <button className="notif-delete-btn" onClick={(e) => handleDismiss(e, 'resets')} title="Supprimer">
+                                  <X size={14} />
+                                </button>
                                 <div className="notif-dot" style={{ backgroundColor: '#ef4444' }}></div>
-                              </button>
+                              </div>
                             )}
 
-                            {notifs.audits > 0 && (
-                              <button 
-                                onClick={() => { navigate('/admin-dashboard/audit'); setIsNotifOpen(false); }}
-                                className="notif-item"
-                              >
-                                <div className="notif-icon-box" style={{ background: '#eef2ff', color: '#6366f1' }}>
-                                  <FileCheck size={22} />
-                                </div>
-                                <div className="notif-content">
-                                  <span className="notif-title">Audits & Fiches</span>
-                                  <span className="notif-desc">{notifs.audits} fiche{notifs.audits > 1 ? 's' : ''} à valider</span>
-                                </div>
+                            {notifs.audits > 0 && !dismissed.audits && (
+                              <div className="notif-item-wrapper">
+                                <button
+                                  onClick={() => { navigate('/admin-dashboard/audit'); setIsNotifOpen(false); }}
+                                  className="notif-item"
+                                >
+                                  <div className="notif-icon-box" style={{ background: '#eef2ff', color: '#6366f1' }}>
+                                    <FileCheck size={22} />
+                                  </div>
+                                  <div className="notif-content">
+                                    <span className="notif-title">Fiches de Service</span>
+                                    <span className="notif-desc">{notifs.audits} nouvelle{notifs.audits > 1 ? 's' : ''} fiche{notifs.audits > 1 ? 's' : ''} reçue{notifs.audits > 1 ? 's' : ''}</span>
+                                  </div>
+                                </button>
+                                <button className="notif-delete-btn" onClick={(e) => handleDismiss(e, 'audits')} title="Supprimer">
+                                  <X size={14} />
+                                </button>
                                 <div className="notif-dot" style={{ backgroundColor: '#6366f1' }}></div>
-                              </button>
+                              </div>
                             )}
 
-                            {notifs.incidents > 0 && (
-                              <button 
-                                onClick={() => { navigate('/admin-dashboard/incidents'); setIsNotifOpen(false); }}
-                                className="notif-item"
-                              >
-                                <div className="notif-icon-box" style={{ background: '#fff7ed', color: '#f97316' }}>
-                                  <Siren size={22} />
-                                </div>
-                                <div className="notif-content">
-                                  <span className="notif-title">Incidents</span>
-                                  <span className="notif-desc">{notifs.incidents} incident{notifs.incidents > 1 ? 's' : ''} non résolu{notifs.incidents > 1 ? 's' : ''}</span>
-                                </div>
+                            {notifs.incidents > 0 && !dismissed.incidents && (
+                              <div className="notif-item-wrapper">
+                                <button
+                                  onClick={() => { navigate('/admin-dashboard/incidents'); setIsNotifOpen(false); }}
+                                  className="notif-item"
+                                >
+                                  <div className="notif-icon-box" style={{ background: '#fff7ed', color: '#f97316' }}>
+                                    <Siren size={22} />
+                                  </div>
+                                  <div className="notif-content">
+                                    <span className="notif-title">Incidents</span>
+                                    <span className="notif-desc">{notifs.incidents} incident{notifs.incidents > 1 ? 's' : ''} non résolu{notifs.incidents > 1 ? 's' : ''}</span>
+                                  </div>
+                                </button>
+                                <button className="notif-delete-btn" onClick={(e) => handleDismiss(e, 'incidents')} title="Supprimer">
+                                  <X size={14} />
+                                </button>
                                 <div className="notif-dot" style={{ backgroundColor: '#f97316' }}></div>
-                              </button>
+                              </div>
                             )}
                           </>
                         )}
                       </div>
-                      
-                      {notifs.total > 0 && (
+
+                      {visibleNotifsCount > 0 && (
                         <div className="notif-footer">
-                          <span className="notif-total-label">Total: {notifs.total} alertes</span>
+                          <span className="notif-total-label">Total: {visibleNotifsCount} Notifications</span>
                         </div>
                       )}
                     </motion.div>
-                    
-                    <div 
-                      className="fixed inset-0 z-40 bg-black/5" 
+
+                    <div
+                      className="fixed inset-0 z-40 bg-black/5"
                       onClick={() => setIsNotifOpen(false)}
                     />
                   </div>
@@ -300,6 +330,8 @@ const AdminLayout = () => {
           localStorage.setItem('user', JSON.stringify(updated));
         }}
       />
+
+      {/* MODAL DE PROFIL REUTILISABLE */}
     </div>
   );
 };

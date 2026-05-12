@@ -281,7 +281,7 @@
     gap: 12px;
 }
 
-.seat-row > div:nth-child(3) {
+.seat-row > div:nth-child(2) {
     margin-right: 40px; /* Aisle */
 }
 

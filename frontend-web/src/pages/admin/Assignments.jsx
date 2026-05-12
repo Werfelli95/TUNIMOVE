@@ -1,26 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2 } from 'lucide-react';
+import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css'; // On réutilise vos styles premium
 
 const Assignments = () => {
-    const getLocalDateString = (dateVal) => {
-        const d = dateVal ? new Date(dateVal) : new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
     // États généraux
-    const [activeTab, setActiveTab] = useState('bus');
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // États pour les Bus
-    const [assignments, setAssignments] = useState([]);
-    const [stats, setStats] = useState({ withReceiver: 0, withoutReceiver: 0, availableReceivers: 0 });
 
     // États pour les Guichets
     const [guichets, setGuichets] = useState([]);
@@ -31,8 +18,6 @@ const Assignments = () => {
     const [selectedItem, setSelectedItem] = useState(null); // Peut être un bus ou un guichet
     const [availableStaff, setAvailableStaff] = useState([]);
     const [selectedStaffId, setSelectedStaffId] = useState('');
-    const [dateDebut, setDateDebut] = useState('');
-    const [dateFin, setDateFin] = useState('');
     const [selectedLigne, setSelectedLigne] = useState('');
     const [stationDepart, setStationDepart] = useState('');
     const [lignes, setLignes] = useState([]);
@@ -40,19 +25,6 @@ const Assignments = () => {
     // États pour l'Ajout de Guichet
     const [isAddGuichetModalOpen, setIsAddGuichetModalOpen] = useState(false);
     const [newGuichet, setNewGuichet] = useState({ nom_guichet: '', emplacement: '' });
-
-    const fetchBusData = async () => {
-        try {
-            const [assignRes, statsRes] = await Promise.all([
-                fetch('http://localhost:5000/api/assignments'),
-                fetch('http://localhost:5000/api/assignments/stats')
-            ]);
-            setAssignments(await assignRes.json());
-            setStats(await statsRes.json());
-        } catch (error) {
-            console.error("Erreur chargement bus:", error);
-        }
-    };
 
     const fetchGuichetData = async () => {
         try {
@@ -71,34 +43,26 @@ const Assignments = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        if (activeTab === 'bus') {
-            await fetchBusData();
-        } else {
-            await fetchGuichetData();
-        }
+        await fetchGuichetData();
         setLoading(false);
     };
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, []);
 
     const handleOpenModal = async (item) => {
         setSelectedItem(item);
         try {
-            const endpoint = activeTab === 'bus'
-                ? 'http://localhost:5000/api/assignments/available-receivers'
-                : 'http://localhost:5000/api/guichets/available-agents';
+            const endpoint = 'http://localhost:5000/api/guichets/available-agents';
 
             const res = await fetch(endpoint);
             let available = await res.json();
 
             // Ajouter la personne déjà affectée à la liste pour pouvoir la conserver
-            const currentStaffId = activeTab === 'bus' ? item.id_receveur : item.id_agent;
+            const currentStaffId = item.id_agent;
             if (currentStaffId) {
-                const staffName = activeTab === 'bus'
-                    ? { id_utilisateur: item.id_receveur, nom: item.receveur_nom, prenom: item.receveur_prenom }
-                    : { id_utilisateur: item.id_agent, nom: item.agent_nom, prenom: item.agent_prenom };
+                const staffName = { id_utilisateur: item.id_agent, nom: item.agent_nom, prenom: item.agent_prenom };
 
                 // Éviter les doublons
                 if (!available.find(u => u.id_utilisateur === currentStaffId)) {
@@ -109,22 +73,12 @@ const Assignments = () => {
 
             if (currentStaffId) {
                 setSelectedStaffId(currentStaffId);
-                if (activeTab === 'bus') {
-                    setDateDebut(item.date_debut_affectation ? getLocalDateString(item.date_debut_affectation) : getLocalDateString());
-                    setDateFin(item.date_fin_affectation ? getLocalDateString(item.date_fin_affectation) : '');
-                } else {
-                    setSelectedLigne(item.num_ligne || '');
-                    setStationDepart(item.station_depart || '');
-                }
+                setSelectedLigne(item.num_ligne || '');
+                setStationDepart(item.station_depart || '');
             } else {
                 setSelectedStaffId('');
-                if (activeTab === 'bus') {
-                    setDateDebut(getLocalDateString());
-                    setDateFin('');
-                } else {
-                    setSelectedLigne('');
-                    setStationDepart(item.emplacement || '');
-                }
+                setSelectedLigne('');
+                setStationDepart(item.emplacement || '');
             }
 
             setIsModalOpen(true);
@@ -134,22 +88,11 @@ const Assignments = () => {
     };
 
     const handleAssign = async () => {
-        if (activeTab === 'bus' && dateFin && dateDebut > dateFin) {
-            alert("La date de fin ne peut pas être antérieure à la date de début.");
-            return;
-        }
         setIsSubmitting(true);
         try {
-            const url = activeTab === 'bus'
-                ? 'http://localhost:5000/api/assignments/update'
-                : 'http://localhost:5000/api/guichets/update';
+            const url = 'http://localhost:5000/api/guichets/update';
 
-            const body = activeTab === 'bus' ? {
-                id_bus: selectedItem.id_bus,
-                id_receveur: selectedStaffId,
-                date_debut: dateDebut,
-                date_fin: dateFin
-            } : {
+            const body = {
                 id_guichet: selectedItem.id_guichet,
                 id_agent: selectedStaffId
             };
@@ -172,20 +115,14 @@ const Assignments = () => {
     };
 
     const handleUnassign = async (id) => {
-        const msg = activeTab === 'bus'
-            ? "Voulez-vous vraiment retirer ce receveur de ce bus ?"
-            : "Voulez-vous vraiment retirer cet agent de ce guichet ?";
+        const msg = "Voulez-vous vraiment retirer cet agent de ce guichet ?";
 
         if (!window.confirm(msg)) return;
 
         try {
-            const url = activeTab === 'bus'
-                ? 'http://localhost:5000/api/assignments/update'
-                : 'http://localhost:5000/api/guichets/update';
+            const url = 'http://localhost:5000/api/guichets/update';
 
-            const body = activeTab === 'bus'
-                ? { id_bus: id, id_receveur: null }
-                : { id_guichet: id, id_agent: null };
+            const body = { id_guichet: id, id_agent: null };
 
             const res = await fetch(url, {
                 method: 'POST',
@@ -259,93 +196,87 @@ const Assignments = () => {
         }
     };
 
-    const filteredBus = assignments.filter(a =>
-        a.numero_bus.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (a.receveur_nom && a.receveur_nom.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-
     const filteredGuichets = guichets.filter(g =>
         g.nom_guichet.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (g.agent_nom && g.agent_nom.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        const tableHtml = document.querySelector('.enterprise-table').outerHTML;
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Affectation Agent - Guichet - TuniMove</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; }
+                        h1 { color: #1e293b; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; white-space: nowrap; }
+                        th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+                        .role-badge { border: 1px solid #ccc; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: bold; }
+                        .actions-col, .btn-add-user, .search-wrapper, .btn-unassign { display: none !important; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Liste des Affectations (Guichets) - TuniMove</h1>
+                    <p>Généré le : ${new Date().toLocaleString()}</p>
+                    ${tableHtml}
+                    <script>
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     return (
         <div className="users-container">
-            {/* TABS SELECTOR - Premium Style */}
-            <div className="flex justify-between items-center mb-8">
-                <div className="tabs-container mb-0">
-                    <button
-                        onClick={() => setActiveTab('bus')}
-                        className={`tab-button ${activeTab === 'bus' ? 'active' : ''}`}
-                    >
-                        <Bus size={20} />
-                        <span>Affectation Bus</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('guichet')}
-                        className={`tab-button ${activeTab === 'guichet' ? 'active' : ''}`}
-                    >
-                        <Store size={20} />
-                        <span>Agents Guichet</span>
-                    </button>
-                </div>
-
-                {activeTab === 'guichet' && (
-                    <button
-                        onClick={() => setIsAddGuichetModalOpen(true)}
-                        className="btn-add-user"
-                    >
-                        <Plus size={18} />
-                        <span>Ajouter un Guichet</span>
-                    </button>
-                )}
+            <div className="flex justify-end items-center mb-8 gap-3">
+                <button
+                    className="btn-add-user"
+                    style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }}
+                    onClick={handlePrint}
+                >
+                    <Printer size={18} />
+                    <span>Imprimer Liste</span>
+                </button>
+                <button
+                    onClick={() => setIsAddGuichetModalOpen(true)}
+                    className="btn-add-user"
+                >
+                    <Plus size={18} />
+                    <span>Ajouter un Guichet</span>
+                </button>
             </div>
 
             {/* STATS CARDS */}
             <div className="stats-grid">
-                {activeTab === 'bus' ? (
-                    <>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Bus avec receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withReceiver}</h3></div>
-                                <CheckCircle className="text-indigo-500" size={32} />
-                            </div>
-                        </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Bus sans receveur</p><h3 className="text-3xl font-bold text-slate-800">{stats.withoutReceiver}</h3></div>
-                                <XCircle className="text-orange-500" size={32} />
-                            </div>
-                        </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Receveurs disponibles</p><h3 className="text-3xl font-bold text-slate-800">{stats.availableReceivers}</h3></div>
-                                <Users className="text-emerald-500" size={32} />
-                            </div>
-                        </motion.div>
-                    </>
-                ) : (
-                    <>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Guichets avec agent</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withAgent}</h3></div>
-                                <CheckCircle className="text-indigo-500" size={32} />
-                            </div>
-                        </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Guichets inoccupés</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withoutAgent}</h3></div>
-                                <XCircle className="text-orange-500" size={32} />
-                            </div>
-                        </motion.div>
-                        <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                            <div className="flex justify-between items-center">
-                                <div><p className="text-slate-500 text-sm">Agents dispos</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.availableAgents}</h3></div>
-                                <Users className="text-emerald-500" size={32} />
-                            </div>
-                        </motion.div>
-                    </>
-                )}
+                <>
+                    <motion.div className="stat-card" style={{ borderLeft: '4px solid #4f46e5' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                        <div className="flex justify-between items-center">
+                            <div><p className="text-slate-500 text-sm">Guichets avec agent</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withAgent}</h3></div>
+                            <CheckCircle className="text-indigo-500" size={32} />
+                        </div>
+                    </motion.div>
+                    <motion.div className="stat-card" style={{ borderLeft: '4px solid #f97316' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+                        <div className="flex justify-between items-center">
+                            <div><p className="text-slate-500 text-sm">Guichets inoccupés</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.withoutAgent}</h3></div>
+                            <XCircle className="text-orange-500" size={32} />
+                        </div>
+                    </motion.div>
+                    <motion.div className="stat-card" style={{ borderLeft: '4px solid #10b981' }} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
+                        <div className="flex justify-between items-center">
+                            <div><p className="text-slate-500 text-sm">Agents dispos</p><h3 className="text-3xl font-bold text-slate-800">{guichetStats.availableAgents}</h3></div>
+                            <Users className="text-emerald-500" size={32} />
+                        </div>
+                    </motion.div>
+                </>
             </div>
 
             {/* HEADER & TABLE */}
@@ -353,7 +284,7 @@ const Assignments = () => {
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">
-                            {activeTab === 'bus' ? 'Affectation Bus - Receveur' : 'Affectation Agent - Guichet'}
+                            Affectation Agent - Guichet
                         </h2>
                         <br></br>
                     </div>
@@ -373,55 +304,40 @@ const Assignments = () => {
                         <table className="enterprise-table">
                             <thead>
                                 <tr>
-                                    <th>{activeTab === 'bus' ? 'Bus' : 'Guichet'}</th>
-                                    <th>{activeTab === 'bus' ? 'Capacité' : 'Emplacement'}</th>
+                                    <th>Guichet</th>
+                                    <th>Emplacement</th>
                                     <th>État</th>
-                                    <th>{activeTab === 'bus' ? 'Receveur Affecté' : 'Agent Affecté'}</th>
-                                    <th className="text-center">Actions</th>
+                                    <th>Agent Affecté</th>
+                                    <th className="text-center actions-col">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {(activeTab === 'bus' ? filteredBus : filteredGuichets).map(item => (
-                                    <tr key={activeTab === 'bus' ? item.id_bus : item.id_guichet}>
+                                {filteredGuichets.map(item => (
+                                    <tr key={item.id_guichet}>
                                         <td className="font-bold text-slate-700">
                                             <div className="flex items-center gap-2">
-                                                {activeTab === 'bus' ? <Bus size={16} className="text-indigo-500" /> : <Store size={16} className="text-indigo-500" />}
-                                                {activeTab === 'bus' ? `Bus N° ${item.numero_bus}` : item.nom_guichet}
+                                                <Store size={16} className="text-indigo-500" />
+                                                {item.nom_guichet}
                                             </div>
                                         </td>
-                                        <td>{activeTab === 'bus' ? `${item.capacite} places` : item.emplacement}</td>
+                                        <td>{item.emplacement}</td>
                                         <td>
-                                            <button 
-                                                onClick={() => activeTab === 'guichet' && handleToggleStatus(item)}
-                                                className={`role-badge ${activeTab === 'bus' ? (item.etat === 'En service' ? 'badge-agent' : 'badge-receveur') : (item.statut === 'Actif' ? 'badge-agent' : 'badge-receveur')} ${activeTab === 'guichet' ? 'cursor-pointer hover:ring-2 hover:ring-indigo-100 transition-all' : ''}`}
-                                                title={activeTab === 'guichet' ? "Cliquer pour changer le statut" : ""}
-                                                disabled={activeTab === 'bus'}
+                                            <button
+                                                onClick={() => handleToggleStatus(item)}
+                                                className={`role-badge ${item.statut === 'Actif' ? 'badge-agent' : 'badge-receveur'} cursor-pointer hover:ring-2 hover:ring-indigo-100 transition-all`}
+                                                title="Cliquer pour changer le statut"
                                             >
-                                                {activeTab === 'bus' ? item.etat : item.statut}
+                                                {item.statut}
                                             </button>
                                         </td>
                                         <td>
-                                            {(activeTab === 'bus' ? item.receveur_nom : item.agent_nom) ? (
+                                            {item.agent_nom ? (
                                                 <div className="flex items-center justify-between gap-3 group/item">
                                                     <div>
                                                         <div className="text-slate-700 font-bold text-lg">
-                                                            {activeTab === 'bus' ? `${item.receveur_prenom} ${item.receveur_nom}` : `${item.agent_prenom} ${item.agent_nom}`}
+                                                            {`${item.agent_prenom} ${item.agent_nom}`}
                                                         </div>
-                                                        {activeTab === 'bus' && (item.date_debut_affectation || item.date_fin_affectation) && (
-                                                            <div className="flex items-center gap-2 mt-2">
-                                                                {item.date_debut_affectation && (
-                                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200">
-                                                                        {item.date_fin_affectation ? 'Du' : 'Depuis le'} {new Date(item.date_debut_affectation).toLocaleDateString()}
-                                                                    </span>
-                                                                )}
-                                                                {item.date_fin_affectation && (
-                                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200">
-                                                                        Au {new Date(item.date_fin_affectation).toLocaleDateString()}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        {activeTab === 'guichet' && item.emplacement && (
+                                                        {item.emplacement && (
                                                             <div className="flex flex-col gap-1 mt-2">
                                                                 <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200 w-fit">
                                                                     Emplacement: {item.emplacement}
@@ -430,7 +346,8 @@ const Assignments = () => {
                                                         )}
                                                     </div>
                                                     <button
-                                                        onClick={() => handleUnassign(activeTab === 'bus' ? item.id_bus : item.id_guichet)}
+                                                        className="btn-unassign"
+                                                        onClick={() => handleUnassign(item.id_guichet)}
                                                         style={{
                                                             display: 'flex',
                                                             alignItems: 'center',
@@ -446,14 +363,14 @@ const Assignments = () => {
                                                             marginLeft: '10px',
                                                             boxShadow: '0 2px 4px rgba(239, 68, 68, 0.1)'
                                                         }}
-                                                        onMouseOver={(e) => { 
-                                                            e.currentTarget.style.backgroundColor = '#ef4444'; 
+                                                        onMouseOver={(e) => {
+                                                            e.currentTarget.style.backgroundColor = '#ef4444';
                                                             e.currentTarget.style.color = 'white';
                                                             e.currentTarget.style.transform = 'scale(1.1)';
                                                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)';
                                                         }}
-                                                        onMouseOut={(e) => { 
-                                                            e.currentTarget.style.backgroundColor = '#fee2e2'; 
+                                                        onMouseOut={(e) => {
+                                                            e.currentTarget.style.backgroundColor = '#fee2e2';
                                                             e.currentTarget.style.color = '#ef4444';
                                                             e.currentTarget.style.transform = 'scale(1)';
                                                             e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.1)';
@@ -469,30 +386,20 @@ const Assignments = () => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="text-center">
+                                        <td className="text-center actions-col">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
-                                                    className={`btn-add-user h-10 py-0 px-6 text-sm ${(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? 'btn-modifier' : ''}`}
+                                                    className={`btn-add-user h-10 py-0 px-6 text-sm ${item.id_agent ? 'btn-modifier' : ''}`}
                                                     onClick={() => handleOpenModal(item)}
-                                                    disabled={activeTab === 'bus' && item.etat !== 'En service'}
-                                                    style={activeTab === 'bus' && item.etat !== 'En service' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                                                 >
-                                                    {(activeTab === 'bus' ? item.id_receveur : item.id_agent) ? (
+                                                    {item.id_agent ? (
                                                         <><Edit2 size={14} /><span>Modifier</span></>
                                                     ) : (
                                                         <><UserPlus size={14} /><span>Affecter</span></>
                                                     )}
                                                 </button>
-                                                
-                                                {activeTab === 'guichet' && (
-                                                    <button
-                                                        className="btn-danger-premium"
-                                                        onClick={() => handleDeleteGuichet(item.id_guichet)}
-                                                        title="Supprimer le guichet"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                )}
+
+
                                             </div>
                                         </td>
                                     </tr>
@@ -510,8 +417,8 @@ const Assignments = () => {
                         <motion.div className="modal-content max-w-md" initial={{ y: 50 }} animate={{ y: 0 }} exit={{ y: 50 }}>
                             <div className="modal-header">
                                 <h2>
-                                    {(activeTab === 'bus' ? selectedItem?.id_receveur : selectedItem?.id_agent) ? 'Modifier l\'affectation' : 'Nouvelle Affectation'}
-                                    - {activeTab === 'bus' ? `Bus ${selectedItem?.numero_bus}` : selectedItem?.nom_guichet}
+                                    {selectedItem?.id_agent ? 'Modifier l\'affectation' : 'Nouvelle Affectation'}
+                                    - {selectedItem?.nom_guichet}
                                 </h2>
                                 <button className="btn-close" onClick={() => setIsModalOpen(false)}><X size={20} /></button>
                             </div>
@@ -521,7 +428,7 @@ const Assignments = () => {
                                     <div className="space-y-6">
                                         <div className="form-group">
                                             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
-                                                Choisir {activeTab === 'bus' ? 'un receveur' : 'un agent'}
+                                                Choisir un agent
                                             </label>
                                             <select
                                                 className="form-select w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
@@ -537,44 +444,10 @@ const Assignments = () => {
                                             </select>
                                         </div>
 
-                                        {activeTab === 'bus' && (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="form-group mb-0">
-                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Date de début *</label>
-                                                    <input
-                                                        type="date"
-                                                        className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
-                                                        value={dateDebut}
-                                                        onChange={(e) => {
-                                                            const newDebut = e.target.value;
-                                                            setDateDebut(newDebut);
-                                                            if (dateFin && newDebut > dateFin) {
-                                                                setDateFin(newDebut);
-                                                            }
-                                                        }}
-                                                        min={getLocalDateString()}
-                                                        required
-                                                    />
-                                                </div>
-                                                <div className="form-group mb-0">
-                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Date de fin (Optionnel)</label>
-                                                    <input
-                                                        type="date"
-                                                        className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
-                                                        value={dateFin}
-                                                        onChange={(e) => setDateFin(e.target.value)}
-                                                        min={dateDebut || new Date().toISOString().split('T')[0]}
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-
-
-
                                         <button
                                             className="btn-submit w-full py-4 justify-center"
                                             onClick={handleAssign}
-                                            disabled={!selectedStaffId || (activeTab === 'bus' && !dateDebut) || isSubmitting}
+                                            disabled={!selectedStaffId || isSubmitting}
                                         >
                                             {isSubmitting ? "Enregistrement..." : "Confirmer l'affectation"}
                                         </button>

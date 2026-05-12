@@ -32,9 +32,11 @@ const upload = multer({
 
 // Route pour obtenir la liste des bus
 router.get('/', busController.getBuses);
+router.get('/details/:numero_bus', busController.getBusByNumero);
 router.post('/', upload.single('image'), busController.createBus);
 router.put('/:id', upload.single('image'), busController.updateBus);
 router.delete('/:id', busController.deleteBus);
 router.get('/active-count', busController.getActiveBusCount);
+router.get('/tracking', busController.getTrackingData);
 
 module.exports = router;

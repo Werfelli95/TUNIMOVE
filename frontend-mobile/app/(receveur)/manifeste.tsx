@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, TextInput, RefreshControl
+  ActivityIndicator, TextInput, RefreshControl, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
   Users, Ticket, MapPin, Clock, Search, RefreshCw,
-  TrendingUp, ArrowRight, AlertCircle, Plus
+  TrendingUp, ArrowRight, AlertCircle, Plus, ChevronLeft
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
-
 import { RECEVEUR_SERVICE_API, SALES_API } from '../../constants/api';
+
+const { width } = Dimensions.get('window');
 
 interface TicketItem {
   id_ticket: number;
@@ -85,145 +86,119 @@ export default function ManifesteScreen() {
   const totalRevenue = tickets.reduce((s, t) => s + parseFloat(String(t.montant_total || 0)), 0);
 
   const renderTicket = ({ item, index }: { item: TicketItem; index: number }) => {
-    const tarifColor = TARIF_COLOR[item.type_tarif] || Colors.primaryLight;
+    const tarifColor = TARIF_COLOR[item.type_tarif] || Colors.primary;
     const emissionTime = item.date_emission
       ? new Date(item.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       : '—';
     return (
       <View style={styles.ticketCard}>
         <View style={styles.ticketTop}>
-          <View style={[styles.ticketIndex, { backgroundColor: Colors.primary + '12' }]}>
+          <View style={[styles.ticketIndex, { backgroundColor: Colors.primary + '10' }]}>
             <Text style={styles.ticketIndexTxt}>{index + 1}</Text>
           </View>
           <View style={styles.ticketRoute}>
-            <Text style={styles.ticketStation}>{item.station_depart || '—'}</Text>
-            <View style={styles.ticketArrow}>
-              <View style={styles.ticketLine} />
-              <ArrowRight color={Colors.textMuted} size={12} />
-            </View>
-            <Text style={styles.ticketStation}>{item.station_arrivee || '—'}</Text>
+            <Text style={styles.ticketStation} numberOfLines={1}>{item.station_depart || '—'}</Text>
+            <ArrowRight color={Colors.textLight} size={14} strokeWidth={2.5} />
+            <Text style={styles.ticketStation} numberOfLines={1}>{item.station_arrivee || '—'}</Text>
           </View>
-          <Text style={styles.ticketPrice}>{parseFloat(String(item.montant_total || 0)).toFixed(3)} TND</Text>
+          <Text style={styles.ticketPrice}>{parseFloat(String(item.montant_total || 0)).toFixed(3)}</Text>
         </View>
 
         <View style={styles.ticketMeta}>
-          <View style={styles.ticketBadge}>
-            <Text style={styles.ticketSiege}>Siège {item.siege || '—'}</Text>
+          <View style={styles.seatBadge}>
+            <Text style={styles.seatText}>SIÈGE {item.siege || '—'}</Text>
           </View>
-          <View style={[styles.ticketTarifBadge, { backgroundColor: tarifColor + '18' }]}>
-            <Text style={[styles.ticketTarifText, { color: tarifColor }]}>{item.type_tarif}</Text>
+          <View style={[styles.tarifBadge, { backgroundColor: tarifColor + '12' }]}>
+            <View style={[styles.tarifDot, { backgroundColor: tarifColor }]} />
+            <Text style={[styles.tarifText, { color: tarifColor }]}>{item.type_tarif}</Text>
           </View>
-          <View style={styles.ticketTimeBadge}>
-            <Clock color={Colors.textMuted} size={11} />
-            <Text style={styles.ticketTime}>{item.heure_depart || emissionTime}</Text>
+          <View style={styles.timeInfo}>
+            <Clock color={Colors.textMuted} size={12} strokeWidth={2.5} />
+            <Text style={styles.timeText}>{item.heure_depart || emissionTime}</Text>
           </View>
         </View>
       </View>
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={Colors.primary} size="large" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
+  );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.container}>
-        {/* ── Summary Card ── */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryTop}>
-            <View>
-              <Text style={styles.summaryTitle}>Liste des réservations</Text>
-              {service_id
-                ? <Text style={styles.summarySubtitle}>Service #{service_id} · Bus {numero_bus}</Text>
-                : <Text style={styles.summarySubtitle}>Bus {numero_bus} · Aujourd'hui</Text>
-              }
-              {ville_depart && (
-                <Text style={styles.summaryRoute}>{ville_depart} → {ville_arrivee}</Text>
-              )}
-            </View>
+        {/* ── Ultra-Premium Header ── */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <ChevronLeft color={Colors.white} size={24} strokeWidth={3} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Manifeste Voyageurs</Text>
+            <Text style={styles.headerSub}>Bus {numero_bus} · Ligne {num_ligne}</Text>
           </View>
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryStat}>
-              <Users color={Colors.primary} size={18} />
-              <Text style={styles.summaryStatVal}>{tickets.length}</Text>
-              <Text style={styles.summaryStatLabel}>Passagers</Text>
-            </View>
-            <View style={styles.summaryStatDiv} />
-            <View style={styles.summaryStat}>
-              <TrendingUp color={Colors.success} size={18} />
-              <Text style={styles.summaryStatVal}>{totalRevenue.toFixed(2)}</Text>
-              <Text style={styles.summaryStatLabel}>TND</Text>
-            </View>
-            <View style={styles.summaryStatDiv} />
-            <View style={styles.summaryStat}>
-              <Ticket color={Colors.warning} size={18} />
-              <Text style={styles.summaryStatVal}>{num_ligne || '—'}</Text>
-              <Text style={styles.summaryStatLabel}>Ligne</Text>
-            </View>
+          <TouchableOpacity style={styles.refreshBtn} onPress={() => { setRefreshing(true); fetchManifeste(); }}>
+             <RefreshCw color={Colors.white} size={20} strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Luxury Summary Card ── */}
+        <View style={styles.summaryCard}>
+          <View style={styles.statBox}>
+             <Users color={Colors.accent} size={20} strokeWidth={2.5} />
+             <Text style={styles.statVal}>{tickets.length}</Text>
+             <Text style={styles.statLbl}>PASSAGERS</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+             <TrendingUp color={Colors.success} size={20} strokeWidth={2.5} />
+             <Text style={styles.statVal}>{totalRevenue.toFixed(2)}</Text>
+             <Text style={styles.statLbl}>RECETTE TND</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+             <Ticket color={Colors.info} size={20} strokeWidth={2.5} />
+             <Text style={styles.statVal}>{service_id || '—'}</Text>
+             <Text style={styles.statLbl}>SERVICE</Text>
           </View>
         </View>
 
-        {/* ── Search + Refresh ── */}
-        <View style={styles.searchRow}>
-          <View style={styles.searchBox}>
-            <Search color={Colors.textMuted} size={16} />
+        {/* ── Search Bar ── */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchBar}>
+            <Search color={Colors.textMuted} size={18} strokeWidth={2.5} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Siège, station, tarif..."
+              placeholder="Rechercher un siège, station ou tarif..."
               value={search}
               onChangeText={handleSearch}
               placeholderTextColor={Colors.textLight}
             />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <X color={Colors.textMuted} size={18} />
+              </TouchableOpacity>
+            )}
           </View>
-          <TouchableOpacity
-            style={styles.refreshBtn}
-            onPress={() => { setRefreshing(true); fetchManifeste(); }}
-          >
-            <RefreshCw color={Colors.primary} size={18} />
-          </TouchableOpacity>
         </View>
 
-        {/* ── List ── */}
+        {/* ── Tickets List ── */}
         {filtered.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Users color={Colors.textLight} size={40} />
+              <Users color={Colors.bgMid} size={64} strokeWidth={1.5} />
             </View>
-            <Text style={styles.emptyTitle}>Aucune réservation</Text>
-            <Text style={styles.emptySub}>
-              {search
-                ? 'Aucun résultat pour cette recherche.'
-                : 'La liste est vide. Émettez le premier billet.'}
-            </Text>
-            {!search && service_id && (
-              <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => router.push({
-                  pathname: '/(receveur)/vente',
-                  params: { nom, prenom, numero_bus, ville_depart, ville_arrivee, num_ligne, service_id }
-                })}
-              >
-                <Plus color={Colors.white} size={16} />
-                <Text style={styles.emptyBtnText}>Émettre un premier billet</Text>
-              </TouchableOpacity>
-            )}
+            <Text style={styles.emptyTitle}>Liste vide</Text>
+            <Text style={styles.emptySub}>Aucun passager ne correspond à votre recherche actuelle.</Text>
           </View>
         ) : (
           <FlatList
             data={filtered}
             renderItem={renderTicket}
             keyExtractor={t => String(t.id_ticket)}
-            contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: 40 }}
-            ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchManifeste(); }} />
-            }
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchManifeste(); }} />}
           />
         )}
       </View>
@@ -231,84 +206,71 @@ export default function ManifesteScreen() {
   );
 }
 
+// Add X icon helper if not imported
+const X = ({ color, size }: { color: string; size: number }) => (
+  <View style={{ transform: [{ rotate: '45deg' }] }}>
+    <Plus color={color} size={size} strokeWidth={3} />
+  </View>
+);
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bgLight },
-  container: { flex: 1 },
+  safe: { flex: 1, backgroundColor: Colors.primary },
+  container: { flex: 1, backgroundColor: Colors.bgLight },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
 
-  // Summary Card
+  header: {
+    backgroundColor: Colors.primary, paddingHorizontal: Spacing.xl, 
+    paddingTop: Spacing.lg, paddingBottom: Spacing.xl,
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+  },
+  backBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: Colors.white, letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, color: 'rgba(255, 255, 255, 0.5)', fontWeight: '700', letterSpacing: 0.5 },
+  refreshBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+
   summaryCard: {
-    backgroundColor: Colors.primary, margin: Spacing.base,
-    borderRadius: Radius.xl, padding: Spacing.base, ...Shadow.strong,
+    flexDirection: 'row', backgroundColor: Colors.white,
+    marginHorizontal: Spacing.xl, marginTop: -Spacing.xl,
+    borderRadius: Radius.xxl, padding: Spacing.xl, ...Shadow.strong,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  summaryTop: { marginBottom: Spacing.md },
-  summaryTitle: { fontSize: 18, fontWeight: '800', color: Colors.white },
-  summarySubtitle: { fontSize: 14, color: Colors.white + '80', marginTop: 2 },
-  summaryRoute: { fontSize: 14, color: Colors.accent, fontWeight: '700', marginTop: 4 },
-  summaryStats: {
-    flexDirection: 'row', backgroundColor: Colors.white + '12',
-    borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center',
-  },
-  summaryStat: { flex: 1, alignItems: 'center', gap: 3 },
-  summaryStatVal: { fontSize: 20, fontWeight: '900', color: Colors.white },
-  summaryStatLabel: { fontSize: 12, color: Colors.white + '70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryStatDiv: { width: 1, height: 32, backgroundColor: Colors.white + '25', marginHorizontal: Spacing.md },
+  statBox: { flex: 1, alignItems: 'center', gap: 4 },
+  statVal: { fontSize: 18, fontWeight: '900', color: Colors.primary, letterSpacing: -0.3 },
+  statLbl: { fontSize: 9, fontWeight: '900', color: Colors.textLight, letterSpacing: 1 },
+  statDivider: { width: 1, height: 36, backgroundColor: Colors.bgMid, alignSelf: 'center' },
 
-  // Search
-  searchRow: {
-    flexDirection: 'row', gap: Spacing.sm,
-    paddingHorizontal: Spacing.base, marginBottom: Spacing.sm,
+  searchSection: { padding: Spacing.xl },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
+    height: 54, paddingHorizontal: Spacing.lg, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.white, borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md, height: 44, ...Shadow.card,
-  },
-  searchInput: { flex: 1, fontSize: 16, color: Colors.textDark },
-  refreshBtn: {
-    width: 44, height: 44, borderRadius: Radius.md,
-    backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', ...Shadow.card,
-  },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.textDark, fontWeight: '700' },
 
-  // Ticket Card
+  listContent: { paddingHorizontal: Spacing.xl, paddingBottom: 40, gap: 12 },
   ticketCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.lg,
-    padding: Spacing.base, ...Shadow.card,
+    backgroundColor: Colors.white, borderRadius: Radius.xl,
+    padding: Spacing.lg, ...Shadow.subtle, borderWidth: 1, borderColor: Colors.bgMid,
   },
-  ticketTop: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm,
-  },
-  ticketIndex: {
-    width: 28, height: 28, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  ticketIndexTxt: { fontSize: 14, fontWeight: '800', color: Colors.primary },
-  ticketRoute: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ticketStation: { fontSize: 15, fontWeight: '800', color: Colors.textDark, flexShrink: 1 },
-  ticketArrow: { flexDirection: 'row', alignItems: 'center' },
-  ticketLine: { width: 16, height: 1.5, backgroundColor: Colors.border },
-  ticketPrice: { fontSize: 16, fontWeight: '800', color: Colors.primary },
-  ticketMeta: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', alignItems: 'center' },
-  ticketBadge: {
-    backgroundColor: Colors.bgMid, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
-  },
-  ticketSiege: { fontSize: 13, fontWeight: '800', color: Colors.textMid },
-  ticketTarifBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
-  ticketTarifText: { fontSize: 13, fontWeight: '800' },
-  ticketTimeBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ticketTime: { fontSize: 13, color: Colors.textMuted, fontWeight: '700' },
+  ticketTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  ticketIndex: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  ticketIndexTxt: { fontSize: 14, fontWeight: '900', color: Colors.primary },
+  ticketRoute: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ticketStation: { fontSize: 15, fontWeight: '900', color: Colors.textDark, flexShrink: 1 },
+  ticketPrice: { fontSize: 17, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
+  
+  ticketMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  seatBadge: { backgroundColor: Colors.bgMid, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill },
+  seatText: { fontSize: 11, fontWeight: '900', color: Colors.textDark, letterSpacing: 0.5 },
+  tarifBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill },
+  tarifDot: { width: 6, height: 6, borderRadius: 3 },
+  tarifText: { fontSize: 11, fontWeight: '900' },
+  timeInfo: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' },
+  timeText: { fontSize: 12, fontWeight: '800', color: Colors.textMuted },
 
-  // Empty
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyIcon: {
-    width: 80, height: 80, borderRadius: 20,
-    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
-  },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: Colors.textMid, marginBottom: 8 },
-  emptySub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
-  emptyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: Radius.lg,
-  },
-  emptyBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 40 },
+  emptyIcon: { width: 100, height: 100, borderRadius: 32, backgroundColor: Colors.bgMid + '30', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: Colors.textMid, marginBottom: 8 },
+  emptySub: { fontSize: 15, color: Colors.textLight, textAlign: 'center', fontWeight: '600', lineHeight: 22 },
 });

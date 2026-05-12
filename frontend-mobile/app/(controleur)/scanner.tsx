@@ -66,6 +66,8 @@ export default function ScannerScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const [totalScanned, setTotalScanned] = useState(0);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -106,6 +108,7 @@ export default function ScannerScreen() {
       Vibration.vibrate(100);
       setLastResult(result);
       setHistory(prev => [result, ...prev.slice(0, 9)]);
+      setTotalScanned(prev => prev + 1);
       setResultModal(true);
     } catch (err: any) {
       // Extraire le message d'erreur et éventuellement le détail technique du backend
@@ -138,6 +141,37 @@ export default function ScannerScreen() {
     setLastResult(null);
     setScanning(true);
     lastScanned.current = '';
+  };
+
+  const handleCloseService = () => {
+    const proceed = async () => {
+      setIsClosing(true);
+      try {
+        await axios.post(`${SALES_API.replace('/sales', '/controleur-service')}/close`, {
+          id_controleur: userId,
+          heure_connexion: params.login_time,
+          nb_tickets_scannes: totalScanned
+        });
+        Alert.alert('Service clôturé', 'Votre fiche de service a été envoyée à l\'administration.', [
+          { text: 'OK', onPress: () => router.replace('/') }
+        ]);
+        if (Platform.OS === 'web') router.replace('/');
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.message || err.message || 'Impossible de clôturer le service';
+        Alert.alert('Erreur', errorMsg);
+      } finally {
+        setIsClosing(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Voulez-vous clôturer votre service et envoyer votre rapport ?')) proceed();
+    } else {
+      Alert.alert('Clôturer le service', 'Voulez-vous clôturer votre service et envoyer votre rapport ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Clôturer', style: 'destructive', onPress: proceed }
+      ]);
+    }
   };
 
   const handleLogout = () => {
@@ -200,6 +234,7 @@ export default function ScannerScreen() {
         userId={userId}
         imageUrl={imageUrl as string}
         onLogout={handleLogout}
+        onCloseService={handleCloseService}
       />
       {/* ── Camera Full Screen ── */}
       {!showHistory && (

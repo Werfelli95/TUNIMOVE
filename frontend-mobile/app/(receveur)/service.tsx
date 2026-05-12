@@ -1,20 +1,21 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Platform
+  ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Platform, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
   Play, Square, Ticket, ClipboardList, AlertTriangle, X,
   Clock, TrendingUp, Bus, Navigation, MapPin, ChevronRight,
-  ChevronDown, CheckCircle
+  ChevronDown, CheckCircle, ArrowUpDown
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 
 import { RECEVEUR_SERVICE_API, NETWORK_API } from '../../constants/api';
 
+const { width } = Dimensions.get('window');
 const BASE = RECEVEUR_SERVICE_API;
 const NET = NETWORK_API;
 
@@ -49,13 +50,14 @@ export default function ServiceScreen() {
   const [refreshing, setRef]    = useState(false);
   const [starting, setStarting] = useState(false);
   const [advancing, setAdv]     = useState(false);
-  const [closing, setClosing]   = useState(false);
   const [stations, setStations] = useState<string[]>([]);
   const [horaires, setHoraires] = useState<string[]>([]);
-  const [selHoraire, setSelHoraire] = useState('');
+  const [selHoraire, setSelHoraire] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
+  const [isReversed, setIsReversed] = useState(params.isReversed === 'true');
   const [showPicker, setShowPicker] = useState(false);
-  const [incModal, setIncModal] = useState(false);
-  const [incRaison, setIncRaison] = useState('');
 
   const load = async () => {
     if (!numero_bus) { setLoading(false); return; }
@@ -69,28 +71,18 @@ export default function ServiceScreen() {
           const net = await axios.get<any[]>(NET);
           const ligne = net.data.find((l: any) => String(l.num_ligne) === String(targetLigne));
           if (ligne) {
-            // Hours
             setHoraires(ligne.horaires || []);
-            if (!selHoraire && ligne.horaires?.length > 0) setSelHoraire(ligne.horaires[0]);
-
-            // Stations
             let list = [...(ligne.stations || [])].sort((a: any, b: any) => a.distance_km - b.distance_km);
-            
             const startName = (ligne.ville_depart || '').trim().toLowerCase();
             const endName = (ligne.ville_arrivee || '').trim().toLowerCase();
 
             if (!list.some((s: any) => (s.arret || '').trim().toLowerCase() === startName)) {
               list.unshift({ arret: ligne.ville_depart, distance_km: 0 });
             }
-            
             if (!list.some((s: any) => (s.arret || '').trim().toLowerCase() === endName)) {
-              // Only add if not already there, and use a more sensible distance if possible, 
-              // but here we just follow the rule of not adding fake high distances if possible.
-              // However, for progression, we usually want the arrival city.
               list.push({ arret: ligne.ville_arrivee, distance_km: list.length > 0 ? list[list.length-1].distance_km + 1 : 1 });
             }
 
-            // Final deduplication by name to be safe
             const uniqueList: any[] = [];
             const seen = new Set();
             for (const s of list) {
@@ -100,7 +92,6 @@ export default function ServiceScreen() {
                 uniqueList.push(s);
               }
             }
-            
             setStations(uniqueList.map((s: any) => s.arret.trim()));
           }
         } catch { /**/ }
@@ -109,38 +100,44 @@ export default function ServiceScreen() {
     finally { setLoading(false); setRef(false); }
   };
 
-  useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
+  useFocusEffect(useCallback(() => { 
+    setLoading(true); 
+    // Forcer l'heure système actuelle à chaque fois qu'on arrive sur l'écran
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    setSelHoraire(timeStr);
+    load(); 
+  }, []));
 
-  // ── Duration ──
   const elapsedMin = svc
     ? Math.max(0, Math.floor((Date.now() - new Date(svc.date_debut).getTime()) / 60000))
     : 0;
   const durLabel = elapsedMin >= 60
-    ? `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}min`
-    : `${elapsedMin}min`;
+    ? `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}m`
+    : `${elapsedMin}m`;
 
-  // ── Station progress ──
-  const currentIdx = stations.findIndex(s => s.toLowerCase().trim() === (svc?.station_actuelle ?? '').toLowerCase().trim());
+  const displayStations = isReversed ? [...stations].reverse() : stations;
+  const currentIdx = displayStations.findIndex(s => s.toLowerCase().trim() === (svc?.station_actuelle ?? '').toLowerCase().trim());
   let nextStation: string | null = null;
   let isLastStop = false;
 
   if (!svc?.voyage_complet) {
-    if (currentIdx >= 0 && currentIdx < stations.length - 1) {
-      nextStation = stations[currentIdx + 1];
-      isLastStop = (currentIdx === stations.length - 2);
-    } else if (currentIdx === -1 && stations.length > 0) {
-      nextStation = stations[0];
-      isLastStop = (stations.length === 1);
+    if (currentIdx >= 0 && currentIdx < displayStations.length - 1) {
+      nextStation = displayStations[currentIdx + 1];
+      isLastStop = (currentIdx === displayStations.length - 2);
+    } else if (currentIdx === -1 && displayStations.length > 0) {
+      nextStation = displayStations[0];
+      isLastStop = (displayStations.length === 1);
     }
   }
 
-  // ── Handlers ──
   const handleStart = () => {
     if (!selHoraire && horaires.length > 0) {
         Alert.alert('Horaire requis', 'Veuillez sélectionner un horaire de départ.');
         return;
     }
-    const msg = `Démarrer le service de ${selHoraire || 'votre choix'} pour le Bus N° ${numero_bus} ?`;
+    const msg = `Lancer le service pour le bus N° ${numero_bus} ?`;
+    
     const proceed = async () => {
       setStarting(true);
       try {
@@ -151,16 +148,13 @@ export default function ServiceScreen() {
         });
         const s = r.data.service as ActiveService;
         setSvc({ ...s, nb_tickets: 0, recette: 0 });
-        if (Platform.OS === 'web') window.alert(`✅ Service #${s.id_service} démarré.`);
-        else Alert.alert('✅ Service démarré', `Service #${s.id_service} démarré.`);
       } catch (e: any) {
-        if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Impossible de démarrer'));
-        else Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de démarrer');
+        Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de démarrer');
       } finally { setStarting(false); }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) proceed();
+      if (confirm(msg)) proceed();
     } else {
       Alert.alert('🚌 Démarrer le service', msg, [
         { text: 'Annuler', style: 'cancel' },
@@ -171,9 +165,8 @@ export default function ServiceScreen() {
 
   const handleAvancer = () => {
     if (!nextStation || !svc) return;
-    
     const title = isLastStop ? '🏁 Destination finale' : '➡️ Prochaine station';
-    const msg = `Confirmer l'arrivée à ${nextStation} ?${isLastStop ? '\nLe voyage sera marqué comme terminé.' : ''}`;
+    const msg = `Confirmer l'arrivée à ${nextStation} ?`;
     
     const proceed = async () => {
       setAdv(true);
@@ -184,19 +177,13 @@ export default function ServiceScreen() {
         });
         const up = r.data.service;
         setSvc(prev => prev ? { ...prev, station_actuelle: up.station_actuelle, voyage_complet: up.voyage_complet } : null);
-        if (isLastStop) {
-          const m = `🏁 Voyage terminé ! Vous êtes à ${nextStation}. Vous pouvez clôturer le service.`;
-          if (Platform.OS === 'web') window.alert(m);
-          else Alert.alert('🏁 Voyage terminé !', m);
-        }
       } catch (e: any) {
-        if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Erreur mise à jour'));
-        else Alert.alert('Erreur', e.response?.data?.message ?? 'Erreur mise à jour');
+        Alert.alert('Erreur', e.response?.data?.message ?? 'Erreur mise à jour');
       } finally { setAdv(false); }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(title + '\n\n' + msg)) proceed();
+      if (confirm(`${title}\n\n${msg}`)) proceed();
     } else {
       Alert.alert(title, msg, [
         { text: 'Annuler', style: 'cancel' },
@@ -205,28 +192,38 @@ export default function ServiceScreen() {
     }
   };
 
-  const handleClose = async (raison?: string) => {
+  const handleStartReturn = async () => {
     if (!svc) return;
-    setClosing(true);
+    setAdv(true);
     try {
-      const r = await axios.post<any>(`${BASE}/${svc.id_service}/close`, raison ? { raison_incident: raison } : {});
-      setSvc(null);
-      setIncModal(false);
-      if (Platform.OS === 'web') window.alert('✅ Service clôturé: ' + r.data.message);
-      else Alert.alert('✅ Service clôturé', r.data.message);
+      // On inverse le sens
+      const nextIsReversed = !isReversed;
+      setIsReversed(nextIsReversed);
+      
+      // On calcule la nouvelle station de départ (celle où on est actuellement)
+      // On demande au backend de remettre voyage_complet à false
+      await axios.post<any>(`${BASE}/${svc.id_service}/avancer`, {
+        prochaine_station: svc.station_actuelle,
+        est_derniere: false,
+      });
+      
+      await load();
+      Alert.alert('Bon voyage !', 'Le trajet de retour a été initialisé.');
     } catch (e: any) {
-      if (Platform.OS === 'web') window.alert('Erreur: ' + (e.response?.data?.message ?? 'Impossible de clôturer'));
-      else Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
-    } finally { setClosing(false); }
+      Alert.alert('Erreur', 'Impossible de relancer le trajet de retour');
+    } finally { setAdv(false); }
   };
+
 
   const navParams = {
     nom, prenom, numero_bus,
-    ville_depart: svc?.station_actuelle || svc?.ville_depart || ville_dep,
-    ville_arrivee: svc?.ville_arrivee || ville_arr,
+    ville_depart: isReversed ? (svc?.ville_arrivee || ville_arr) : (svc?.ville_depart || ville_dep),
+    ville_arrivee: isReversed ? (svc?.ville_depart || ville_dep) : (svc?.ville_arrivee || ville_arr),
+    station_actuelle: svc?.station_actuelle || '',
     num_ligne: svc ? String(svc.num_ligne) : num_ligne,
     service_id: svc ? String(svc.id_service) : '',
     horaire: svc?.horaire || '',
+    isReversed: isReversed ? 'true' : 'false'
   };
 
   if (loading) return (
@@ -241,416 +238,372 @@ export default function ServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         {svc ? (
-          /* ══════════ ACTIVE SERVICE ══════════ */
           <>
-            {/* ── Service Header ── */}
+            {/* ── Ultra-Premium Service Card ── */}
             <View style={styles.serviceHeader}>
-              <View style={styles.serviceHeaderTop}>
-                <View style={styles.activePill}>
-                  <View style={styles.activeDot} />
-                  <Text style={styles.activePillText}>EN SERVICE</Text>
+              <View style={styles.headerTop}>
+                <View style={styles.statusPill}>
+                  <View style={styles.pulseDot} />
+                  <Text style={styles.statusPillText}>SERVICE ACTIF</Text>
                 </View>
-                <Text style={styles.serviceNum}>#{svc.id_service}</Text>
               </View>
-              <View style={styles.serviceHeaderInfo}>
-                <View style={styles.sInfoItem}>
-                  <Bus color={Colors.accent} size={14} />
-                  <Text style={styles.sInfoText}>Bus {svc.numero_bus}</Text>
+              
+              <View style={styles.headerMain}>
+                <View style={styles.unitBadge}>
+                  <Bus color={Colors.white} size={24} strokeWidth={2.5} />
                 </View>
-                <View style={styles.sInfoDot} />
-                <View style={styles.sInfoItem}>
-                  <Navigation color={Colors.accent} size={14} />
-                  <Text style={styles.sInfoText}>Ligne {svc.num_ligne}</Text>
+                <View>
+                  <Text style={styles.unitLabel}>BUS UNITÉ</Text>
+                  <Text style={styles.unitNum}>N° {svc.numero_bus}</Text>
                 </View>
-                <View style={styles.sInfoDot} />
-                <View style={styles.sInfoItem}>
-                  <Clock color={Colors.accent} size={14} />
-                  <Text style={styles.sInfoText}>
-                    {new Date(svc.date_debut).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                <View>
+                  <Text style={styles.unitLabel}>LIGNE</Text>
+                  <Text style={styles.unitNum}>{svc.num_ligne}</Text>
+                </View>
+              </View>
+
+              <View style={styles.headerDirection}>
+                <Navigation color={Colors.accent} size={16} strokeWidth={2.5} />
+                <Text style={styles.directionLabel}>
+                  {isReversed ? svc.ville_arrivee : svc.ville_depart} 
+                  {' ➔ '}
+                  {isReversed ? svc.ville_depart : svc.ville_arrivee}
+                </Text>
+                <View style={styles.sensBadge}>
+                   <Text style={styles.sensBadgeText}>{isReversed ? 'RETOUR' : 'ALLER'}</Text>
                 </View>
               </View>
             </View>
 
-            {/* ── KPI Cards ── */}
+            {/* ── Premium KPI Row ── */}
             <View style={styles.kpiRow}>
               <View style={styles.kpiCard}>
-                <Clock color={Colors.primary} size={18} />
+                <View style={[styles.kpiIcon, { backgroundColor: Colors.info + '12' }]}>
+                  <Clock color={Colors.info} size={18} strokeWidth={2.5} />
+                </View>
                 <Text style={styles.kpiVal}>{durLabel}</Text>
-                <Text style={styles.kpiLbl}>Durée</Text>
+                <Text style={styles.kpiLbl}>DURÉE</Text>
               </View>
               <View style={styles.kpiCard}>
-                <Ticket color={Colors.warning} size={18} />
+                <View style={[styles.kpiIcon, { backgroundColor: Colors.warning + '12' }]}>
+                  <Ticket color={Colors.warning} size={18} strokeWidth={2.5} />
+                </View>
                 <Text style={styles.kpiVal}>{svc.nb_tickets}</Text>
-                <Text style={styles.kpiLbl}>Billets</Text>
+                <Text style={styles.kpiLbl}>BILLETS</Text>
               </View>
               <View style={styles.kpiCard}>
-                <TrendingUp color={Colors.success} size={18} />
+                <View style={[styles.kpiIcon, { backgroundColor: Colors.success + '12' }]}>
+                  <TrendingUp color={Colors.success} size={18} strokeWidth={2.5} />
+                </View>
                 <Text style={styles.kpiVal}>{parseFloat(String(svc.recette)).toFixed(1)}</Text>
                 <Text style={styles.kpiLbl}>TND</Text>
               </View>
             </View>
 
-            {/* ── Route Progress ── */}
-            <View style={styles.routeCard}>
-              <View style={styles.routeHeader}>
-                <MapPin color={Colors.primary} size={16} />
-                <Text style={styles.routeTitle}>Progression du trajet</Text>
+            {/* ── Flight-Track Timeline ── */}
+            <View style={styles.timelineCard}>
+              <View style={styles.cardHeader}>
+                <MapPin color={Colors.primary} size={20} strokeWidth={2.5} />
+                <Text style={styles.cardTitle}>Itinéraire en temps réel</Text>
+                <View style={{ flex: 1 }} />
+                <View style={[styles.directionMiniBadge, { backgroundColor: isReversed ? Colors.info + '15' : Colors.success + '15' }]}>
+                  <ArrowUpDown color={isReversed ? Colors.info : Colors.success} size={12} strokeWidth={3} />
+                  <Text style={[styles.directionMiniText, { color: isReversed ? Colors.info : Colors.success }]}>
+                    {isReversed ? 'RETOUR' : 'ALLER'}
+                  </Text>
+                </View>
                 {svc.voyage_complet && (
-                  <View style={styles.doneBadge}>
-                    <CheckCircle color={Colors.success} size={12} />
-                    <Text style={styles.doneBadgeText}>Terminé</Text>
+                  <View style={styles.finishedBadge}>
+                    <Text style={styles.finishedText}>TERMINÉ</Text>
                   </View>
                 )}
               </View>
 
+              <View style={styles.timeline}>
+                {displayStations.map((st, i) => {
+                  const isPast = (currentIdx >= 0 && i < currentIdx) || svc.voyage_complet;
+                  const isCur = st.toLowerCase().trim() === (svc?.station_actuelle ?? '').toLowerCase().trim() && !svc.voyage_complet;
+                  const isLast = i === displayStations.length - 1;
 
-
-              {stations.length > 0 && (
-                <View style={styles.timeline}>
-                  {stations.map((st, i) => {
-                    const isPast = (currentIdx >= 0 && i < currentIdx) || svc.voyage_complet;
-                    const isCur = st === svc.station_actuelle && !svc.voyage_complet;
-                    const isNext = i === currentIdx + 1 && !svc.voyage_complet;
-                    const isLast = i === stations.length - 1;
-
-                    return (
-                      <View key={st} style={styles.tlItem}>
-                        <View style={styles.tlLeft}>
-                          <View style={[
-                            styles.tlDot,
-                            isPast && !isCur && styles.dotDone,
-                            isCur && styles.dotCur,
-                            isNext && styles.dotNext,
-                          ]} />
-                          {!isLast && <View style={[styles.tlLine, (isPast && !isCur) && styles.lineDone]} />}
-                        </View>
-                        <View style={styles.tlContent}>
-                          <Text style={[
-                            styles.tlStation,
-                            isCur && styles.tlCur,
-                            isPast && !isCur && styles.tlPast,
-                            isNext && styles.tlNext,
-                          ]}>
-                            {st}
-                            {isCur ? ' ← ici' : ''}
-                          </Text>
-                        </View>
+                  return (
+                    <View key={st + i} style={styles.tlItem}>
+                      <View style={styles.tlLeft}>
+                        <View style={[
+                          styles.tlDot,
+                          isPast && !isCur && styles.dotPast,
+                          isCur && styles.dotCurrent,
+                        ]} />
+                        {!isLast && <View style={[styles.tlLine, isPast && styles.linePast]} />}
                       </View>
-                    );
-                  })}
-                </View>
-              )}
+                      <View style={styles.tlRight}>
+                        <Text style={[
+                          styles.tlStation,
+                          isCur && styles.tlStationCur,
+                          isPast && !isCur && styles.tlStationPast,
+                        ]}>
+                          {st}
+                        </Text>
+                        {isCur && <Text style={styles.curLabel}>Station Actuelle</Text>}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
 
-              {/* Avancer Button */}
               {!svc.voyage_complet && nextStation && (
                 <TouchableOpacity
-                  style={[styles.avancerBtn, advancing && styles.btnDisabled]}
+                  style={[styles.advanceBtn, advancing && styles.btnDis]}
                   onPress={handleAvancer}
                   disabled={advancing}
                 >
-                  {advancing
-                    ? <ActivityIndicator color={Colors.white} size="small" />
-                    : <><ChevronRight color={Colors.white} size={18} /><Text style={styles.avancerBtnText}>
-                        {isLastStop ? '🏁 Arriver à destination' : `Prochaine : ${nextStation}`}
-                      </Text></>
+                  <Text style={styles.advanceBtnText}>
+                    {isLastStop ? 'Arriver au terminus' : `Prochain arrêt : ${nextStation}`}
+                  </Text>
+                  <ChevronRight color={Colors.white} size={20} strokeWidth={3} />
+                </TouchableOpacity>
+              )}
+
+              {(svc.voyage_complet || (currentIdx === displayStations.length - 1 && displayStations.length > 1)) && (
+                <TouchableOpacity
+                  style={[styles.advanceBtn, advancing && styles.btnDis, { backgroundColor: Colors.info }]}
+                  onPress={handleStartReturn}
+                  disabled={advancing}
+                >
+                  {advancing 
+                    ? <ActivityIndicator color={Colors.white} />
+                    : <>
+                        <Text style={styles.advanceBtnText}>Démarrer le trajet de retour</Text>
+                        <ArrowUpDown color={Colors.white} size={20} strokeWidth={3} />
+                      </>
                   }
                 </TouchableOpacity>
               )}
             </View>
 
-            {/* ── Action Buttons ── */}
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => router.push({ pathname: '/(receveur)/manifeste', params: navParams })}
-            >
-              <ClipboardList color={Colors.info} size={20} />
-              <Text style={styles.secondaryBtnText}>Manifeste ({svc.nb_tickets} passager{svc.nb_tickets !== 1 ? 's' : ''})</Text>
-              <ChevronRight color={Colors.info} size={16} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
+            {/* ── Additional Actions ── */}
+            <View style={styles.actionSection}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => router.push({ pathname: '/(receveur)/manifeste', params: navParams })}
+              >
+                <View style={[styles.actionIconBtn, { backgroundColor: Colors.info + '12' }]}>
+                  <ClipboardList color={Colors.info} size={20} strokeWidth={2.5} />
+                </View>
+                <Text style={styles.actionBtnText}>Manifeste des passagers</Text>
+                <View style={styles.badgeCount}>
+                   <Text style={styles.badgeText}>{svc.nb_tickets}</Text>
+                </View>
+              </TouchableOpacity>
 
-            {/* Close / Incident */}
-            {svc.voyage_complet ? (
               <TouchableOpacity
-                style={[styles.closeBtn, closing && styles.btnDisabled]}
-                onPress={() => handleClose()}
-                disabled={closing}
+                style={[styles.actionBtn, !(svc.voyage_complet || currentIdx === displayStations.length - 1 || currentIdx <= 0) && { opacity: 0.5 }]}
+                onPress={() => setIsReversed(!isReversed)}
+                disabled={!(svc.voyage_complet || currentIdx === displayStations.length - 1 || currentIdx <= 0)}
               >
-                {closing
-                  ? <ActivityIndicator color={Colors.white} />
-                  : <><Square color={Colors.white} size={18} /><Text style={styles.closeBtnText}>Clôturer le service</Text></>
-                }
+                <View style={[styles.actionIconBtn, { backgroundColor: Colors.primary + '12' }]}>
+                  <ArrowUpDown color={Colors.primary} size={20} strokeWidth={2.5} />
+                </View>
+                <Text style={styles.actionBtnText}>Inverser le sens du trajet</Text>
+                <Text style={styles.sensLabel}>{isReversed ? 'RETOUR' : 'ALLER'}</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.incidentBtn}
-                onPress={() => setIncModal(true)}
-              >
-                <AlertTriangle color={Colors.danger} size={18} />
-                <Text style={styles.incidentBtnText}>Terminer pour incident</Text>
-              </TouchableOpacity>
-            )}
+
+
+            </View>
           </>
         ) : (
-          /* ══════════ NO SERVICE ══════════ */
+          /* ══════════ IDLE STATE ══════════ */
           <>
-            <View style={styles.idleCard}>
+            <View style={styles.idleContainer}>
               <View style={styles.idleIconWrap}>
-                <Bus color={Colors.textLight} size={48} />
+                <Bus color={Colors.textLight} size={64} strokeWidth={1.5} />
               </View>
-              <Text style={styles.idleTitle}>Aucun service actif</Text>
-              <Text style={styles.idleSub}>Bus N° {numero_bus}</Text>
-              <Text style={styles.idleRoute}>{ville_dep} → {ville_arr}</Text>
+              <Text style={styles.idleTitle}>Prêt pour le service</Text>
+              <Text style={styles.idleSub}>BUS N° {numero_bus} · LIGNE {num_ligne}</Text>
               
-              <View style={{ width: '100%', marginTop: 20 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textMuted, marginBottom: 8, textTransform: 'uppercase' }}>
-                    Horaire de départ
-                </Text>
-                <TouchableOpacity 
-                    style={[styles.picker, { borderColor: Colors.primary }]} 
-                    onPress={() => setShowPicker(!showPicker)}
-                >
-                    <Clock size={18} color={Colors.primary} />
-                    <Text style={{ flex: 1, marginLeft: 10, fontSize: 16, fontWeight: '700', color: Colors.textDark }}>
-                        {selHoraire || 'Sélectionner l\'heure...'}
-                    </Text>
-                    <ChevronDown size={20} color={Colors.textMuted} />
+              <View style={styles.idleRouteCard}>
+                <View style={styles.routeRow}>
+                  <MapPin color={Colors.success} size={18} strokeWidth={2.5} />
+                  <Text style={styles.routeCity}>{isReversed ? ville_arr : ville_dep}</Text>
+                </View>
+                <View style={styles.routeDivider} />
+                <View style={styles.routeRow}>
+                  <MapPin color={Colors.danger} size={18} strokeWidth={2.5} />
+                  <Text style={styles.routeCity}>{isReversed ? ville_dep : ville_arr}</Text>
+                </View>
+                
+                <TouchableOpacity style={styles.swapBtn} onPress={() => setIsReversed(!isReversed)}>
+                  <ArrowUpDown color={Colors.primary} size={18} strokeWidth={2.5} />
                 </TouchableOpacity>
+              </View>
+
+              <View style={styles.pickerSection}>
+                <Text style={styles.pickerLabel}>HORAIRE DE DÉPART</Text>
+                <TouchableOpacity style={styles.timePicker} onPress={() => setShowPicker(!showPicker)}>
+                  <Clock color={Colors.primary} size={20} strokeWidth={2.5} />
+                  <Text style={styles.timeValue}>{selHoraire || 'Choisir l\'horaire'}</Text>
+                  <ChevronDown color={Colors.textMuted} size={20} />
+                </TouchableOpacity>
+                
                 {showPicker && (
-                    <View style={styles.horairesDropdown}>
-                        {horaires.map(h => (
-                            <TouchableOpacity 
-                                key={h} 
-                                style={[styles.hStep, selHoraire === h && styles.hStepActive]}
-                                onPress={() => { setSelHoraire(h); setShowPicker(false); }}
-                            >
-                                <Text style={[styles.hStepText, selHoraire === h && styles.hStepTextActive]}>{h}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                  <View style={styles.timeDropdown}>
+                    {horaires.map(h => (
+                      <TouchableOpacity 
+                        key={h} 
+                        style={[styles.timeItem, selHoraire === h && styles.timeItemActive]}
+                        onPress={() => { setSelHoraire(h); setShowPicker(false); }}
+                      >
+                        <Text style={[styles.timeItemText, selHoraire === h && styles.timeItemTextActive]}>{h}</Text>
+                        {selHoraire === h && <CheckCircle color={Colors.primary} size={16} />}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 )}
               </View>
 
-              <Text style={[styles.idleHint, { marginTop: 20 }]}>
-                Démarrez un service pour commencer à vendre des billets et suivre les passagers.
-              </Text>
+              <TouchableOpacity
+                style={[styles.startBtn, (starting || !selHoraire) && styles.btnDis]}
+                onPress={handleStart}
+                disabled={starting || !selHoraire}
+              >
+                {starting 
+                  ? <ActivityIndicator color={Colors.primary} />
+                  : <><Play color={Colors.primary} size={24} strokeWidth={3} /><Text style={styles.startBtnText}>Démarrer la mission</Text></>
+                }
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={[styles.startBtn, (starting || !selHoraire) && styles.btnDisabled]}
-              onPress={handleStart}
-              disabled={starting || !selHoraire}
-            >
-              {starting
-                ? <ActivityIndicator color={Colors.primary} />
-                : <><Play color={Colors.primary} size={22} /><Text style={styles.startBtnText}>Démarrer le service</Text></>
-              }
-            </TouchableOpacity>
           </>
         )}
       </ScrollView>
-
-      {/* ── Incident Close Modal ── */}
-      <Modal visible={incModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.modalHeaderRow}>
-              <AlertTriangle color={Colors.danger} size={22} />
-              <Text style={styles.modalTitle}>Clôture pour incident</Text>
-              <TouchableOpacity onPress={() => setIncModal(false)} style={styles.modalClose}>
-                <X color={Colors.textMuted} size={20} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalSub}>
-              Décrivez l'incident pour autoriser la clôture anticipée du service :
-            </Text>
-            <TextInput
-              style={styles.incidentInput}
-              placeholder="Ex: panne moteur, accident, malaise passager..."
-              value={incRaison}
-              onChangeText={setIncRaison}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              placeholderTextColor={Colors.textLight}
-            />
-            <TouchableOpacity
-              style={[styles.modalConfirm, (!incRaison.trim() || closing) && styles.btnDisabled]}
-              onPress={() => handleClose(incRaison.trim())}
-              disabled={!incRaison.trim() || closing}
-            >
-              {closing
-                ? <ActivityIndicator color={Colors.white} />
-                : <Text style={styles.modalConfirmText}>Clôturer pour incident</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bgLight },
-  content: { padding: Spacing.base, paddingBottom: 40 },
+  content: { padding: Spacing.xl, paddingBottom: 60 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
 
   // Service Header
   serviceHeader: {
-    backgroundColor: Colors.primary, borderRadius: Radius.xl,
-    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.strong,
+    backgroundColor: Colors.primary, borderRadius: Radius.xxl,
+    padding: Spacing.xl, marginBottom: Spacing.lg, ...Shadow.strong,
   },
-  serviceHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm },
-  activePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.success + '30', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill,
+  headerDirection: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginTop: 20, paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success },
-  activePillText: { fontSize: 12, fontWeight: '800', color: Colors.success, letterSpacing: 1 },
-  serviceNum: { fontSize: 24, fontWeight: '900', color: Colors.white },
-  serviceHeaderInfo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: Spacing.sm },
-  sInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sInfoText: { fontSize: 14, color: Colors.white + 'CC', fontWeight: '700' },
-  sInfoDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: Colors.white + '50' },
+  directionLabel: { fontSize: 16, fontWeight: '800', color: Colors.white, flex: 1 },
+  sensBadge: { backgroundColor: Colors.accent, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  sensBadgeText: { fontSize: 10, fontWeight: '900', color: Colors.primary },
 
-  // KPI
-  kpiRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  directionMiniBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 },
+  directionMiniText: { fontSize: 10, fontWeight: '900' },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xl },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill,
+  },
+  pulseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
+  statusPillText: { fontSize: 11, fontWeight: '900', color: Colors.success, letterSpacing: 1.5 },
+  serviceId: { fontSize: 20, fontWeight: '900', color: 'rgba(255, 255, 255, 0.3)', letterSpacing: -0.5 },
+  
+  headerMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  unitBadge: { width: 52, height: 52, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  unitLabel: { fontSize: 10, color: Colors.accent, fontWeight: '900', letterSpacing: 1.5 },
+  unitNum: { fontSize: 22, fontWeight: '900', color: Colors.white, letterSpacing: -0.5, marginTop: 2 },
+  headerLine: { width: 1.5, height: 40, backgroundColor: 'rgba(255, 255, 255, 0.15)', marginHorizontal: Spacing.sm },
+
+  // KPI Row
+  kpiRow: { flexDirection: 'row', gap: 10, marginBottom: Spacing.xl },
   kpiCard: {
-    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.lg,
-    padding: Spacing.md, alignItems: 'center', gap: 4, ...Shadow.card,
+    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.xl,
+    padding: Spacing.lg, alignItems: 'center', gap: 6, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  kpiVal: { fontSize: 20, fontWeight: '900', color: Colors.textDark },
-  kpiLbl: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  kpiIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  kpiVal: { fontSize: 20, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  kpiLbl: { fontSize: 10, color: Colors.textLight, fontWeight: '900', letterSpacing: 1 },
 
-  // Route
-  routeCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.xl,
-    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
+  // Timeline Card
+  timelineCard: {
+    backgroundColor: Colors.white, borderRadius: Radius.xxl,
+    padding: Spacing.xl, marginBottom: Spacing.xl, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  routeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm },
-  routeTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.textDark },
-  doneBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.successLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
-  },
-  doneBadgeText: { fontSize: 13, fontWeight: '800', color: Colors.success },
-  dirRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
-  dirFrom: { fontSize: 15, fontWeight: '800', color: Colors.primary },
-  dirTo: { fontSize: 15, fontWeight: '800', color: Colors.danger },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: Spacing.xxl },
+  cardTitle: { flex: 1, fontSize: 18, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  finishedBadge: { backgroundColor: Colors.success + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill },
+  finishedText: { fontSize: 10, fontWeight: '900', color: Colors.success, letterSpacing: 1 },
 
-  // Timeline
-  timeline: { gap: 0 },
-  tlItem: { flexDirection: 'row', gap: 10 },
-  tlLeft: { alignItems: 'center', width: 18 },
-  tlDot: {
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: Colors.bgMid, borderWidth: 2, borderColor: Colors.border, marginTop: 2,
-  },
-  dotDone: { backgroundColor: Colors.success, borderColor: Colors.success },
-  dotCur: { backgroundColor: Colors.primary, borderColor: Colors.primary, width: 18, height: 18, borderRadius: 9, marginTop: 0 },
-  dotNext: { borderColor: Colors.primary, borderStyle: 'dashed' },
-  tlLine: { width: 2, flex: 1, backgroundColor: Colors.border, marginTop: 2, marginBottom: 2 },
-  lineDone: { backgroundColor: Colors.success },
-  tlContent: { flex: 1, paddingBottom: 16, paddingTop: 0 },
-  tlStation: { fontSize: 15, color: Colors.textMuted, fontWeight: '600' },
-  tlCur: { color: Colors.primary, fontWeight: '800', fontSize: 16 },
-  tlPast: { color: Colors.success, fontWeight: '700' },
-  tlNext: { color: Colors.primary, fontWeight: '700' },
+  timeline: { paddingLeft: 4, marginBottom: Spacing.xl },
+  tlItem: { flexDirection: 'row', gap: 20 },
+  tlLeft: { alignItems: 'center', width: 20 },
+  tlDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.white, borderWidth: 3, borderColor: Colors.bgMid, zIndex: 2, marginTop: 6 },
+  dotPast: { backgroundColor: Colors.success, borderColor: Colors.success },
+  dotCurrent: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.primary, borderColor: Colors.accent, borderWidth: 5, marginTop: 1, ...Shadow.accent },
+  tlLine: { width: 3, flex: 1, backgroundColor: Colors.bgMid, marginVertical: -4, zIndex: 1, borderRadius: 1.5 },
+  linePast: { backgroundColor: Colors.success },
+  tlRight: { flex: 1, paddingBottom: 28 },
+  tlStation: { fontSize: 16, color: Colors.textLight, fontWeight: '700' },
+  tlStationCur: { color: Colors.textDark, fontWeight: '900', fontSize: 18 },
+  tlStationPast: { color: Colors.textMid, fontWeight: '800' },
+  curLabel: { fontSize: 12, color: Colors.primary, fontWeight: '900', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  avancerBtn: {
-    backgroundColor: Colors.primary, height: 44, borderRadius: Radius.md, marginTop: Spacing.md,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  advanceBtn: {
+    backgroundColor: Colors.primary, height: 60, borderRadius: Radius.xl,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadow.strong,
   },
-  avancerBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+  advanceBtnText: { color: Colors.white, fontWeight: '900', fontSize: 17, letterSpacing: -0.3 },
 
-  // Action Buttons
-  primaryBtn: {
-    backgroundColor: Colors.accent, height: 56, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base,
-    gap: 10, marginBottom: Spacing.sm, ...Shadow.accent,
+  // Actions
+  actionSection: { gap: 12 },
+  actionBtn: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
+    padding: Spacing.base, borderRadius: Radius.xl, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  primaryBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary, flex: 1 },
-
-  secondaryBtn: {
-    backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.base,
-    gap: 10, marginBottom: Spacing.md, ...Shadow.card,
-    borderWidth: 1.5, borderColor: Colors.infoLight,
+  actionIconBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  actionBtnText: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  badgeCount: { backgroundColor: Colors.info, paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill },
+  badgeText: { color: Colors.white, fontWeight: '900', fontSize: 12 },
+  sensLabel: { fontSize: 12, fontWeight: '900', color: Colors.primary, letterSpacing: 1 },
+  dangerActionBtn: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
+    padding: Spacing.base, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.danger + '30',
   },
-  secondaryBtnText: { fontSize: 16, fontWeight: '800', color: Colors.info, flex: 1 },
-
-  closeBtn: {
-    backgroundColor: Colors.success, height: 50, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    marginBottom: Spacing.sm,
-  },
-  closeBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
-
-  incidentBtn: {
-    height: 48, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: Colors.danger + '50',
-    backgroundColor: Colors.dangerLight,
-  },
-  incidentBtnText: { fontSize: 15, fontWeight: '800', color: Colors.danger },
-
-  btnDisabled: { opacity: 0.5 },
+  dangerBtnText: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.danger },
 
   // Idle
-  idleCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.xxl,
-    padding: Spacing.xl, alignItems: 'center', marginBottom: Spacing.lg, ...Shadow.card,
+  idleContainer: { flex: 1, alignItems: 'center', paddingTop: 20 },
+  idleIconWrap: { width: 120, height: 120, borderRadius: 32, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xl, ...Shadow.card, borderWidth: 1, borderColor: Colors.bgMid },
+  idleTitle: { fontSize: 26, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.8 },
+  idleSub: { fontSize: 14, color: Colors.textLight, fontWeight: '800', marginTop: 4, letterSpacing: 1 },
+  
+  idleRouteCard: {
+    width: '100%', backgroundColor: Colors.white, borderRadius: Radius.xxl,
+    padding: Spacing.xl, marginTop: Spacing.xxl, ...Shadow.card,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
-  idleIconWrap: {
-    width: 80, height: 80, borderRadius: 20,
-    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.lg,
-  },
-  idleTitle: { fontSize: 22, fontWeight: '800', color: Colors.textMid, marginBottom: 4 },
-  idleSub: { fontSize: 16, fontWeight: '800', color: Colors.primary, marginBottom: 4 },
-  idleRoute: { fontSize: 15, color: Colors.textMuted, marginBottom: Spacing.md },
-  idleHint: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  routeCity: { fontSize: 18, fontWeight: '900', color: Colors.textDark },
+  routeDivider: { width: 2, height: 32, backgroundColor: Colors.bgMid, marginLeft: 8, marginVertical: 4 },
+  swapBtn: { position: 'absolute', right: 24, top: '50%', marginTop: -20, width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center' },
+
+  pickerSection: { width: '100%', marginTop: Spacing.xxl, gap: 12 },
+  pickerLabel: { fontSize: 12, fontWeight: '900', color: Colors.textLight, letterSpacing: 1.5 },
+  timePicker: { height: 60, borderRadius: Radius.xl, backgroundColor: Colors.bgMid, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xl },
+  timeValue: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.textDark, marginLeft: 12 },
+  timeDropdown: { marginTop: 8, backgroundColor: Colors.white, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.strong, borderWidth: 1, borderColor: Colors.bgMid },
+  timeItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: Colors.bgMid },
+  timeItemActive: { backgroundColor: Colors.primary + '05' },
+  timeItemText: { fontSize: 17, color: Colors.textMid, fontWeight: '700' },
+  timeItemTextActive: { color: Colors.primary, fontWeight: '900' },
 
   startBtn: {
-    backgroundColor: Colors.accent, height: 60, borderRadius: Radius.xl,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadow.accent,
+    backgroundColor: Colors.accent, height: 68, borderRadius: Radius.xxl, width: '100%',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14,
+    marginTop: Spacing.xxxl, ...Shadow.accent,
   },
-  startBtnText: { fontSize: 19, fontWeight: '800', color: Colors.primary },
-
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: Spacing.xl, paddingBottom: 40,
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
-  modalHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
-  modalTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: Colors.textDark },
-  modalClose: { padding: 4 },
-  modalSub: { fontSize: 15, color: Colors.textMuted, marginBottom: Spacing.md, lineHeight: 20 },
-  incidentInput: {
-    borderWidth: 1.5, borderColor: Colors.danger + '50', borderRadius: Radius.md,
-    padding: Spacing.md, fontSize: 16, color: Colors.textDark,
-    backgroundColor: Colors.dangerLight + '30', minHeight: 90, marginBottom: Spacing.base,
-  },
-  modalConfirm: {
-    backgroundColor: Colors.danger, height: 52, borderRadius: Radius.lg,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  modalConfirmText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
-  
-  // Custom horaires picker styles
-  picker: {
-    height: 52, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border,
-    paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
-  },
-  horairesDropdown: {
-    marginTop: 8, backgroundColor: Colors.white, borderRadius: Radius.lg,
-    borderWidth: 1.5, borderColor: Colors.primary + '30', overflow: 'hidden',
-  },
-  hStep: { padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  hStepActive: { backgroundColor: Colors.primary + '10' },
-  hStepText: { fontSize: 15, color: Colors.textMid, fontWeight: '600' },
-  hStepTextActive: { color: Colors.primary, fontWeight: '800' },
+  startBtnText: { fontSize: 20, fontWeight: '900', color: Colors.primary, letterSpacing: 0.5 },
+  btnDis: { opacity: 0.6 },
 });

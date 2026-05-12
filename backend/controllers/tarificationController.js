@@ -21,6 +21,21 @@ exports.getBagages = async (req, res) => {
 };
 
 // Toggle, Create, Update pour dashboard admin
+exports.updateTarification = async (req, res) => {
+    const { id } = req.params;
+    const { code, libelle, categorie, mode_calcul, valeur } = req.body;
+    try {
+        await db.query(
+            'UPDATE type_tarification SET code=$1, libelle=$2, categorie=$3, mode_calcul=$4, valeur=$5 WHERE id_type_tarification=$6',
+            [code, libelle, categorie, mode_calcul, valeur, id]
+        );
+        res.json({ message: 'Tarification mise à jour' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erreur modification tarification' });
+    }
+};
+
 exports.addTarification = async (req, res) => {
     const { code, libelle, categorie, mode_calcul, valeur } = req.body;
     try {
@@ -32,6 +47,21 @@ exports.addTarification = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Erreur ajout tarification' });
+    }
+};
+
+exports.updateBagage = async (req, res) => {
+    const { id } = req.params;
+    const { code, libelle, prix } = req.body;
+    try {
+        await db.query(
+            'UPDATE type_bagage SET code=$1, libelle=$2, prix=$3 WHERE id_type_bagage=$4',
+            [code, libelle, prix, id]
+        );
+        res.json({ message: 'Bagage mis à jour' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erreur modification bagage' });
     }
 };
 

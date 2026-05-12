@@ -8,6 +8,7 @@ router.get('/tickets/occupied-seats', saleController.getOccupiedSeats);
 router.get('/stats/revenue', saleController.getRevenueStats);
 router.get('/stats/passengers', saleController.getPassengerStats);
 router.get('/agent/:agentId/daily', saleController.getAgentDailySales);
+router.post('/agent/:agentId/close-service', saleController.closeAgentService);
 router.get('/controleur/:controleurId/daily', saleController.getControleurDailyScans);
 router.get('/stats/bus-occupancy', saleController.getBusOccupancy);
 router.get('/stats/advanced', saleController.getAdvancedStats);

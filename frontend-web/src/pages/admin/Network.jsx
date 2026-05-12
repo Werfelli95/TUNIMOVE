@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Network as NetIcon, MapPin, Clock, Plus, Trash2, X, Edit2,
-    ChevronRight, Search, Loader2
+    ChevronRight, Search, Loader2, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Users.css';
@@ -15,7 +15,7 @@ const Network = () => {
 
     const [formData, setFormData] = useState({
         ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active',
-        stations: [{ arret: '', distance_km: '' }]
+        stations: [{ arret: '', distance_km: '', duree_minutes: '' }]
     });
 
     useEffect(() => { fetchNetwork(); }, []);
@@ -40,7 +40,7 @@ const Network = () => {
             });
         } else {
             setEditingId(null);
-            setFormData({ ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active', stations: [{ arret: '', distance_km: '' }] });
+            setFormData({ ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active', stations: [{ arret: '', distance_km: '', duree_minutes: '' }] });
         }
         setIsModalOpen(true);
     };
@@ -68,7 +68,7 @@ const Network = () => {
     };
 
     // Fonctions stations
-    const addStation = () => setFormData({ ...formData, stations: [...formData.stations, { arret: '', distance_km: '' }] });
+    const addStation = () => setFormData({ ...formData, stations: [...formData.stations, { arret: '', distance_km: '', duree_minutes: '' }] });
     const removeStation = (idx) => setFormData({ ...formData, stations: formData.stations.filter((_, i) => i !== idx) });
     const updateSt = (idx, field, val) => {
         const newSt = [...formData.stations];
@@ -85,9 +85,54 @@ const Network = () => {
         setFormData({ ...formData, horaires: newH });
     };
 
+    const calculateArrivalTime = (departureTime, cumulativeMinutes) => {
+        if (!departureTime) return '';
+        const [hours, minutes] = departureTime.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes + cumulativeMinutes, 0, 0);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
     const filteredLines = lines.filter(l =>
         `${l.ville_depart} ${l.ville_arrivee} ${l.num_ligne}`.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        const tableHtml = document.querySelector('.enterprise-table').outerHTML;
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Réseau TuniMove</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; }
+                        h1 { color: #1e293b; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+                        th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+                        .role-badge { border: 1px solid #ccc; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: bold; }
+                        .actions-col, .row-actions, .btn-add-user, .search-wrapper, .screen-only { display: none !important; }
+                        .print-only { display: block !important; white-space: normal; }
+                        .user-info-cell { display: flex; align-items: center; gap: 10px; }
+                        .user-avatar { display: none; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Réseau des Lignes - TuniMove</h1>
+                    <p>Généré le : ${new Date().toLocaleString()}</p>
+                    ${tableHtml}
+                    <script>
+                        setTimeout(() => {
+                            window.print();
+                            window.close();
+                        }, 500);
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
 
     return (
         <div className="users-container">
@@ -96,9 +141,14 @@ const Network = () => {
                     <h1>Gestion du Réseau</h1>
                     <p>{lines.length} lignes configurées sur le réseau TuniMove</p>
                 </div>
-                <button className="btn-add-user" onClick={() => handleOpenModal()}>
-                    <Plus size={20} /> Nouvelle Ligne
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button className="btn-add-user" style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }} onClick={handlePrint}>
+                        <Printer size={20} /> Imprimer Liste
+                    </button>
+                    <button className="btn-add-user" onClick={() => handleOpenModal()}>
+                        <Plus size={20} /> Nouvelle Ligne
+                    </button>
+                </div>
             </div>
 
             {/* SEARCH BAR */}
@@ -127,7 +177,7 @@ const Network = () => {
                                 <th>Horaire</th>
                                 <th>Stations</th>
                                 <th>Statut</th>
-                                <th style={{ textAlign: 'center' }}>Actions</th>
+                                <th style={{ textAlign: 'center' }} className="actions-col">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -143,14 +193,19 @@ const Network = () => {
                                         </div>
                                     </td>
                                     <td>
-                                        <div style={{ maxWidth: '150px' }}>
+                                        <div style={{ maxWidth: '220px' }}>
                                             {(line.horaires && line.horaires.length > 0 && line.horaires[0] !== null) ? (
-                                                <select className="stations-select" defaultValue="">
-                                                    <option value="" disabled>🕒 {line.horaires.length} Horaires</option>
-                                                    {line.horaires.map((h, i) => (
-                                                        <option key={i} value={h}>{h}</option>
-                                                    ))}
-                                                </select>
+                                                <>
+                                                    <select className="stations-select screen-only" defaultValue="">
+                                                        <option value="" disabled>🕒 {line.horaires.length} Horaires</option>
+                                                        {line.horaires.map((h, i) => (
+                                                            <option key={i} value={h} disabled>{h}</option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="print-only" style={{ display: 'none', color: '#334155', fontWeight: 600 }}>
+                                                        🕒 {line.horaires.join(', ')}
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <div className="user-matricule" style={{ textAlign: 'center' }}>-</div>
                                             )}
@@ -159,24 +214,66 @@ const Network = () => {
                                     <td>
                                         <div style={{ maxWidth: '300px' }}>
                                             {line.stations.length > 0 ? (
-                                                <select
-                                                    className="stations-select"
-                                                    defaultValue=""
-                                                >
-                                                    <option value="" disabled> {line.stations.length} Stations</option>
-                                                    {line.stations.map((st, idx) => (
-                                                        <option key={idx} value={st.arret}>
-                                                            {idx + 1}. {st.arret} {st.distance_km ? `- ${st.distance_km} km` : ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                <>
+                                                    <select
+                                                        className="stations-select screen-only"
+                                                        defaultValue=""
+                                                    >
+                                                        <option value="" disabled> {line.stations.length} Stations</option>
+                                                        {line.stations.map((st, idx) => {
+                                                            const cumulativeMinutes = line.stations.slice(0, idx + 1).reduce((acc, s) => acc + (parseInt(s.duree_minutes) || 0), 0);
+                                                            const firstHoraire = (line.horaires && line.horaires.length > 0) ? line.horaires[0] : null;
+                                                            const arrivalTime = firstHoraire ? calculateArrivalTime(firstHoraire, cumulativeMinutes) : null;
+                                                            return (
+                                                                <option key={idx} value={st.arret} disabled>
+                                                                    {idx + 1}. {st.arret} 
+                                                                    {st.distance_km ? ` - ${st.distance_km} km` : ''} 
+                                                                    {arrivalTime ? ` - 🕒 ${arrivalTime}` : ''}
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </select>
+                                                    <div className="print-only" style={{ display: 'none', margin: '4px 0' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                            {line.stations.map((st, idx) => {
+                                                                const cumulativeMinutes = line.stations.slice(0, idx + 1).reduce((acc, s) => acc + (parseInt(s.duree_minutes) || 0), 0);
+                                                                const firstHoraire = (line.horaires && line.horaires.length > 0) ? line.horaires[0] : null;
+                                                                const arrivalTime = firstHoraire ? calculateArrivalTime(firstHoraire, cumulativeMinutes) : null;
+                                                                
+                                                                return (
+                                                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                                                                        <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0' }}>
+                                                                            {idx + 1}
+                                                                        </span>
+                                                                        <span style={{ fontWeight: '700', color: '#1e293b' }}>{st.arret}</span>
+                                                                        {st.distance_km && (
+                                                                            <span style={{ color: '#64748b', fontSize: '11px', background: '#f8fafc', padding: '1px 5px', borderRadius: '4px' }}>
+                                                                                {st.distance_km} km
+                                                                            </span>
+                                                                        )}
+                                                                        {st.duree_minutes && (
+                                                                            <span style={{ color: '#0f172a', fontSize: '11px', fontWeight: 'bold' }}>
+                                                                                ⏱️ {st.duree_minutes} min
+                                                                            </span>
+                                                                        )}
+                                                                        {arrivalTime && (
+                                                                            <span style={{ color: '#2563eb', fontSize: '11px', fontWeight: 'bold' }}>
+                                                                                (Est: {arrivalTime})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                </>
                                             ) : (
                                                 <span className="user-email" style={{ fontStyle: 'italic' }}>Aucun arrêt intermédiaire</span>
                                             )}
                                         </div>
                                     </td>
                                     <td><span className={`role-badge ${line.statut_ligne === 'Active' ? 'badge-agent' : 'badge-receveur'}`}>{line.statut_ligne}</span></td>
-                                    <td>
+                                    <td className="actions-col">
                                         <div className="row-actions">
                                             <button className="action-btn btn-edit" onClick={() => handleOpenModal(line)}><Edit2 size={16} /></button>
                                             <button className="action-btn btn-trash" onClick={() => handleDelete(line.num_ligne)}><Trash2 size={16} /></button>
@@ -224,7 +321,8 @@ const Network = () => {
                                             <div key={i} className="st-item">
                                                 <span className="st-number">{i + 1}</span>
                                                 <input className="st-name-input" placeholder="Nom station" value={st.arret} onChange={e => updateSt(i, 'arret', e.target.value)} required />
-                                                <div className="st-km"><input type="number" value={st.distance_km} onChange={e => updateSt(i, 'distance_km', e.target.value)} /><span>km</span></div>
+                                                <div className="st-km" style={{width: '100px'}}><input type="number" placeholder="Km" value={st.distance_km} onChange={e => updateSt(i, 'distance_km', e.target.value)} /><span style={{fontSize: '10px', marginLeft: '4px'}}>km</span></div>
+                                                <div className="st-km" style={{width: '120px'}}><Clock size={14} style={{marginRight: '5px'}} /><input type="number" placeholder="Min" value={st.duree_minutes} onChange={e => updateSt(i, 'duree_minutes', e.target.value)} /><span style={{fontSize: '10px', marginLeft: '4px'}}>min</span></div>
                                                 <button type="button" className="st-remove" onClick={() => removeStation(i)}><Trash2 size={16} /></button>
                                             </div>
                                         ))}

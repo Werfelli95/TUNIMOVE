@@ -38,6 +38,7 @@ const AgentLogin = () => {
                 prenom: res.data.user.prenom,
                 matricule: matricule
             }));
+            localStorage.setItem('login_time', new Date().toISOString());
             window.location.href = '/agent-dashboard';
         } catch (err) {
             setError(err.response?.data?.message || 'Identifiants invalides');

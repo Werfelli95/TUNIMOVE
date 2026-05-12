@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Calendar,
     Clock,
@@ -10,13 +10,20 @@ import {
     Bus,
     History,
     Ticket,
-    ArrowRight
+    ArrowRight,
+    FileText,
+    TrendingUp,
+    ShieldCheck,
+    AlertTriangle,
+    X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from "react-qr-code";
 import './Guichet.css'; // We will create this
 
 const Guichet = () => {
     const { mode, setMode } = useOutletContext() || { mode: 'Vente Directe', setMode: () => { } };
+    const navigate = useNavigate();
     const [lignes, setLignes] = useState([]);
     const [buses, setBuses] = useState([]);
     const [tarifConfig, setTarifConfig] = useState(null);
@@ -50,6 +57,81 @@ const Guichet = () => {
     const [dailySales, setDailySales] = useState([]);
     const [reprintTicket, setReprintTicket] = useState(null);
     const [soldTicketInfo, setSoldTicketInfo] = useState(null);
+    const [isClosing, setIsClosing] = useState(false);
+    const [closureResult, setClosureResult] = useState(null);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+    const handleCloseService = async () => {
+        const userId = agentInfo.id || agentInfo.id_utilisateur;
+        if (!userId) return;
+
+        setIsClosing(true);
+        setShowConfirmModal(false);
+        try {
+            const loginTime = localStorage.getItem('login_time');
+            const res = await fetch(`http://localhost:5000/api/Sales/agent/${userId}/close-service`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ heure_connexion: loginTime })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setClosureResult(data);
+                
+                // Déconnexion automatique après un court délai pour voir le message de succès
+                setTimeout(() => {
+                    localStorage.clear();
+                    navigate('/login');
+                }, 1500);
+            } else {
+                const err = await res.json();
+                alert(err.message || "Erreur lors de la clôture.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Erreur réseau");
+        } finally {
+            setIsClosing(false);
+        }
+    };
+
+    const getLocalArrivalDate = (baseHoraire) => {
+        if (!baseHoraire || !activeLigne || !arretDepart) return null;
+        const [hours, minutes] = baseHoraire.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+
+        let cumulativeMinutes = 0;
+        if (arretDepart.toLowerCase().trim() !== activeLigne.ville_depart.toLowerCase().trim()) {
+            const stationIdx = (activeLigne.stations || []).findIndex(s => 
+                s.arret.toLowerCase().trim() === arretDepart.toLowerCase().trim()
+            );
+            if (stationIdx !== -1) {
+                cumulativeMinutes = activeLigne.stations.slice(0, stationIdx + 1).reduce((acc, s) => acc + (parseInt(s.duree_minutes || s.duree) || 0), 0);
+            }
+        }
+
+        let arrivalDate = new Date(date.getTime() + cumulativeMinutes * 60000);
+        const now = new Date();
+
+        // Logique circulaire : si l'heure est passée de plus de 12h, on considère que c'est pour demain
+        // (Ex: il est 19h, on veut voir le bus de 01h00 du matin qui est donc demain)
+        if (now - arrivalDate > 12 * 60 * 60 * 1000) {
+            arrivalDate.setDate(arrivalDate.getDate() + 1);
+        }
+        
+        return arrivalDate;
+    };
+
+    const getLocalTime = (baseHoraire) => {
+        const arrivalDate = getLocalArrivalDate(baseHoraire);
+        if (!arrivalDate) return baseHoraire;
+        
+        const hh = String(arrivalDate.getHours()).padStart(2, '0');
+        const mm = String(arrivalDate.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+    };
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -102,7 +184,8 @@ const Guichet = () => {
                             if (guichetData) {
                                 setMyGuichet(guichetData);
 
-                                // FILTRAGE : On ne garde que les lignes ACTIVES qui partent de la station du guichet
+                                // FILTRAGE : On ne garde que les lignes ACTIVES qui partent OU PASSENT par la station du guichet
+                                // EXCEPTION : Si le guichet est à l'ARRIVÉE finale de la ligne, on ne la montre pas (on ne peut plus rien vendre)
                                 const filteredLignes = lignesData.filter(ligne => {
                                     // 1. Vérifier si la ligne est active
                                     if (ligne.statut_ligne?.toLowerCase() !== 'active') return false;
@@ -112,9 +195,19 @@ const Guichet = () => {
                                     if (!loc) return true; // Si pas d'emplacement, on montre tout par sécurité
 
                                     const dep = ligne.ville_depart?.toLowerCase() || '';
+                                    const arr = ligne.ville_arrivee?.toLowerCase() || '';
 
-                                    // STREICT FILTER: Only show lines starting EXACTLY from this station/city
-                                    return loc.includes(dep) || dep.includes(loc);
+                                    // Si le guichet est au terminus de la ligne, on l'exclut
+                                    if (loc.includes(arr) || arr.includes(loc)) return false;
+
+                                    const isStart = loc.includes(dep) || dep.includes(loc);
+
+                                    // On vérifie aussi si une des stations intermédiaires correspond au guichet
+                                    const isIntermediate = ligne.stations?.some(s =>
+                                        loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
+                                    );
+
+                                    return isStart || isIntermediate;
                                 });
                                 setLignes(filteredLignes);
 
@@ -153,7 +246,7 @@ const Guichet = () => {
                     prix_par_km: 0.1,
                     frais_fixes: 0.4,
                     red_etudiant: 25,
-                    red_handicape: 50
+                    red_pmr: 50
                 });
             } catch (error) {
                 console.error("Erreur lors du chargement des données:", error);
@@ -182,7 +275,7 @@ const Guichet = () => {
     };
 
     useEffect(() => {
-        if (mode === 'Historique') {
+        if (mode === 'Historique' || mode === 'Clôture') {
             fetchDailySales();
         } else if (mode === 'Réservations') {
             // Pour les réservations, on force au moins demain
@@ -215,24 +308,44 @@ const Guichet = () => {
         fetchOccupiedSeats();
     }, [selectedLigne, dateVoyage, horaire, activeLigne]);
 
-    // On construit la liste des stations en incluant le point de départ s'il n'existe pas déjà à 0 km
+    // Sécurité : Si on est en mode Vente et que l'horaire sélectionné est déjà passé à NOTRE station, on le réinitialise
+    useEffect(() => {
+        if (mode === 'Vente Directe' && horaire && horaire !== "" && activeLigne && arretDepart) {
+            const arrivalDate = getLocalArrivalDate(horaire);
+            const now = new Date();
+
+            if (arrivalDate && arrivalDate < now) {
+                // On laisse une petite marge de 5 minutes pour les retardataires
+                if (now - arrivalDate > 5 * 60000) {
+                    setHoraire('');
+                    setSelectedBus('');
+                }
+            }
+        }
+    }, [mode, horaire, dateVoyage, arretDepart, activeLigne]);
+
+    // On construit la liste des stations en incluant le point de départ et d'arrivée s'ils n'existent pas
     const activeStations = React.useMemo(() => {
         if (!activeLigne) return [];
         let stations = [...(activeLigne.stations || [])];
 
-        // Vérifier si la ville de départ est déjà présente à 0 km
-        const hasStart = stations.some(s => s.distance_km === 0 || s.arret.toLowerCase() === activeLigne.ville_depart.toLowerCase());
-
+        // 1. S'assurer que le départ (ville_depart) est présent
+        const hasStart = stations.some(s => Number(s.distance_km) === 0 || s.arret.toLowerCase() === activeLigne.ville_depart.toLowerCase());
         if (!hasStart) {
-            // Ajouter la ville de départ comme point 0
-            stations.push({
-                arret: activeLigne.ville_depart,
-                distance_km: 0,
-                id_trajet: 'start-point'
-            });
+            stations.push({ arret: activeLigne.ville_depart, distance_km: 0, id_trajet: 'start-point' });
         }
 
-        return stations.sort((a, b) => a.distance_km - b.distance_km);
+        // 2. S'assurer que l'arrivée (ville_arrivee) est présente
+        const hasEnd = stations.some(s => s.arret.toLowerCase() === activeLigne.ville_arrivee.toLowerCase());
+        if (!hasEnd) {
+            const maxD = stations.length > 0 ? Math.max(...stations.map(s => Number(s.distance_km))) : 0;
+            stations.push({ arret: activeLigne.ville_arrivee, distance_km: maxD + 1, id_trajet: 'end-point' });
+        }
+
+        // On normalise les distances et on trie
+        return stations
+            .map(s => ({ ...s, distance_km: Number(s.distance_km) }))
+            .sort((a, b) => a.distance_km - b.distance_km);
     }, [activeLigne]);
 
     // On s'assure qu'il y a un horaire pour permettre la procédure
@@ -240,12 +353,8 @@ const Guichet = () => {
     // canProceed : l'agent a choisi un horaire ET le système a trouvé le bus correspondant
     const canProceed = hasHoraires && !!selectedBus;
 
-    // Recherche robuste des stations pour le calcul de distance
-    const departStation = activeStations.find(s =>
-        (s.arret === arretDepart) ||
-        (arretDepart && (s.arret.toLowerCase().includes(arretDepart.toLowerCase()) || arretDepart.toLowerCase().includes(s.arret.toLowerCase()))) ||
-        (s.distance_km === 0 && activeLigne && s.arret.toLowerCase() === activeLigne.ville_depart.toLowerCase())
-    );
+    // Recherche robuste de la station de départ sélectionnée dans la liste ordonnée
+    const departStation = activeStations.find(s => s.arret === arretDepart);
     const arriveeStation = activeStations.find(s => s.arret === arretArrivee);
 
     let distance = 0;
@@ -288,7 +397,7 @@ const Guichet = () => {
 
         const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T'];
 
-        const numRows = Math.ceil(capaciteBus / 5);
+        const numRows = Math.ceil(capaciteBus / 4);
         const seatRows = [];
         let seatCount = 0;
 
@@ -296,7 +405,7 @@ const Guichet = () => {
             if (seatCount >= capaciteBus) break;
 
             const rowLabel = rows[i];
-            const colsInThisRow = Math.min(5, capaciteBus - seatCount);
+            const colsInThisRow = Math.min(4, capaciteBus - seatCount);
             const cols = Array.from({ length: colsInThisRow }, (_, i) => i + 1);
             seatCount += colsInThisRow;
 
@@ -335,7 +444,7 @@ const Guichet = () => {
                 num_ligne: selectedLigne,
                 bus: selectedBus,
                 date_voyage: dateVoyage,
-                heure: horaire,
+                heure: getLocalTime(horaire),
                 siege: selectedSeat,
                 prix: calculatedTotal,
                 arret_depart: arretDepart,
@@ -364,6 +473,16 @@ const Guichet = () => {
                     setIsPrinting(false);
                     // Reset soldTicketInfo after print to not affect next sale until it's done
                     setSoldTicketInfo(null);
+
+                    // Réinitialisation des champs pour la vente suivante
+                    setSelectedSeat(null);
+                    setArretArrivee('');
+                    setSelectedBagageId('');
+                    setSelectedCategory('VOYAGEUR');
+                    const defaultTarif = tarifsDb.find(t => t.actif && t.categorie === 'VOYAGEUR');
+                    if (defaultTarif) setSelectedTarifId(defaultTarif.id_type_tarification);
+
+                    // On garde la ligne et l'horaire car l'agent vend souvent plusieurs tickets pour le même bus.
                 }, 700);
             } else {
                 alert("Erreur lors de l'enregistrement de la vente.");
@@ -391,7 +510,7 @@ const Guichet = () => {
         ville_depart: departStation?.arret || reprintTicket?.arret_depart || "Non spécifié",
         ville_arrivee: arriveeStation?.arret || reprintTicket?.arret_arrivee || "Non spécifié",
         date: dateVoyage || reprintTicket?.date_voyage,
-        heure: horaire || reprintTicket?.heure,
+        heure: getLocalTime(horaire) || reprintTicket?.heure,
         bus: selectedBus || reprintTicket?.numero_bus,
         siege: selectedSeat || reprintTicket?.siege,
         prix: (calculatedTotal || parseFloat(reprintTicket?.prix || 0)).toFixed(3),
@@ -407,7 +526,150 @@ const Guichet = () => {
                 </div>
             </div>
 
-            {mode !== 'Historique' ? (
+            {mode === 'Clôture' ? (
+                /* SECTION CLÔTURE SERVICE */
+                <div className="historique-container animate-in">
+                    <div className="glass-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '3rem' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                            <div style={{ background: '#eef2ff', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                                <ShieldCheck size={40} color="#4f46e5" />
+                            </div>
+                            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1e293b' }}>Clôture du Service</h2>
+                            <p style={{ color: '#64748b', fontSize: '1.1rem' }}>Vérifiez votre bilan avant d'envoyer la fiche à l'administration.</p>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                            <div className="stat-card" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                    <Clock size={16} /> HEURE DE CONNEXION
+                                </div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+                                    {localStorage.getItem('login_time') ? new Date(localStorage.getItem('login_time')).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                </div>
+                            </div>
+                            <div className="stat-card" style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                    <TrendingUp size={16} /> HEURE ACTUELLE
+                                </div>
+                                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>
+                                    {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            </div>
+                            <div className="stat-card" style={{ background: '#f0fdf4', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #dcfce7', gridColumn: 'span 2' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#166534', fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                            <FileText size={16} /> BILAN FINANCIER DU JOUR
+                                        </div>
+                                        <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#15803d' }}>
+                                            {dailySales.reduce((acc, curr) => acc + parseFloat(curr.prix), 0).toFixed(3)} <span style={{ fontSize: '1rem' }}>TND</span>
+                                        </div>
+                                        <div style={{ color: '#166534', fontWeight: 600, marginTop: '0.5rem' }}>
+                                            {dailySales.length} tickets vendus aujourd'hui
+                                        </div>
+                                    </div>
+                                    <div style={{ background: 'rgba(21, 128, 61, 0.1)', padding: '1rem', borderRadius: '1rem' }}>
+                                        <Ticket size={40} color="#15803d" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {closureResult ? (
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
+                                <CheckCircle size={32} color="#15803d" style={{ marginBottom: '0.5rem' }} />
+                                <h3 style={{ color: '#15803d', margin: 0 }}>Service clôturé avec succès !</h3>
+                                <p style={{ color: '#166534', margin: '0.5rem 0 0' }}>La fiche #A{String(closureResult.id_fiche).padStart(3, '0')} a été envoyée.</p>
+                            </div>
+                        ) : (
+                            <button 
+                                className="print-btn" 
+                                style={{ width: '100%', height: '60px', fontSize: '1.1rem', background: '#4f46e5' }}
+                                onClick={() => setShowConfirmModal(true)}
+                                disabled={isClosing}
+                            >
+                                {isClosing ? 'Traitement en cours...' : 'Confirmer la Clôture et Envoyer le Rapport'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : mode === 'Historique' ? (
+                /* SECTION HISTORIQUE */
+                <div className="historique-container animate-in">
+                    <div className="glass-card w-full" style={{ maxWidth: 'none', padding: '2rem' }}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3><History size={24} /> Ventes d'Aujourd'hui</h3>
+                            <button className="btn-pdf" onClick={fetchDailySales}>Actualiser</button>
+                        </div>
+
+                        {dailySales.length > 0 ? (
+                            <div className="table-responsive">
+                                <table className="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Ligne & Destination</th>
+                                            <th>Heure</th>
+                                            <th>Bus</th>
+                                            <th>Siège</th>
+                                            <th>Type</th>
+                                            <th>Trajet (Arrêts)</th>
+                                            <th>Tarif</th>
+                                            <th>Prix</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dailySales.map((t) => (
+                                            <tr key={t.id_ticket}>
+                                                <td><span className="badge badge-blue">T{String(t.id_ticket).padStart(3, '0')}</span></td>
+                                                <td>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-slate-800">Ligne {t.num_ligne}</span>
+                                                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                                                            {t.ligne_depart} → {t.ligne_arrivee}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td><span className="time-badge">{t.heure.substring(0, 5)}</span></td>
+                                                <td><span className="bus-badge">Bus {t.numero_bus}</span></td>
+                                                <td><span className="seat-badge">{t.siege}</span></td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '4px 10px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 700,
+                                                        background: t.type_ticket === 'Directe' ? '#ecfdf5' : '#eff6ff',
+                                                        color: t.type_ticket === 'Directe' ? '#059669' : '#2563eb',
+                                                        border: `1px solid ${t.type_ticket === 'Directe' ? '#10b981' : '#3b82f6'}`,
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {t.type_ticket}
+                                                    </span>
+                                                </td>
+                                                <td className="text-sm font-medium text-slate-600">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="opacity-60">{t.arret_depart}</span>
+                                                        <ArrowRight size={12} className="text-indigo-400" />
+                                                        <span>{t.arret_arrivee}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span className={`badge-tarif ${t.type_tarif.toLowerCase().replace('é', 'e')}`}>{t.type_tarif}</span></td>
+                                                <td className="font-bold text-indigo-700">{parseFloat(t.prix).toFixed(3)} TND</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="empty-state py-10 text-center text-slate-400">
+                                <Ticket size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                <p>Aucun ticket vendu aujourd'hui.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : (
                 <div className="guichet-content">
                     {/* Left Forms */}
                     <div className="guichet-forms">
@@ -474,7 +736,7 @@ const Guichet = () => {
                                 <div className="flex-1">
                                     <label>Horaire de Départ *</label>
                                     {activeLigne && activeLigne.horaires && activeLigne.horaires.length > 0 && activeLigne.horaires[0] !== null ? (
-                                        <select className="g-select" value={horaire} onChange={e => {
+                                        <select className="g-select" value={horaire} onChange={(e) => {
                                             const h = e.target.value;
                                             setHoraire(h);
                                             // Auto-affecter le bus selon ligne + horaire (config Admin)
@@ -490,9 +752,32 @@ const Guichet = () => {
                                             setSelectedSeat(null);
                                         }}>
                                             <option value="">--:--</option>
-                                            {activeLigne.horaires.map((h, i) => (
-                                                <option key={i} value={h}>{h}</option>
-                                            ))}
+                                            {(activeLigne.horaires || [])
+                                                .filter(h => !!h)
+                                                .sort((a, b) => {
+                                                    const dateA = getLocalArrivalDate(a);
+                                                    const dateB = getLocalArrivalDate(b);
+                                                    if (!dateA || !dateB) return 0;
+                                                    return dateA - dateB;
+                                                })
+                                                .map((h, i) => {
+                                                const arrivalDate = getLocalArrivalDate(h);
+                                                const now = new Date();
+
+                                                // En mode Vente Directe, on bloque si l'heure d'arrivée à NOTRE station est passée (avec marge 5min)
+                                                const isPast = mode === 'Vente Directe' && arrivalDate && (now - arrivalDate > 5 * 60000);
+
+                                                return (
+                                                    <option
+                                                        key={i}
+                                                        value={h}
+                                                        disabled={isPast}
+                                                        style={isPast ? { color: '#ccc', fontStyle: 'italic' } : {}}
+                                                    >
+                                                        {getLocalTime(h)} {isPast ? ' (Passé)' : ''}
+                                                    </option>
+                                                );
+                                            })}
                                         </select>
                                     ) : activeLigne && activeLigne.horaire ? (
                                         <select className="g-select" value={horaire} onChange={e => {
@@ -506,7 +791,24 @@ const Guichet = () => {
                                             setSelectedSeat(null);
                                         }}>
                                             <option value="">--:--</option>
-                                            <option value={activeLigne.horaire}>{activeLigne.horaire}</option>
+                                            {(() => {
+                                                const h = activeLigne.horaire;
+                                                if (!h) return null;
+                                                
+                                                const arrivalDate = getLocalArrivalDate(h);
+                                                const now = new Date();
+                                                const isPast = mode === 'Vente Directe' && arrivalDate && (now - arrivalDate > 5 * 60000);
+                                                
+                                                return (
+                                                    <option
+                                                        value={h}
+                                                        disabled={isPast}
+                                                        style={isPast ? { color: '#ccc', fontStyle: 'italic' } : {}}
+                                                    >
+                                                        {getLocalTime(h)} {isPast ? ' (Déjà passé)' : ''}
+                                                    </option>
+                                                );
+                                            })()}
                                         </select>
                                     ) : (
                                         <select className="g-select" value="" disabled>
@@ -548,7 +850,11 @@ const Guichet = () => {
                                         <select className="g-select" value={arretArrivee} onChange={e => setArretArrivee(e.target.value)} disabled={activeLigne && !canProceed}>
                                             <option value="">Choisir arrivée...</option>
                                             {activeStations
-                                                .filter(s => s.arret !== arretDepart) // On ne peut pas arriver là où on part
+                                                .filter(s => {
+                                                    // On ne montre que les stations situées APRÈS le point de départ sélectionné
+                                                    if (!departStation) return s.arret !== arretDepart;
+                                                    return s.distance_km > departStation.distance_km;
+                                                })
                                                 .map(s => (
                                                     <option key={s.arret} value={s.arret}>{s.arret}</option>
                                                 ))}
@@ -596,10 +902,16 @@ const Guichet = () => {
                                 <div className="flex-1">
                                     <label>Catégorie *</label>
                                     <select className="g-select" value={selectedCategory} onChange={(e) => {
-                                        setSelectedCategory(e.target.value);
-                                        const ops = tarifsDb.filter(t => t.categorie === e.target.value);
+                                        const cat = e.target.value;
+                                        setSelectedCategory(cat);
+                                        const ops = tarifsDb.filter(t => t.categorie === cat);
                                         if (ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification);
                                         else setSelectedTarifId('');
+                                        
+                                        // On réinitialise les bagages si c'est une expédition
+                                        if (cat === 'EXPEDITION') {
+                                            setSelectedBagageId('');
+                                        }
                                     }}>
                                         <option value="VOYAGEUR">Voyageur (Réductions & Base)</option>
                                         <option value="CONVENTION">Conventions (Police, Armée...)</option>
@@ -619,19 +931,21 @@ const Guichet = () => {
                                 </div>
                             </div>
 
-                            <div className="flex-row mt-3">
-                                <div className="flex-1">
-                                    <label>Bagages supplémentaires (Optionnel)</label>
-                                    <select className="g-select" value={selectedBagageId} onChange={(e) => setSelectedBagageId(e.target.value)}>
-                                        <option value="">-- Aucun supplément bagage --</option>
-                                        {bagagesDb.map(b => (
-                                            <option key={b.id_type_bagage} value={b.id_type_bagage}>
-                                                {b.libelle} (+ {(b.prix / 1000).toFixed(3)} TND)
-                                            </option>
-                                        ))}
-                                    </select>
+                            {selectedCategory !== 'EXPEDITION' && (
+                                <div className="flex-row mt-3">
+                                    <div className="flex-1">
+                                        <label>Bagages supplémentaires (Optionnel)</label>
+                                        <select className="g-select" value={selectedBagageId} onChange={(e) => setSelectedBagageId(e.target.value)}>
+                                            <option value="">-- Aucun supplément bagage --</option>
+                                            {bagagesDb.map(b => (
+                                                <option key={b.id_type_bagage} value={b.id_type_bagage}>
+                                                    {b.libelle} (+ {(b.prix / 1000).toFixed(3)} TND)
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                     </div>
@@ -654,7 +968,7 @@ const Guichet = () => {
                                 )}
                                 <div className="row">
                                     <span>Horaire:</span>
-                                    <strong>{horaire || '-'}</strong>
+                                    <strong>{getLocalTime(horaire) || '-'}</strong>
                                 </div>
                                 <div className="row">
                                     <span>Bus:</span>
@@ -722,82 +1036,6 @@ const Guichet = () => {
                         </div>
                     </div>
                 </div>
-            ) : (
-                /* SECTION HISTORIQUE */
-                <div className="historique-container animate-in">
-                    <div className="glass-card w-full" style={{ maxWidth: 'none', padding: '2rem' }}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3><History size={24} /> Ventes d'Aujourd'hui</h3>
-                            <button className="btn-pdf" onClick={fetchDailySales}>Actualiser</button>
-                        </div>
-
-                        {dailySales.length > 0 ? (
-                            <div className="table-responsive">
-                                <table className="history-table">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Ligne & Destination</th>
-                                            <th>Heure</th>
-                                            <th>Bus</th>
-                                            <th>Siège</th>
-                                            <th>Type</th>
-                                            <th>Trajet (Arrêts)</th>
-                                            <th>Tarif</th>
-                                            <th>Prix</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {dailySales.map((t) => (
-                                            <tr key={t.id_ticket}>
-                                                <td><span className="badge badge-blue">T{String(t.id_ticket).padStart(3, '0')}</span></td>
-                                                <td>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-slate-800">Ligne {t.num_ligne}</span>
-                                                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                                                            {t.ligne_depart} → {t.ligne_arrivee}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td><span className="time-badge">{t.heure.substring(0, 5)}</span></td>
-                                                <td><span className="bus-badge">Bus {t.numero_bus}</span></td>
-                                                <td><span className="seat-badge">{t.siege}</span></td>
-                                                <td>
-                                                    <span style={{ 
-                                                        padding: '4px 10px', 
-                                                        borderRadius: '8px', 
-                                                        fontSize: '0.8rem', 
-                                                        fontWeight: 700,
-                                                        background: t.type_ticket === 'Directe' ? '#ecfdf5' : '#eff6ff',
-                                                        color: t.type_ticket === 'Directe' ? '#059669' : '#2563eb',
-                                                        border: `1px solid ${t.type_ticket === 'Directe' ? '#10b981' : '#3b82f6'}`,
-                                                        whiteSpace: 'nowrap'
-                                                    }}>
-                                                        {t.type_ticket}
-                                                    </span>
-                                                </td>
-                                                <td className="text-sm font-medium text-slate-600">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="opacity-60">{t.arret_depart}</span>
-                                                        <ArrowRight size={12} className="text-indigo-400" />
-                                                        <span>{t.arret_arrivee}</span>
-                                                    </div>
-                                                </td>
-                                                <td><span className={`badge-tarif ${t.type_tarif.toLowerCase().replace('é', 'e')}`}>{t.type_tarif}</span></td>
-                                                <td className="font-bold text-indigo-700">{parseFloat(t.prix).toFixed(3)} TND</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="empty-state py-10 text-center text-slate-400">
-                                <Ticket size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                                <p>Aucun ticket vendu aujourd'hui.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
             )}
 
             {/* Print Layout Hidden - Activated via @media print */}
@@ -842,7 +1080,7 @@ const Guichet = () => {
                             <span>Départ:</span><strong>{arretDepart}</strong>
                             <span>Arrivée:</span><strong>{arretArrivee}</strong>
                             <span>Date:</span><strong>{typeof dateVoyage === 'string' ? dateVoyage.split('-').reverse().join('/') : ''}</strong>
-                            <span>Heure:</span><strong>{horaire}</strong>
+                            <span>Heure:</span><strong>{getLocalTime(horaire)}</strong>
                             <span>Siège:</span><strong>{selectedSeat}</strong>
                             <span>Bus:</span><strong>N° {selectedBus}</strong>
                             <span>Distance:</span><strong>{distance.toFixed(0)} km</strong>
@@ -887,6 +1125,106 @@ const Guichet = () => {
                     </div>
                 )}
             </div>
+            {/* MODAL DE CONFIRMATION CLÔTURE */}
+            <AnimatePresence>
+                {showConfirmModal && (
+                    <motion.div 
+                        className="modal-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(15, 23, 42, 0.6)',
+                            backdropFilter: 'blur(4px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            padding: '20px'
+                        }}
+                        onClick={() => setShowConfirmModal(false)}
+                    >
+                        <motion.div 
+                            className="glass-card"
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            style={{
+                                width: '100%',
+                                maxWidth: '500px',
+                                padding: '2.5rem',
+                                textAlign: 'center',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div style={{ 
+                                background: '#fef2f2', 
+                                width: '64px', 
+                                height: '64px', 
+                                borderRadius: '50%', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                margin: '0 auto 1.5rem' 
+                            }}>
+                                <AlertTriangle size={32} color="#dc2626" />
+                            </div>
+
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '1rem' }}>
+                                Confirmer la clôture ?
+                            </h3>
+                            
+                            <p style={{ color: '#64748b', lineHeight: 1.6, marginBottom: '2rem', fontSize: '1.05rem' }}>
+                                Êtes-vous sûr de vouloir clôturer votre service pour aujourd'hui ? <br/>
+                                <strong style={{ color: '#475569' }}>Cette action enverra votre bilan financier final à l'administration.</strong>
+                            </p>
+
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button 
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: '12px', 
+                                        borderRadius: '12px', 
+                                        border: '1px solid #e2e8f0', 
+                                        background: 'white', 
+                                        color: '#64748b', 
+                                        fontWeight: 700, 
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onClick={() => setShowConfirmModal(false)}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                                >
+                                    Annuler
+                                </button>
+                                <button 
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: '12px', 
+                                        borderRadius: '12px', 
+                                        border: 'none', 
+                                        background: '#dc2626', 
+                                        color: 'white', 
+                                        fontWeight: 700, 
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'
+                                    }}
+                                    onClick={handleCloseService}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                                >
+                                    Oui, Clôturer
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Platform, Image
+  ActivityIndicator, Alert, Platform, Image, Modal, TextInput, KeyboardAvoidingView, Dimensions
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -14,6 +14,7 @@ import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/the
 import { RECEVEUR_SERVICE_API, API_IP, API_PORT } from '../../constants/api';
 import SideDrawer from '../../components/SideDrawer';
 
+const { width } = Dimensions.get('window');
 const BASE = RECEVEUR_SERVICE_API;
 
 interface ActiveService {
@@ -28,6 +29,13 @@ interface ActiveService {
   recette: number;
 }
 
+// Helper for Changing Bus icon (Rotated Navigation)
+const CustomRefreshIcon = ({ color, size }: { color: string; size: number }) => (
+  <View style={{ transform: [{ rotate: '45deg' }] }}>
+    <Navigation color={color} size={size} strokeWidth={3} />
+  </View>
+);
+
 export default function ReceveurDashboard() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -40,25 +48,49 @@ export default function ReceveurDashboard() {
   const login_time = params.login_time as string;
   const matricule = params.matricule as string;
 
+  const [currentBus, setCurrentBus] = useState(numero_bus || '');
+  const [showBusModal, setShowBusModal] = useState(!numero_bus);
+  const [busInput, setBusInput] = useState('');
+  const [busError, setBusError] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
   const [activeService, setActiveService] = useState<ActiveService | null>(null);
+  const [busDetails, setBusDetails] = useState<any>(null);
   const [loadingSvc, setLoadingSvc] = useState(true);
+  const [closing, setClosing] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const userId = params.userId as string;
 
+  const displayLigne = activeService?.num_ligne || busDetails?.num_ligne || num_ligne || '';
+  const displayDepart = activeService?.ville_depart || busDetails?.ville_depart || ville_depart || '';
+  const displayArrivee = activeService?.ville_arrivee || busDetails?.ville_arrivee || ville_arrivee || '';
+
   const navParams = {
-    userId, nom, prenom, matricule, numero_bus, ville_depart, ville_arrivee, num_ligne,
+    userId, nom, prenom, matricule, numero_bus: currentBus, 
+    ville_depart: displayDepart, ville_arrivee: displayArrivee, num_ligne: displayLigne,
     service_id: activeService ? String(activeService.id_service) : '',
     login_time: login_time || '',
   };
 
   const fetchService = async () => {
-    if (!numero_bus) { setLoadingSvc(false); return; }
+    if (!currentBus) { setLoadingSvc(false); return; }
     try {
-      const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(numero_bus)}`);
+      setLoadingSvc(true);
+      const r = await axios.get<ActiveService | null>(`${BASE}/active/${encodeURIComponent(currentBus)}`);
       setActiveService(r.data);
-    } catch { setActiveService(null); }
-    finally { setLoadingSvc(false); }
+      
+      try {
+        const busRes = await axios.get(`${BASE.replace('/receveur-service', '/buses')}/details/${encodeURIComponent(currentBus)}`);
+        setBusDetails(busRes.data);
+      } catch (err) {
+        setBusDetails(null);
+      }
+    } catch { 
+      setActiveService(null); 
+    } finally { 
+      setLoadingSvc(false); 
+    }
   };
 
   const [userData, setUserData] = useState<any>(null);
@@ -77,7 +109,7 @@ export default function ReceveurDashboard() {
 
   const imageUrl = userData?.image_url || params.image_url;
 
-  useFocusEffect(useCallback(() => { setLoadingSvc(true); fetchService(); }, []));
+  useFocusEffect(useCallback(() => { setLoadingSvc(true); fetchService(); }, [currentBus]));
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000);
@@ -88,18 +120,13 @@ export default function ReceveurDashboard() {
     ? Math.floor((now - new Date(activeService.date_debut).getTime()) / 60000)
     : 0;
   const elapsedLabel = elapsed >= 60
-    ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}min`
-    : `${elapsed}min`;
+    ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}m`
+    : `${elapsed}m`;
 
   const handleLogout = () => {
-    const logoutAction = () => {
-      router.replace('/');
-    };
-
+    const logoutAction = () => router.replace('/');
     if (Platform.OS === 'web') {
-      if (confirm('Voulez-vous vous déconnecter ?')) {
-        logoutAction();
-      }
+      if (confirm('Voulez-vous vous déconnecter ?')) logoutAction();
     } else {
       Alert.alert('Déconnexion', 'Voulez-vous vous déconnecter ?', [
         { text: 'Annuler', style: 'cancel' },
@@ -116,11 +143,7 @@ export default function ReceveurDashboard() {
     }
     router.push({ 
       pathname: '/(receveur)/vente', 
-      params: { 
-        ...navParams, 
-        service_id: String(activeService.id_service),
-        station_actuelle: activeService.station_actuelle || ''
-      } 
+      params: { ...navParams, service_id: String(activeService.id_service), station_actuelle: activeService.station_actuelle || '' } 
     });
   };
   const goManifeste = () => {
@@ -130,361 +153,252 @@ export default function ReceveurDashboard() {
     }
     router.push({ pathname: '/(receveur)/manifeste', params: { ...navParams, service_id: String(activeService.id_service) } });
   };
+  
+  const handleCloseService = () => {
+    if (!activeService) return;
+    const proceed = async () => {
+      setClosing(true);
+      try {
+        await axios.post(`${RECEVEUR_SERVICE_API}/${activeService.id_service}/close`, {});
+        setActiveService(null);
+        Alert.alert('Succès', 'Mission clôturée avec succès.', [
+          { text: 'OK', onPress: () => router.replace('/') }
+        ]);
+        if (Platform.OS === 'web') router.replace('/');
+      } catch (e: any) {
+        Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
+      } finally {
+        setClosing(false);
+      }
+    };
 
-  const hasAssignment = !!numero_bus;
+    if (Platform.OS === 'web') {
+      if (confirm('Voulez-vous vraiment terminer cette mission ?')) proceed();
+    } else {
+      Alert.alert('Clôturer le service', 'Voulez-vous terminer cette mission ?', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Clôturer', style: 'destructive', onPress: proceed }
+      ]);
+    }
+  };
+
+  const handleBusSubmit = async () => {
+    const input = busInput.trim();
+    if (input.length === 0) return;
+
+    setVerifying(true);
+    setBusError('');
+
+    try {
+      // 1. Check if bus exists and get details
+      const busRes = await axios.get(`${BASE.replace('/receveur-service', '/buses')}/details/${encodeURIComponent(input)}`);
+      const busData = busRes.data;
+
+      // 2. Check if assigned to a line
+      if (!busData.num_ligne) {
+        setBusError("bus n'est pas affecté à aucune ligne");
+        return;
+      }
+
+      // Success
+      setCurrentBus(input);
+      setShowBusModal(false);
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setBusError("bus inexistante");
+      } else {
+        setBusError("Erreur lors de la vérification du bus");
+      }
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <SideDrawer 
-        visible={drawerOpen} 
-        onClose={() => setDrawerOpen(false)} 
-        nom={nom}
-        prenom={prenom}
-        matricule={matricule}
-        role="receveur"
-        userId={userId}
-        imageUrl={imageUrl as string}
-        onLogout={handleLogout}
-      />
-      {/* ── Top Bar ── */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={() => setDrawerOpen(true)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Menu color={Colors.primary} size={22} />
-          </TouchableOpacity>
-          {imageUrl ? (
-            <Image
-              key={imageUrl as string}
-              source={{ uri: `http://${API_IP}:${API_PORT}/${imageUrl}` }}
-              style={styles.topAvatarImg}
-            />
-          ) : (
-            <View style={styles.topAvatar}>
-              <Text style={styles.topAvatarText}>{(prenom?.[0] ?? 'R').toUpperCase()}</Text>
-            </View>
-          )}
-          <View>
-            <Text style={styles.topGreeting}>Bienvenue</Text>
-            <Text style={styles.topName}>{prenom} {nom}</Text>
-          </View>
-        </View>
-        <TouchableOpacity 
-          style={styles.logoutBtn} 
-          onPress={handleLogout}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-        >
-          <LogOut color={Colors.textMuted} size={20} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* ── Assignment Card ── */}
-        {hasAssignment ? (
-          <View style={styles.assignCard}>
-            <View style={styles.assignTop}>
-              <View style={styles.assignIcon}>
-                <Bus color={Colors.white} size={20} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.assignBusLabel}>BUS AFFECTÉ</Text>
-                <Text style={styles.assignBus}>N° {numero_bus}</Text>
-              </View>
-              <View style={[styles.statusBadge, activeService ? styles.statusActive : styles.statusIdle]}>
-                <View style={[styles.statusDot, { backgroundColor: activeService ? Colors.success : Colors.textMuted }]} />
-                <Text style={[styles.statusText, { color: activeService ? Colors.success : Colors.textMuted }]}>
-                  {activeService ? 'En service' : 'Inactif'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.assignDivider} />
-            <View style={styles.assignRow}>
-              <View style={styles.assignItem}>
-                <Navigation color={Colors.primaryLight} size={14} />
-                <Text style={styles.assignItemLabel}>Ligne</Text>
-                <Text style={styles.assignItemValue}>{num_ligne || '—'}</Text>
-              </View>
-              <View style={styles.assignSep} />
-              <View style={styles.assignItem}>
-                <MapPin color={Colors.primaryLight} size={14} />
-                <Text style={styles.assignItemLabel}>Trajet</Text>
-                <Text style={styles.assignItemValue} numberOfLines={1}>
-                  {ville_depart || '—'} → {ville_arrivee || '—'}
-                </Text>
-              </View>
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <SideDrawer 
+          visible={drawerOpen} onClose={() => setDrawerOpen(false)} 
+          nom={nom} prenom={prenom} matricule={matricule} role="receveur"
+          userId={userId} imageUrl={imageUrl as string} onLogout={handleLogout}
+        />
+        
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={() => setDrawerOpen(true)} activeOpacity={0.7}>
+              <Menu color={Colors.primary} size={22} strokeWidth={2.5} />
+            </TouchableOpacity>
+            <View style={styles.userInfo}>
+              <Text style={styles.greeting}>Bonjour,</Text>
+              <Text style={styles.userName}>{prenom} {nom}</Text>
             </View>
           </View>
-        ) : (
-          <View style={styles.noAssignCard}>
-            <Bus color={Colors.textLight} size={40} />
-            <Text style={styles.noAssignTitle}>Aucune affectation</Text>
-            <Text style={styles.noAssignSub}>Contactez votre responsable pour être affecté à une ligne.</Text>
-          </View>
-        )}
-
-        {/* ── Session & Service KPIs ── */}
-        <View style={styles.kpiRow}>
-          <View style={styles.kpiCard}>
-            <Clock color={Colors.primary} size={18} />
-            <Text style={styles.kpiValue}>{elapsedLabel}</Text>
-            <Text style={styles.kpiLabel}>Durée</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <Ticket color={Colors.warning} size={18} />
-            <Text style={styles.kpiValue}>{activeService ? activeService.nb_tickets : 0}</Text>
-            <Text style={styles.kpiLabel}>Billets</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <TrendingUp color={Colors.success} size={18} />
-            <Text style={styles.kpiValue}>{activeService ? parseFloat(String(activeService.recette)).toFixed(1) : '0.0'}</Text>
-            <Text style={styles.kpiLabel}>TND</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={() => setDrawerOpen(true)} activeOpacity={0.8}>
+              {imageUrl ? (
+                <Image source={{ uri: `http://${API_IP}:${API_PORT}/${imageUrl}` }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarText}>{(prenom?.[0] ?? 'R').toUpperCase()}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── Current Stop Banner (active service) ── */}
-        {activeService?.station_actuelle && (
-          <View style={styles.stopBanner}>
-            <MapPin color={Colors.accent} size={16} />
-            <Text style={styles.stopBannerText}>
-              Station actuelle : <Text style={{ fontWeight: '800' }}>{activeService.station_actuelle}</Text>
-            </Text>
-            {activeService.voyage_complet && (
-              <View style={styles.completeBadge}>
-                <Text style={styles.completeBadgeTxt}>✅ Terminé</Text>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.heroWrapper}>
+            {currentBus ? (
+              <View style={styles.heroCard}>
+                <View style={styles.heroMain}>
+                  <View style={styles.heroBusBadge}>
+                    <Bus color={Colors.white} size={22} strokeWidth={2.5} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.heroBusLabel}>VOTRE BUS</Text>
+                    <Text style={styles.heroBusNum}>BUS N° {currentBus}</Text>
+                  </View>
+                  <View style={[styles.statusTag, activeService ? styles.statusActive : styles.statusIdle]}>
+                    <Text style={styles.statusTagText}>{activeService ? 'EN SERVICE' : 'INACTIF'}</Text>
+                  </View>
+                </View>
+                <View style={styles.heroDivider} />
+                <View style={styles.heroFooter}>
+                  <View style={styles.heroStat}><Navigation color={Colors.accent} size={14} strokeWidth={2.5} /><Text style={styles.heroStatVal}>{displayLigne || '—'}</Text><Text style={styles.heroStatLabel}>LIGNE</Text></View>
+                  <View style={styles.heroStatSep} />
+                  <View style={styles.heroStat}><MapPin color={Colors.accent} size={14} strokeWidth={2.5} /><Text style={styles.heroStatVal} numberOfLines={1}>{displayDepart || '—'}</Text><Text style={styles.heroStatLabel}>DÉPART</Text></View>
+                  <View style={styles.heroStatSep} />
+                  <View style={styles.heroStat}><MapPin color={Colors.accent} size={14} strokeWidth={2.5} /><Text style={styles.heroStatVal} numberOfLines={1}>{displayArrivee || '—'}</Text><Text style={styles.heroStatLabel}>ARRIVÉE</Text></View>
+                </View>
+                <TouchableOpacity style={styles.heroChangeBtn} onPress={() => setShowBusModal(true)} activeOpacity={0.7}>
+                  <CustomRefreshIcon color={Colors.white} size={14} />
+                </TouchableOpacity>
               </View>
+            ) : (
+              <TouchableOpacity style={styles.heroEmpty} onPress={() => setShowBusModal(true)}>
+                <Bus color={Colors.textLight} size={48} strokeWidth={1.5} />
+                <Text style={styles.heroEmptyTitle}>Aucune affectation</Text>
+                <Text style={styles.heroEmptySub}>Touchez ici pour choisir votre bus</Text>
+              </TouchableOpacity>
             )}
           </View>
-        )}
 
-        {/* ── Section Title ── */}
-        <Text style={styles.sectionLabel}>Actions opérationnelles</Text>
-
-        {/* ── Primary CTA: Start/Manage Service ── */}
-        <TouchableOpacity style={styles.primaryCTA} onPress={goService} activeOpacity={0.85}>
-          <View style={styles.primaryCTAIcon}>
-            {activeService
-              ? <Navigation color={Colors.primary} size={24} />
-              : <Play color={Colors.primary} size={24} />
-            }
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiBox}><View style={[styles.kpiIconWrap, { backgroundColor: Colors.infoLight }]}><Clock color={Colors.info} size={18} strokeWidth={2.5} /></View><Text style={styles.kpiValue}>{elapsedLabel}</Text><Text style={styles.kpiLabel}>DURÉE</Text></View>
+            <View style={styles.kpiBox}><View style={[styles.kpiIconWrap, { backgroundColor: Colors.warningLight }]}><Ticket color={Colors.warning} size={18} strokeWidth={2.5} /></View><Text style={styles.kpiValue}>{activeService ? activeService.nb_tickets : 0}</Text><Text style={styles.kpiLabel}>BILLETS</Text></View>
+            <View style={styles.kpiBox}><View style={[styles.kpiIconWrap, { backgroundColor: Colors.successLight }]}><TrendingUp color={Colors.success} size={18} strokeWidth={2.5} /></View><Text style={styles.kpiValue}>{activeService ? parseFloat(String(activeService.recette)).toFixed(1) : '0.0'}</Text><Text style={styles.kpiLabel}>TND</Text></View>
           </View>
-          <View style={styles.primaryCTAContent}>
-            <Text style={styles.primaryCTATitle}>
-              {activeService ? 'Gérer le service en cours' : 'Démarrer un service'}
-            </Text>
-            <Text style={styles.primaryCTASub}>
-              {activeService
-                ? `Service #${activeService.id_service} · ${activeService.station_actuelle ?? 'En cours'}`
-                : 'Aucun service actif pour ce bus'
-              }
-            </Text>
+
+          <Text style={styles.sectionHeading}>OPÉRATIONS TERRAIN</Text>
+          <TouchableOpacity style={[styles.primaryAction, activeService ? styles.primaryActionActive : styles.primaryActionIdle]} onPress={goService} activeOpacity={0.9}>
+            <View style={styles.primaryActionLeft}><View style={styles.primaryActionIcon}>{activeService ? <Navigation color={Colors.primary} size={28} strokeWidth={2.5} /> : <Play color={Colors.primary} size={28} strokeWidth={2.5} />}</View><View><Text style={styles.primaryActionTitle}>{activeService ? 'Gérer le service' : 'Lancer un service'}</Text><Text style={styles.primaryActionSub}>{activeService ? `Station: ${activeService.station_actuelle || 'En route'}` : 'Prêt à démarrer le trajet'}</Text></View></View>
+            <ChevronRight color={Colors.primary} size={24} strokeWidth={3} />
+          </TouchableOpacity>
+
+          <View style={styles.actionGrid}>
+            <TouchableOpacity style={[styles.actionCard, !activeService && styles.actionCardDisabled]} onPress={goVente} disabled={!activeService} activeOpacity={0.8}><View style={[styles.actionCardIcon, { backgroundColor: Colors.warning + '12' }]}><Ticket color={activeService ? Colors.warning : Colors.textLight} size={24} strokeWidth={2.5} /></View><Text style={styles.actionCardTitle}>Émettre un billet</Text><Text style={styles.actionCardSub}>Vente directe à bord</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.actionCard, !activeService && styles.actionCardDisabled]} onPress={goManifeste} disabled={!activeService} activeOpacity={0.8}><View style={[styles.actionCardIcon, { backgroundColor: Colors.info + '12' }]}><Users color={activeService ? Colors.info : Colors.textLight} size={24} strokeWidth={2.5} /></View><Text style={styles.actionCardTitle}>Manifeste</Text><Text style={styles.actionCardSub}>Liste des passagers</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard} onPress={() => router.push({ pathname: '/(receveur)/incident', params: navParams })} activeOpacity={0.8}><View style={[styles.actionCardIcon, { backgroundColor: Colors.danger + '12' }]}><AlertTriangle color={Colors.danger} size={24} strokeWidth={2.5} /></View><Text style={styles.actionCardTitle}>Signaler Incident</Text><Text style={styles.actionCardSub}>Problème technique</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.actionCard, !activeService && styles.actionCardDisabled]} onPress={activeService ? handleCloseService : undefined} disabled={!activeService || closing} activeOpacity={0.8}>
+              <View style={[styles.actionCardIcon, { backgroundColor: activeService ? Colors.primary + '12' : Colors.bgMid }]}>
+                {closing ? <ActivityIndicator size="small" color={Colors.primary} /> : <Square color={activeService ? Colors.primary : Colors.textLight} size={24} strokeWidth={2.5} />}
+              </View>
+              <Text style={styles.actionCardTitle}>Clôturer</Text>
+              <Text style={styles.actionCardSub}>Terminer la mission</Text>
+            </TouchableOpacity>
           </View>
-          <ChevronRight color={Colors.primary} size={20} />
-        </TouchableOpacity>
+          {loadingSvc && <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />}
+        </ScrollView>
+      </SafeAreaView>
 
-        {/* ── Action Grid ── */}
-        <View style={styles.actionGrid}>
-          {/* Émettre un billet */}
-          <TouchableOpacity
-            style={[styles.actionCard, !activeService && styles.actionCardDisabled]}
-            onPress={goVente}
-            activeOpacity={activeService ? 0.8 : 1}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: Colors.warningLight }]}>
-              <Ticket color={activeService ? Colors.warning : Colors.textLight} size={24} />
-            </View>
-            <Text style={[styles.actionTitle, !activeService && styles.actionTitleDisabled]}>Émettre un billet</Text>
-            <Text style={styles.actionSub}>{activeService ? 'Nouvelle vente à bord' : 'Service requis'}</Text>
-          </TouchableOpacity>
-
-          {/* Manifeste */}
-          <TouchableOpacity
-            style={[styles.actionCard, !activeService && styles.actionCardDisabled]}
-            onPress={goManifeste}
-            activeOpacity={activeService ? 0.8 : 1}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: Colors.infoLight }]}>
-              <Users color={activeService ? Colors.info : Colors.textLight} size={24} />
-            </View>
-            <Text style={[styles.actionTitle, !activeService && styles.actionTitleDisabled]}>Liste des réservations</Text>
-            <Text style={styles.actionSub}>
-              {activeService ? `${activeService.nb_tickets} passager(s)` : 'Service requis'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Incident */}
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push({ pathname: '/(receveur)/incident', params: navParams })}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: Colors.dangerLight }]}>
-              <AlertTriangle color={Colors.danger} size={24} />
-            </View>
-            <Text style={styles.actionTitle}>Incident</Text>
-            <Text style={styles.actionSub}>Signaler un problème</Text>
-          </TouchableOpacity>
-
-          {/* Clôturer */}
-          <TouchableOpacity
-            style={[styles.actionCard, !activeService && styles.actionCardDisabled]}
-            onPress={activeService ? goService : undefined}
-            activeOpacity={activeService ? 0.8 : 1}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: activeService ? Colors.dangerLight : Colors.bgMid }]}>
-              <Square color={activeService ? Colors.danger : Colors.textLight} size={24} />
-            </View>
-            <Text style={[styles.actionTitle, !activeService && styles.actionTitleDisabled]}>Clôturer</Text>
-            <Text style={styles.actionSub}>{activeService ? 'Fermer le service' : 'Service requis'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── No assignment helper ── */}
-        {!hasAssignment && (
-          <View style={styles.helperBox}>
-            <AlertTriangle color={Colors.warning} size={16} />
-            <Text style={styles.helperText}>
-              Vous n'avez pas d'affectation active. Les fonctions de service sont désactivées.
-            </Text>
+      <Modal visible={showBusModal} animationType="fade" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}><View style={styles.modalIconWrap}><Bus color={Colors.primary} size={24} /></View><View><Text style={styles.modalTitle}>Affectation Bus</Text><Text style={styles.modalSub}>Saisissez le numéro du bus actuel</Text></View></View>
+            <View style={styles.modalInputWrap}><Bus color={Colors.textLight} size={20} /><TextInput style={styles.modalTextInput} placeholder="Ex: 1045" value={busInput} onChangeText={v => { setBusInput(v); setBusError(''); }} placeholderTextColor={Colors.textLight} autoCapitalize="characters" onSubmitEditing={handleBusSubmit} /></View>
+            {busError ? <Text style={styles.busErrorText}>{busError}</Text> : null}
+            <TouchableOpacity 
+              style={[styles.modalSubmit, (!busInput.trim() || verifying) && styles.modalSubmitDisabled]} 
+              onPress={handleBusSubmit} 
+              disabled={!busInput.trim() || verifying}
+            >
+              {verifying ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.modalSubmitText}>Confirmer affectation</Text>}
+            </TouchableOpacity>
+            {currentBus ? <TouchableOpacity style={styles.modalCancel} onPress={() => setShowBusModal(false)}><Text style={styles.modalCancelText}>Annuler</Text></TouchableOpacity> : null}
           </View>
-        )}
-
-        {loadingSvc && (
-          <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bgLight },
+  container: { flex: 1, backgroundColor: Colors.bgLight },
+  safe: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { padding: Spacing.base, paddingBottom: 40 },
+  scrollContent: { paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, backgroundColor: Colors.white },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerIconBtn: { width: 44, height: 44, borderRadius: Radius.md, backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center' },
+  userInfo: { gap: 2 },
+  greeting: { fontSize: 13, color: Colors.textLight, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  userName: { fontSize: 18, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 
-  // Top Bar
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
-    backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.divider,
-  },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  topAvatar: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
-  },
-  topAvatarImg: {
-    width: 40, height: 40, borderRadius: 12,
-    borderWidth: 1, borderColor: Colors.divider,
-  },
-  topAvatarText: { color: Colors.white, fontWeight: '800', fontSize: 18 },
-  topGreeting: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
-  topName: { fontSize: 17, fontWeight: '800', color: Colors.textDark },
-  menuBtn: {
-    width: 40, height: 40, borderRadius: 10,
-    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
-    marginRight: 4,
-  },
-  logoutBtn: {
-    width: 40, height: 40, borderRadius: 10,
-    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
-  },
-
-  // Assignment Card
-  assignCard: {
-    backgroundColor: Colors.primary, borderRadius: Radius.xl,
-    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.strong,
-  },
-  assignTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  assignIcon: {
-    width: 40, height: 40, borderRadius: 10,
-    backgroundColor: Colors.white + '20', alignItems: 'center', justifyContent: 'center',
-  },
-  assignBusLabel: { fontSize: 12, color: Colors.accent, fontWeight: '800', letterSpacing: 1 },
-  assignBus: { fontSize: 22, fontWeight: '900', color: Colors.white },
-  statusBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill,
-    backgroundColor: Colors.white + '15',
-  },
-  statusActive: {},
-  statusIdle: {},
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 13, fontWeight: '800' },
-  assignDivider: { height: 1, backgroundColor: Colors.white + '20', marginVertical: Spacing.md },
-  assignRow: { flexDirection: 'row', alignItems: 'center' },
-  assignItem: { flex: 1, gap: 3, alignItems: 'center' },
-  assignItemLabel: { fontSize: 12, color: Colors.accent, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
-  assignItemValue: { fontSize: 15, color: Colors.white, fontWeight: '800' },
-  assignSep: { width: 1, height: 32, backgroundColor: Colors.white + '25', marginHorizontal: Spacing.md },
-
-  noAssignCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.xl,
-    alignItems: 'center', marginBottom: Spacing.md, ...Shadow.card,
-  },
-  noAssignTitle: { fontSize: 18, fontWeight: '800', color: Colors.textMid, marginTop: 12 },
-  noAssignSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginTop: 6, lineHeight: 18 },
-
-  // KPI Row
-  kpiRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  kpiCard: {
-    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.lg,
-    padding: Spacing.md, alignItems: 'center', gap: 4, ...Shadow.card,
-  },
-  kpiValue: { fontSize: 22, fontWeight: '900', color: Colors.textDark },
-  kpiLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  stopBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.primary + '12', borderRadius: Radius.lg,
-    padding: Spacing.md, marginBottom: Spacing.md,
-    borderWidth: 1, borderColor: Colors.primary + '20',
-  },
-  stopBannerText: { flex: 1, fontSize: 15, color: Colors.primary, fontWeight: '700' },
-  completeBadge: { backgroundColor: Colors.successLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
-  completeBadgeTxt: { fontSize: 13, fontWeight: '800', color: Colors.success },
-
-  // Section
-  sectionLabel: { ...Typography.label, marginBottom: Spacing.md, marginTop: 4 },
-
-  // Primary CTA
-  primaryCTA: {
-    backgroundColor: Colors.accent, borderRadius: Radius.xl,
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.accent,
-  },
-  primaryCTAIcon: {
-    width: 48, height: 48, borderRadius: Radius.md,
-    backgroundColor: Colors.white + '30', alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
-  },
-  primaryCTAContent: { flex: 1 },
-  primaryCTATitle: { fontSize: 18, fontWeight: '800', color: Colors.primary },
-  primaryCTASub: { fontSize: 14, color: Colors.primary + 'AA', marginTop: 2, fontWeight: '600' },
-
-  // Action Grid
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.base },
-  actionCard: {
-    width: '48%', backgroundColor: Colors.white, borderRadius: Radius.lg,
-    padding: Spacing.base, gap: 6, ...Shadow.card,
-  },
-  actionCardDisabled: { opacity: 0.45 },
-  actionIcon: {
-    width: 46, height: 46, borderRadius: Radius.md,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  actionTitle: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
-  actionTitleDisabled: { color: Colors.textMuted },
-  actionSub: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
-
-  // Helper
-  helperBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    backgroundColor: Colors.warningLight, borderRadius: Radius.md,
-    padding: Spacing.md, borderWidth: 1, borderColor: Colors.warning + '40',
-  },
-  helperText: { flex: 1, fontSize: 14, color: Colors.warning, fontWeight: '700', lineHeight: 18 },
+  avatarPlaceholder: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarImg: { width: 44, height: 44, borderRadius: 14, borderWidth: 2, borderColor: Colors.bgMid },
+  avatarText: { color: Colors.white, fontWeight: '900', fontSize: 18 },
+  heroWrapper: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.base },
+  heroCard: { backgroundColor: Colors.primary, borderRadius: Radius.xxl, padding: Spacing.xl, ...Shadow.strong, overflow: 'hidden' },
+  heroMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  heroBusBadge: { width: 56, height: 56, borderRadius: Radius.lg, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  heroBusLabel: { fontSize: 11, color: Colors.accent, fontWeight: '900', letterSpacing: 2 },
+  heroBusNum: { fontSize: 28, fontWeight: '900', color: Colors.white, letterSpacing: -0.5, marginTop: 2 },
+  statusTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill },
+  statusActive: { backgroundColor: Colors.success + '20' },
+  statusIdle: { backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+  statusTagText: { fontSize: 11, fontWeight: '900', color: Colors.white, letterSpacing: 0.5 },
+  heroDivider: { height: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.08)', marginVertical: Spacing.xl },
+  heroFooter: { flexDirection: 'row', alignItems: 'center' },
+  heroStat: { flex: 1, alignItems: 'center', gap: 4 },
+  heroStatVal: { fontSize: 16, fontWeight: '800', color: Colors.white, letterSpacing: -0.3 },
+  heroStatLabel: { fontSize: 10, color: 'rgba(255, 255, 255, 0.4)', fontWeight: '900', letterSpacing: 1 },
+  heroStatSep: { width: 1, height: 32, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginHorizontal: Spacing.sm },
+  heroChangeBtn: { position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.15)', alignItems: 'center', justifyContent: 'center' },
+  heroEmpty: { height: 180, borderRadius: Radius.xxl, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.bgMid, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  heroEmptyTitle: { fontSize: 18, fontWeight: '800', color: Colors.textMid },
+  heroEmptySub: { fontSize: 14, color: Colors.textLight, fontWeight: '600' },
+  kpiGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: Spacing.xl, marginBottom: Spacing.xl },
+  kpiBox: { flex: 1, backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, alignItems: 'center', gap: 8, ...Shadow.card, borderWidth: 1, borderColor: Colors.bgMid },
+  kpiIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  kpiValue: { fontSize: 20, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  kpiLabel: { fontSize: 10, color: Colors.textLight, fontWeight: '900', letterSpacing: 1 },
+  sectionHeading: { fontSize: 12, fontWeight: '900', color: Colors.textLight, paddingHorizontal: Spacing.xl, marginBottom: Spacing.md, letterSpacing: 1.5 },
+  primaryAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: Spacing.xl, padding: Spacing.xl, borderRadius: Radius.xxl, marginBottom: Spacing.xl, ...Shadow.strong },
+  primaryActionActive: { backgroundColor: Colors.accent, ...Shadow.accent },
+  primaryActionIdle: { backgroundColor: Colors.bgMid, borderWidth: 1, borderColor: Colors.divider },
+  primaryActionLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  primaryActionIcon: { width: 56, height: 56, borderRadius: Radius.lg, backgroundColor: 'rgba(255, 255, 255, 0.4)', alignItems: 'center', justifyContent: 'center' },
+  primaryActionTitle: { fontSize: 20, fontWeight: '900', color: Colors.primary, letterSpacing: -0.5 },
+  primaryActionSub: { fontSize: 14, color: Colors.primary + '70', fontWeight: '700', marginTop: 2 },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: Spacing.xl },
+  actionCard: { width: (width - Spacing.xl * 2 - 12) / 2, backgroundColor: Colors.white, borderRadius: Radius.xxl, padding: Spacing.xl, gap: 12, ...Shadow.card, borderWidth: 1, borderColor: Colors.bgMid },
+  actionCardDisabled: { opacity: 0.5 },
+  actionCardIcon: { width: 52, height: 52, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
+  actionCardTitle: { fontSize: 16, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.3 },
+  actionCardSub: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: Colors.white, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, padding: Spacing.xl, ...Shadow.strong },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xl },
+  modalIconWrap: { width: 52, height: 52, borderRadius: 16, backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  modalSub: { fontSize: 14, color: Colors.textMuted, fontWeight: '600' },
+  modalInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.bgLight, borderRadius: Radius.lg, borderWidth: 2, borderColor: Colors.bgMid, height: 60, paddingHorizontal: Spacing.lg, marginBottom: Spacing.xl },
+  modalTextInput: { flex: 1, fontSize: 18, color: Colors.textDark, fontWeight: '700' },
+  modalSubmit: { backgroundColor: Colors.primary, height: 60, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', ...Shadow.strong },
+  modalSubmitDisabled: { opacity: 0.5 },
+  modalSubmitText: { fontSize: 17, fontWeight: '900', color: Colors.white },
+  modalCancel: { height: 50, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  modalCancelText: { fontSize: 15, fontWeight: '800', color: Colors.textMuted },
+  busErrorText: { color: Colors.danger, fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: Spacing.md },
 });

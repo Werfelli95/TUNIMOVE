@@ -10,7 +10,7 @@ import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { API_IP, API_PORT } from '../constants/api';
 
 const { width } = Dimensions.get('window');
-const DRAWER_WIDTH = width * 0.78;
+const DRAWER_WIDTH = width * 0.82;
 
 interface SideDrawerProps {
   visible: boolean;
@@ -22,15 +22,16 @@ interface SideDrawerProps {
   userId?: string;
   imageUrl?: string;
   onLogout: () => void;
+  onCloseService?: () => void;
 }
 
 const ROLE_CONFIG = {
-  receveur: { label: 'Receveur', icon: Bus,    color: Colors.primary },
+  receveur: { label: 'Receveur', icon: Bus,    color: Colors.accent },
   controleur:{ label: 'Contrôleur', icon: Shield, color: Colors.info },
 };
 
 export default function SideDrawer({
-  visible, onClose, nom, prenom, matricule, role, userId, imageUrl, onLogout
+  visible, onClose, nom, prenom, matricule, role, userId, imageUrl, onLogout, onCloseService
 }: SideDrawerProps) {
   const router = useRouter();
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
@@ -77,46 +78,50 @@ export default function SideDrawer({
       <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
 
-          {/* ── Header ── */}
+          {/* ── Ultra-Premium Header ── */}
           <View style={styles.header}>
-            {imageUrl ? (
-              <Image 
-                source={{ uri: `http://${API_IP}:${API_PORT}/${imageUrl}` }} 
-                style={styles.avatarImg} 
-              />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initials}</Text>
+            <View style={styles.headerTop}>
+              <View style={styles.avatarWrapper}>
+                {imageUrl ? (
+                  <Image 
+                    source={{ uri: `http://${API_IP}:${API_PORT}/${imageUrl}` }} 
+                    style={styles.avatarImg} 
+                  />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials}</Text>
+                  </View>
+                )}
+                <View style={styles.roleDot} />
               </View>
-            )}
-            <View style={{ flex: 1 }}>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+                <X color={Colors.white} size={20} strokeWidth={3} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.profileInfo}>
               <Text style={styles.name} numberOfLines={1}>{prenom} {nom}</Text>
-              <Text style={styles.matricule}>Matricule: {matricule}</Text>
-              <View style={[styles.roleBadge, { backgroundColor: cfg.color + '20' }]}>
-                <RoleIcon color={cfg.color} size={12} />
-                <Text style={[styles.roleText, { color: cfg.color }]}>{cfg.label}</Text>
+              <Text style={styles.matricule}>MATRICULE: {matricule}</Text>
+              <View style={[styles.roleBadge, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
+                <RoleIcon color={cfg.color} size={14} strokeWidth={2.5} />
+                <Text style={styles.roleText}>{cfg.label}</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <X color={Colors.textMuted} size={20} />
-            </TouchableOpacity>
           </View>
 
-          <View style={styles.divider} />
-
-          {/* ── Menu Items ── */}
-          <View style={styles.menu}>
-            <Text style={styles.menuSection}>MON COMPTE</Text>
+          {/* ── Immersive Menu ── */}
+          <View style={styles.menuContainer}>
+            <Text style={styles.sectionTitle}>Opérations</Text>
 
             <TouchableOpacity style={styles.menuItem} onPress={goProfile} activeOpacity={0.7}>
-              <View style={[styles.menuIcon, { backgroundColor: Colors.primary + '15' }]}>
-                <User color={Colors.primary} size={20} />
+              <View style={[styles.menuIcon, { backgroundColor: Colors.primary + '10' }]}>
+                <User color={Colors.primary} size={20} strokeWidth={2.5} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>Mon profil</Text>
-                <Text style={styles.menuSub}>Informations personnelles</Text>
+              <View style={styles.menuBody}>
+                <Text style={styles.menuLabel}>Profil & Sécurité</Text>
+                <Text style={styles.menuSub}>Gérer vos informations</Text>
               </View>
-              <ChevronRight color={Colors.textLight} size={18} />
+              <ChevronRight color={Colors.textLight} size={18} strokeWidth={2} />
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -131,31 +136,50 @@ export default function SideDrawer({
               }} 
               activeOpacity={0.7}
             >
-              <View style={[styles.menuIcon, { backgroundColor: (role === 'receveur' || role === 'RECEVEUR' ? Colors.success : Colors.info) + '15' }]}>
+              <View style={[styles.menuIcon, { backgroundColor: (role === 'receveur' || role === 'RECEVEUR' ? Colors.success : Colors.info) + '10' }]}>
                 {role === 'receveur' || role === 'RECEVEUR' ? (
-                  <TrendingUp color={Colors.success} size={20} />
+                  <TrendingUp color={Colors.success} size={20} strokeWidth={2.5} />
                 ) : (
-                  <Search color={Colors.info} size={20} />
+                  <Search color={Colors.info} size={20} strokeWidth={2.5} />
                 )}
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.menuBody}>
                 <Text style={styles.menuLabel}>
-                  {role === 'receveur' || role === 'RECEVEUR' ? 'Historique des ventes' : 'Historique des scans'}
+                  {role === 'receveur' || role === 'RECEVEUR' ? 'Journal des ventes' : 'Audit des scans'}
                 </Text>
-                <Text style={styles.menuSub}>
-                  {role === 'receveur' || role === 'RECEVEUR' ? 'Tickets vendus aujourd\'hui' : 'Tickets scannés aujourd\'hui'}
-                </Text>
+                <Text style={styles.menuSub}>Consulter vos activités</Text>
               </View>
-              <ChevronRight color={Colors.textLight} size={18} />
+              <ChevronRight color={Colors.textLight} size={18} strokeWidth={2} />
             </TouchableOpacity>
+
+            {role === 'controleur' && onCloseService && (
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => {
+                  onClose();
+                  onCloseService();
+                }} 
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: Colors.danger + '10' }]}>
+                  <Shield color={Colors.danger} size={20} strokeWidth={2.5} />
+                </View>
+                <View style={styles.menuBody}>
+                  <Text style={[styles.menuLabel, { color: Colors.danger }]}>Clôturer Service</Text>
+                  <Text style={styles.menuSub}>Envoyer le rapport final</Text>
+                </View>
+                <ChevronRight color={Colors.danger} size={18} strokeWidth={2} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* ── Logout ── */}
+          {/* ── Premium Footer ── */}
           <View style={styles.footer}>
             <TouchableOpacity style={styles.logoutBtn} onPress={onLogout} activeOpacity={0.8}>
-              <LogOut color={Colors.danger} size={20} />
-              <Text style={styles.logoutText}>Se déconnecter</Text>
+              <LogOut color={Colors.danger} size={20} strokeWidth={2.5} />
+              <Text style={styles.logoutText}>Déconnexion</Text>
             </TouchableOpacity>
+            <Text style={styles.copyright}>TuniMove Field v2.1.0 · SNTRI</Text>
           </View>
 
         </SafeAreaView>
@@ -167,80 +191,98 @@ export default function SideDrawer({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: Colors.overlay,
   },
   drawer: {
     position: 'absolute', top: 0, bottom: 0, left: 0,
     width: DRAWER_WIDTH,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.bgLight,
     ...Shadow.strong,
   },
 
   // Header
   header: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    padding: Spacing.xl, gap: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxxl,
+    paddingBottom: Spacing.xl,
     backgroundColor: Colors.primary,
-    paddingTop: Spacing.xxl,
+    borderBottomRightRadius: Radius.xxl,
+    ...Shadow.strong,
+  },
+  headerTop: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    ...Shadow.strong,
   },
   avatar: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 72, height: 72, borderRadius: 24,
     backgroundColor: Colors.accent,
     alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    borderWidth: 3, borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  avatarText: { fontSize: 20, fontWeight: '900', color: Colors.primary },
   avatarImg: {
-    width: 56, height: 56, borderRadius: 28,
-    borderWidth: 2, borderColor: Colors.accent,
+    width: 72, height: 72, borderRadius: 24,
+    borderWidth: 3, borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  name: { fontSize: 17, fontWeight: '800', color: Colors.white, marginBottom: 2 },
-  matricule: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600', marginBottom: 6 },
-  roleBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill,
-    alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)',
+  avatarText: { fontSize: 26, fontWeight: '900', color: Colors.primary },
+  roleDot: { 
+    position: 'absolute', bottom: -2, right: -2, 
+    width: 18, height: 18, borderRadius: 9, 
+    backgroundColor: Colors.success, borderWidth: 3, borderColor: Colors.primary 
   },
-  roleText: { fontSize: 12, fontWeight: '800', color: Colors.white },
   closeBtn: {
-    width: 32, height: 32, borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 40, height: 40, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
   },
-
-  divider: { height: 1, backgroundColor: Colors.divider },
+  profileInfo: { gap: 4 },
+  name: { fontSize: 22, fontWeight: '900', color: Colors.white, letterSpacing: -0.5 },
+  matricule: { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: '900', letterSpacing: 1 },
+  roleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill,
+    alignSelf: 'flex-start', marginTop: 8,
+  },
+  roleText: { fontSize: 12, fontWeight: '900', color: Colors.white, textTransform: 'uppercase', letterSpacing: 1 },
 
   // Menu
-  menu: { flex: 1, padding: Spacing.base, paddingTop: Spacing.lg },
-  menuSection: {
-    fontSize: 11, fontWeight: '800', color: Colors.textLight,
-    letterSpacing: 1.2, textTransform: 'uppercase',
-    marginBottom: Spacing.md, marginLeft: 4,
+  menuContainer: { flex: 1, padding: Spacing.xl, paddingTop: Spacing.xxl },
+  sectionTitle: {
+    fontSize: 11, fontWeight: '900', color: Colors.textLight,
+    letterSpacing: 2, textTransform: 'uppercase',
+    marginBottom: Spacing.xl,
   },
   menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: Spacing.md, paddingHorizontal: Spacing.md,
-    borderRadius: Radius.lg, backgroundColor: Colors.bgLight,
-    marginBottom: Spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.lg,
+    paddingVertical: Spacing.base, paddingHorizontal: Spacing.base,
+    borderRadius: Radius.xl, backgroundColor: Colors.white,
+    marginBottom: Spacing.base, ...Shadow.subtle,
+    borderWidth: 1, borderColor: Colors.bgMid,
   },
   menuIcon: {
-    width: 40, height: 40, borderRadius: 10,
+    width: 48, height: 48, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
-  menuLabel: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
-  menuSub: { fontSize: 13, color: Colors.textMuted, marginTop: 1 },
+  menuBody: { flex: 1, gap: 2 },
+  menuLabel: { fontSize: 16, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.3 },
+  menuSub: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
 
   // Footer
   footer: {
     padding: Spacing.xl,
-    borderTopWidth: 1, borderTopColor: Colors.divider,
+    paddingBottom: Spacing.xxl,
+    alignItems: 'center', gap: 16,
   },
   logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    backgroundColor: Colors.dangerLight,
-    paddingHorizontal: Spacing.base, paddingVertical: 14,
-    borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.danger + '30',
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.danger + '10',
+    paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: Radius.pill, width: '100%',
+    justifyContent: 'center', borderWidth: 1, borderColor: Colors.danger + '20',
   },
-  logoutText: { fontSize: 16, fontWeight: '800', color: Colors.danger },
+  logoutText: { fontSize: 16, fontWeight: '900', color: Colors.danger, letterSpacing: 0.3 },
+  copyright: { fontSize: 11, color: Colors.textLight, fontWeight: '700', letterSpacing: 0.5 },
 });

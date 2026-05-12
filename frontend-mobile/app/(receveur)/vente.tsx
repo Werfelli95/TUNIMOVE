@@ -1,36 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Alert, ActivityIndicator, Dimensions, Platform
+  Modal, Alert, ActivityIndicator, Dimensions, Platform, TextInput
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
   MapPin, Clock, Ticket, User, X, CheckCircle,
-  ChevronDown, ChevronRight, ChevronLeft, Printer
+  ChevronDown, ChevronRight, ChevronLeft, Printer, ShoppingBag, Info, Bus
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 import { API_BASE_URL, NETWORK_API, TARIFS_API, TARIFICATION_API, SALES_API } from '../../constants/api';
 
-const BASE = API_BASE_URL;
 const { width } = Dimensions.get('window');
+const STEPS = ['Itinéraire', 'Configuration', 'Validation'];
 
 interface Station { arret: string; distance_km: number; }
 interface Ligne { num_ligne: number | string; ville_depart: string; ville_arrivee: string; horaires: string[]; horaire?: string; stations: Station[]; }
-interface TarifCfg { prix_par_km: number; frais_fixes: number; red_etudiant: number; red_handicape: number; }
+interface TarifCfg { prix_par_km: number; frais_fixes: number; red_etudiant: number; red_pmr: number; }
 
-const SEAT_ROWS = 'ABCDEFGHIJKLM'.split('');
-const TARIFS = [
-  { key: 'Tarif Plein', label: 'Plein tarif',    reduc: 0,  color: Colors.primary },
-  { key: 'Étudiant',   label: 'Étudiant',        reduc: 25, color: Colors.success },
-  { key: 'Handicapé',  label: 'Handicapé(e)',     reduc: 50, color: Colors.warning },
-  { key: 'Militaire',  label: 'Militaire',        reduc: 30, color: '#7C3AED'      },
-];
-
-// ── Steps ──────────────────────────────────────────────────────────────────
-const STEPS = ['Trajet', 'Tarif & Siège', 'Récapitulatif'];
+const SEAT_ROWS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function VenteScreen() {
   const params = useLocalSearchParams();
@@ -48,19 +39,17 @@ export default function VenteScreen() {
   const matricule   = params.matricule as string;
   const userId      = params.userId as string;
 
-  // ── Data
   const [ligne, setLigne]         = useState<Ligne | null>(null);
   const [tarifCfg, setTarifCfg]   = useState<TarifCfg | null>(null);
   const [occupied, setOccupied]   = useState<string[]>([]);
+  const [busCapacite, setBusCapacite] = useState(50);
   const [loading, setLoading]     = useState(true);
+  const [step, setStep]           = useState(0);
 
-  // ── Step state
-  const [step, setStep]           = useState(service_id && paramHoraire && ville_dep ? 1 : 0);
-
-  // ── Step 1: Trajet
-  const defaultHoraire = service_id 
-    ? new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    : paramHoraire || '';
+  const defaultHoraire = paramHoraire || (() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  })();
   const [horaire, setHoraire]         = useState(defaultHoraire);
   const [showHoraire, setShowHoraire] = useState(false);
   const [depart, setDepart]           = useState(station_actuelle || ville_dep || '');
@@ -68,7 +57,6 @@ export default function VenteScreen() {
   const [arrivee, setArrivee]         = useState('');
   const [showArrivee, setShowArrivee] = useState(false);
 
-  // ── Step 2: Tarif & Siège
   const [tarifsDb, setTarifsDb] = useState<any[]>([]);
   const [bagagesDb, setBagagesDb] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('VOYAGEUR');
@@ -76,38 +64,50 @@ export default function VenteScreen() {
   const [selectedBagageId, setSelectedBagageId] = useState('');
   const [selectedSeat, setSeat]     = useState<string | null>(null);
 
-  // ── Step 3: Result
   const [selling, setSelling]   = useState(false);
   const [ticketModal, setModal] = useState(false);
   const [lastTicket, setLastTicket] = useState<any>(null);
 
-  // ── Load data ───────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
-        const [netRes, tarifRes, tRes, bRes] = await Promise.all([
+        const [netRes, tarifRes, tRes, bRes, busRes] = await Promise.all([
           axios.get<Ligne[]>(NETWORK_API),
           axios.get<TarifCfg>(TARIFS_API),
           axios.get<any[]>(TARIFICATION_API),
-          axios.get<any[]>(`${TARIFICATION_API}/bagages`)
+          axios.get<any[]>(`${TARIFICATION_API}/bagages`),
+          axios.get(`${API_BASE_URL}/api/buses/details/${numero_bus}`).catch(() => ({ data: { capacite: 50 } }))
         ]);
         const found = netRes.data.find(l => String(l.num_ligne) === String(num_ligne));
         setLigne(found ?? null);
         setTarifCfg(tarifRes.data);
+        setBusCapacite(busRes.data?.capacite ? parseInt(busRes.data.capacite) : 50);
         
         if (tRes.data && Array.isArray(tRes.data)) {
-            setTarifsDb(tRes.data.filter((t: any) => t.actif));
-            const voyageurs = tRes.data.filter((t: any) => t.actif && t.categorie === 'VOYAGEUR');
+            const active = tRes.data.filter((t: any) => t.actif);
+            setTarifsDb(active);
+            const voyageurs = active.filter((t: any) => t.categorie === 'VOYAGEUR');
             if(voyageurs.length > 0) setSelectedTarifId(voyageurs[0].id_type_tarification.toString());
         }
         if (bRes.data && Array.isArray(bRes.data)) {
             setBagagesDb(bRes.data.filter((b: any) => b.actif));
         }
-      } catch { /**/ }
-      finally { setLoading(false); }
+      } catch (err) {
+        console.error("Vente load error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     if (num_ligne) load(); else setLoading(false);
-  }, []);
+  }, [num_ligne]);
+
+  useFocusEffect(useCallback(() => {
+    if (!paramHoraire) {
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      setHoraire(timeStr);
+    }
+  }, [paramHoraire]));
 
   useEffect(() => {
     if (!horaire || !num_ligne || !depart || !arrivee) return;
@@ -116,732 +116,547 @@ export default function VenteScreen() {
       .then(r => setOccupied(r.data))
       .catch(() => setOccupied([]));
     setSeat(null);
-  }, [horaire, depart, arrivee]);
+  }, [horaire, depart, arrivee, num_ligne]);
 
-  // ── Derived ─────────────────────────────────────────────────────────────
   const stations = useMemo<Station[]>(() => {
     if (!ligne) return [];
     let list = [...(ligne.stations || [])];
     const startName = (ligne.ville_depart ?? '').trim().toLowerCase();
-    
     if (!list.some(s => (s.arret || '').trim().toLowerCase() === startName)) {
       list.push({ arret: ligne.ville_depart, distance_km: 0 });
     }
-
-    // Sort first
     list.sort((a, b) => a.distance_km - b.distance_km);
-
-    // Deduplicate by name
     const unique: Station[] = [];
     const seen = new Set();
     for (const s of list) {
       const name = (s.arret || '').trim().toLowerCase();
-      if (!seen.has(name)) {
-        seen.add(name);
-        unique.push(s);
-      }
+      if (!seen.has(name)) { seen.add(name); unique.push(s); }
     }
-    return unique;
-  }, [ligne]);
+    return params.isReversed === 'true' ? [...unique].reverse() : unique;
+  }, [ligne, params.isReversed]);
 
   const deptSt  = stations.find(s => s.arret === depart);
-  const arrivSt = stations.find(s => s.arret === arrivee);
-  const distance = deptSt && arrivSt ? Math.abs(arrivSt.distance_km - deptSt.distance_km) : 0;
-
-  const arriveeOptions = depart
-    ? stations.filter(s => s.arret !== depart && (deptSt ? s.distance_km > deptSt.distance_km : true))
-    : [];
+  const deptIdx = stations.findIndex(s => s.arret === depart);
+  const arrSt   = stations.find(s => s.arret === arrivee);
+  const distance = deptSt && arrSt ? Math.abs(arrSt.distance_km - deptSt.distance_km) : 0;
+  const arriveeOptions = deptIdx >= 0 ? stations.slice(deptIdx + 1) : [];
 
   const currentTarif = tarifsDb.find(t => String(t.id_type_tarification) === String(selectedTarifId));
   const currentBagage = bagagesDb.find(b => String(b.id_type_bagage) === String(selectedBagageId));
 
   const prix = useMemo(() => {
     if (!tarifCfg || distance <= 0 || !currentTarif) return 0;
-    
     let basePrice = distance * tarifCfg.prix_par_km + parseFloat(tarifCfg.frais_fixes.toString());
     let total = 0;
-    
-    if (currentTarif.mode_calcul === 'PERCENT_RESTANT') {
-        total = basePrice * (currentTarif.valeur / 100);
-    } else if (currentTarif.mode_calcul === 'FIXE') {
-        total = parseFloat(currentTarif.valeur.toString()) / 1000;
-    }
-
-    if (currentBagage) {
-        total += parseFloat(currentBagage.prix.toString()) / 1000;
-    }
-    
+    if (currentTarif.mode_calcul === 'PERCENT_RESTANT') total = basePrice * (currentTarif.valeur / 100);
+    else if (currentTarif.mode_calcul === 'FIXE') total = parseFloat(currentTarif.valeur.toString()) / 1000;
+    if (currentBagage) total += parseFloat(currentBagage.prix.toString()) / 1000;
     return Math.max(0, total);
   }, [tarifCfg, distance, currentTarif, currentBagage]);
 
   const horaires: string[] = ligne?.horaires?.filter(Boolean) ?? (ligne?.horaire ? [ligne.horaire] : []);
-
-  // ── Step validation
   const step0Valid = !!horaire && !!depart && !!arrivee;
   const step1Valid = !!selectedSeat;
 
-  // ── Seat grid ───────────────────────────────────────────────────────────
-  const capacite = 50;
-  const numRows  = Math.ceil(capacite / 5);
-  const SEAT_SZ  = Math.min(40, (width - 80) / 5);
-
   const renderSeats = () => {
+    const numRows = Math.ceil(busCapacite / 4);
     const rows = [];
+    let seatCount = 0;
+
     for (let i = 0; i < Math.min(numRows, SEAT_ROWS.length); i++) {
-      const row = SEAT_ROWS[i];
-      const cols = Math.min(5, capacite - i * 5);
+      if (seatCount >= busCapacite) break;
+      const rowLabel = SEAT_ROWS[i];
+      const colsInThisRow = Math.min(4, busCapacite - seatCount);
       const cells = [];
-      for (let c = 1; c <= cols; c++) {
-        const id = `${row}${c}`;
+
+      for (let c = 1; c <= colsInThisRow; c++) {
+        const id = `${rowLabel}${c}`;
         const occ = occupied.includes(id);
         const sel = selectedSeat === id;
         cells.push(
           <TouchableOpacity
             key={id}
-            style={[styles.seat,
-              occ ? styles.seatOcc : sel ? styles.seatSel : styles.seatFree
+            style={[
+              styles.seat,
+              occ ? styles.seatOcc : sel ? styles.seatSel : styles.seatFree,
+              c === 2 && colsInThisRow > 2 && { marginRight: 36 } // Aisle Gap
             ]}
             onPress={() => !occ && setSeat(sel ? null : id)}
             disabled={occ}
           >
-            <Text style={[styles.seatTxt, occ ? styles.seatTxtOcc : sel ? styles.seatTxtSel : styles.seatTxtFree]}>
-              {id}
-            </Text>
+            <Text style={[styles.seatTxt, occ ? styles.seatTxtOcc : sel ? styles.seatTxtSel : styles.seatTxtFree]}>{id}</Text>
           </TouchableOpacity>
         );
       }
-      rows.push(<View key={row} style={styles.seatRow}>{cells}</View>);
+      seatCount += colsInThisRow;
+      rows.push(<View key={rowLabel} style={styles.seatRow}>{cells}</View>);
     }
     return rows;
   };
 
-  // ── Sell ────────────────────────────────────────────────────────────────
   const handleSell = async () => {
     if (!selectedSeat || !depart || !arrivee || !horaire) return;
     setSelling(true);
     try {
       const today = new Date().toISOString().split('T')[0];
       const payload = {
-        num_ligne, 
-        bus: numero_bus,
-        date_voyage: today, 
-        heure: horaire, 
-        siege: selectedSeat,
-        prix, 
-        arret_depart: depart, 
-        arret_arrivee: arrivee,
-        agent_id: userId ? parseInt(userId) : null, 
+        num_ligne, bus: numero_bus, date_voyage: today, heure: horaire, siege: selectedSeat,
+        prix, arret_depart: depart, arret_arrivee: arrivee, agent_id: userId ? parseInt(userId) : null, 
         type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
         id_type_tarification: currentTarif ? currentTarif.id_type_tarification : null,
         id_type_bagage: currentBagage ? currentBagage.id_type_bagage : null,
         prix_bagage: currentBagage ? parseFloat(currentBagage.prix) / 1000 : 0,
         id_service: service_id ? parseInt(service_id) : null,
       };
-
       const r = await axios.post<any>(`${SALES_API}/tickets/vendre`, payload);
       setOccupied(prev => [...prev, selectedSeat]);
-      const code = 'TKT' + Date.now().toString().slice(-6);
-      
+      const basePrice = distance * (tarifCfg?.prix_par_km || 0) + parseFloat(tarifCfg?.frais_fixes?.toString() || '0');
       setLastTicket({
-        code_ticket: r.data?.code_ticket || code,
-        siege: selectedSeat, 
-        type_tarif: currentTarif ? currentTarif.libelle : 'Tarif Normal',
+        ...payload, 
+        id_ticket: r.data?.id_ticket,
+        code_ticket: r.data?.code_ticket, 
         montant_total: prix, 
-        station_depart: depart,
+        station_depart: depart, 
         station_arrivee: arrivee, 
         heure_depart: horaire,
-        date_emission: new Date().toISOString(),
+        date_emission: new Date().toISOString(), 
         numero_bus, 
-        num_ligne,
+        num_ligne, 
         matricule,
+        distance,
+        base_price: basePrice,
+        ligne_full: ligne ? `${ligne.ville_depart} - ${ligne.ville_arrivee}` : `Ligne ${num_ligne}`
       });
-
-      setSeat(null);
-      setStep(0);
-      setDepart(''); 
-      setArrivee(''); 
       setModal(true);
+      setSeat(null); 
+      setDepart(station_actuelle || ville_dep || ''); 
+      setArrivee(''); 
+      setStep(0);
     } catch (err: any) {
       Alert.alert('Erreur', err.response?.data?.message || 'Impossible d\'émettre le billet');
-    } finally { 
-      setSelling(false); 
-    }
+    } finally { setSelling(false); }
   };
 
-  if (loading) return (
-    <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
-  );
+  if (loading) return <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       {/* ── Steps Bar ── */}
-      <View style={styles.stepsBar}>
+      <View style={styles.stepsContainer}>
         {STEPS.map((s, i) => (
           <View key={s} style={styles.stepItem}>
-            <View style={[styles.stepNum, i <= step && styles.stepNumActive, i < step && styles.stepNumDone]}>
-              {i < step
-                ? <CheckCircle color={Colors.white} size={14} />
-                : <Text style={[styles.stepNumText, i === step && styles.stepNumTextActive]}>{i + 1}</Text>
-              }
+            <View style={[styles.stepCircle, i < step && styles.stepDone, i === step && styles.stepActive]}>
+              {i < step ? <CheckCircle color={Colors.white} size={14} /> : <Text style={[styles.stepText, i === step && styles.stepTextActive]}>{i + 1}</Text>}
             </View>
             <Text style={[styles.stepLabel, i === step && styles.stepLabelActive]}>{s}</Text>
-            {i < STEPS.length - 1 && <View style={[styles.stepConnector, i < step && styles.stepConnectorDone]} />}
+            {i < STEPS.length - 1 && <View style={[styles.stepLine, i < step && styles.stepLineDone]} />}
           </View>
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-        {/* ══ STEP 0: TRAJET ══════════════════════════════════════════ */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ══ STEP 0: ITINÉRAIRE ══ */}
         {step === 0 && (
-          <>
-            {/* Service banner */}
-            <View style={styles.serviceBanner}>
-              <View style={styles.bannerDot} />
-              <Text style={styles.bannerText}>
-                Service #{service_id} · Bus {numero_bus} · Ligne {num_ligne}
-              </Text>
+          <View style={styles.formSection}>
+            <View style={styles.infoBanner}>
+              <Bus color={Colors.primary} size={18} strokeWidth={2.5} />
+              <Text style={styles.bannerTxt}>Service #{service_id || 'Autonome'} · Bus {numero_bus}</Text>
             </View>
 
-            {/* Horaire */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}><Clock size={14} color={Colors.textMid} /> Horaire de départ</Text>
-              {service_id ? (
-                <View style={[styles.picker, { backgroundColor: Colors.bgMid, opacity: 0.8 }]}>
-                    <Text style={styles.pickerVal}>{horaire}</Text>
-                    <Clock color={Colors.textMuted} size={16} />
-                </View>
-              ) : (
-                <>
-                {horaires.length > 0 ? (
-                    <>
-                        <TouchableOpacity style={styles.picker} onPress={() => { setShowHoraire(!showHoraire); setShowDepart(false); setShowArrivee(false); }}>
-                        <Text style={horaire ? styles.pickerVal : styles.pickerPh}>{horaire || 'Choisir un horaire...'}</Text>
-                        <ChevronDown color={Colors.textMuted} size={18} />
-                        </TouchableOpacity>
-                        {showHoraire && (
-                        <View style={styles.dropdown}>
-                            {horaires.map(h => (
-                            <TouchableOpacity
-                                key={h}
-                                style={[styles.ddItem, horaire === h && styles.ddItemActive]}
-                                onPress={() => { setHoraire(h); setShowHoraire(false); }}
-                            >
-                                <Clock color={horaire === h ? Colors.primary : Colors.textMuted} size={14} />
-                                <Text style={[styles.ddItemText, horaire === h && styles.ddItemTextActive]}>{h}</Text>
-                            </TouchableOpacity>
-                            ))}
-                        </View>
-                        )}
-                    </>
-                ) : (
-                <View style={[styles.picker, { opacity: 0.5 }]}>
-                    <Text style={styles.pickerPh}>Aucun horaire défini pour cette ligne</Text>
-                </View>
-                )}
-                </>
-              )}
-            </View>
-
-            {/* Station départ */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}><MapPin size={14} color={Colors.success} /> Point de montée</Text>
-              {service_id ? (
-                <View style={[styles.picker, { backgroundColor: Colors.bgMid, opacity: 0.8 }]}>
-                    <Text style={styles.pickerVal}>{depart}</Text>
-                    <MapPin color={Colors.success} size={16} />
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.picker} onPress={() => { setShowDepart(!showDepart); setShowHoraire(false); setShowArrivee(false); }}>
-                  <Text style={depart ? styles.pickerVal : styles.pickerPh}>{depart || 'Station de départ...'}</Text>
-                  <ChevronDown color={Colors.textMuted} size={18} />
-                  </TouchableOpacity>
-                  {showDepart && (
-                    <View style={styles.dropdown}>
-                      {stations.map(s => (
-                        <TouchableOpacity
-                          key={s.arret}
-                          style={[styles.ddItem, depart === s.arret && styles.ddItemActive]}
-                          onPress={() => { setDepart(s.arret); setArrivee(''); setShowDepart(false); }}
-                        >
-                          <Text style={[styles.ddItemText, depart === s.arret && styles.ddItemTextActive]}>
-                            {s.arret}
-                          </Text>
-                          <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
-
-            {/* Station arrivée */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}><MapPin size={14} color={Colors.danger} /> Destination</Text>
-              {!depart ? (
-                <View style={[styles.picker, { opacity: 0.4 }]}>
-                  <Text style={styles.pickerPh}>Choisissez d'abord le départ</Text>
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.picker} onPress={() => { setShowArrivee(!showArrivee); setShowHoraire(false); setShowDepart(false); }}>
-                    <Text style={arrivee ? styles.pickerVal : styles.pickerPh}>{arrivee || 'Destination...'}</Text>
-                    <ChevronDown color={Colors.textMuted} size={18} />
-                  </TouchableOpacity>
-                  {showArrivee && (
-                    <View style={styles.dropdown}>
-                      {arriveeOptions.length === 0
-                        ? <View style={styles.ddItem}><Text style={{ color: Colors.textMuted, fontSize: 15 }}>Aucune station après ce départ</Text></View>
-                        : arriveeOptions.map(s => (
-                          <TouchableOpacity
-                            key={s.arret}
-                            style={[styles.ddItem, arrivee === s.arret && styles.ddItemActive]}
-                            onPress={() => { setArrivee(s.arret); setShowArrivee(false); }}
-                          >
-                            <Text style={[styles.ddItemText, arrivee === s.arret && styles.ddItemTextActive]}>{s.arret}</Text>
-                            <Text style={styles.ddItemSub}>{s.distance_km} km</Text>
-                          </TouchableOpacity>
-                        ))
-                      }
-                    </View>
-                  )}
-                </>
-              )}
-              {distance > 0 && (
-                <View style={styles.distBadge}>
-                  <ChevronRight color={Colors.success} size={13} />
-                  <Text style={styles.distText}>{depart} → {arrivee} · {distance.toFixed(1)} km</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>HORAIRE DE DÉPART</Text>
+              <TouchableOpacity style={styles.pickerField} onPress={() => { setShowHoraire(!showHoraire); setShowDepart(false); }}>
+                <Clock color={Colors.primary} size={18} strokeWidth={2.5} />
+                <Text style={styles.pickerValue}>{horaire || 'Choisir l\'horaire'}</Text>
+                <ChevronDown color={Colors.textMuted} size={18} />
+              </TouchableOpacity>
+              {showHoraire && (
+                <View style={styles.dropdown}>
+                  {horaires.map(h => (
+                    <TouchableOpacity key={h} style={[styles.ddItem, horaire === h && styles.ddItemActive]} onPress={() => { setHoraire(h); setShowHoraire(false); }}>
+                      <Text style={[styles.ddItemTxt, horaire === h && styles.ddItemTxtActive]}>{h}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               )}
             </View>
 
-            <TouchableOpacity
-              style={[styles.nextBtn, !step0Valid && styles.nextBtnDisabled]}
-              onPress={() => setStep(1)}
-              disabled={!step0Valid}
-            >
-              <Text style={[styles.nextBtnText, !step0Valid && styles.nextBtnTextDis]}>Suivant — Choisir le tarif</Text>
-              <ChevronRight color={step0Valid ? Colors.primary : Colors.textMuted} size={18} />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>POINT DE MONTÉE</Text>
+              <TouchableOpacity 
+                style={[styles.pickerField, !!station_actuelle && styles.pickerDisabled]} 
+                disabled={!!station_actuelle}
+                onPress={() => { setShowDepart(!showDepart); setShowHoraire(false); }}
+              >
+                <MapPin color={Colors.success} size={18} strokeWidth={2.5} />
+                <Text style={styles.pickerValue}>{depart || 'Sélectionner l\'arrêt'}</Text>
+                { !station_actuelle && <ChevronDown color={Colors.textMuted} size={18} /> }
+              </TouchableOpacity>
+              {showDepart && (
+                <View style={styles.dropdown}>
+                  {stations.map(s => (
+                    <TouchableOpacity key={s.arret} style={[styles.ddItem, depart === s.arret && styles.ddItemActive]} onPress={() => { setDepart(s.arret); setArrivee(''); setShowDepart(false); }}>
+                      <Text style={[styles.ddItemTxt, depart === s.arret && styles.ddItemTxtActive]}>{s.arret}</Text>
+                      <Text style={styles.ddItemKm}>{s.distance_km} km</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>DESTINATION</Text>
+              <TouchableOpacity style={[styles.pickerField, !depart && styles.pickerDisabled]} disabled={!depart} onPress={() => setShowArrivee(!showArrivee)}>
+                <MapPin color={Colors.danger} size={18} strokeWidth={2.5} />
+                <Text style={styles.pickerValue}>{arrivee || 'Terminus'}</Text>
+                <ChevronDown color={Colors.textMuted} size={18} />
+              </TouchableOpacity>
+              {showArrivee && (
+                <View style={styles.dropdown}>
+                  {arriveeOptions.map(s => (
+                    <TouchableOpacity key={s.arret} style={[styles.ddItem, arrivee === s.arret && styles.ddItemActive]} onPress={() => { setArrivee(s.arret); setShowArrivee(false); }}>
+                      <Text style={[styles.ddItemTxt, arrivee === s.arret && styles.ddItemTxtActive]}>{s.arret}</Text>
+                      <Text style={styles.ddItemKm}>{s.distance_km} km</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity style={[styles.mainBtn, !step0Valid && styles.btnDis]} disabled={!step0Valid} onPress={() => setStep(1)}>
+              <Text style={styles.mainBtnTxt}>Continuer</Text>
+              <ChevronRight color={Colors.primary} size={20} strokeWidth={3} />
             </TouchableOpacity>
-          </>
+          </View>
         )}
 
-        {/* ══ STEP 1: TARIF & SIÈGE ══════════════════════════════════ */}
+        {/* ══ STEP 1: CONFIGURATION ══ */}
         {step === 1 && (
-          <>
-            {/* Route summary */}
-            <View style={styles.routeSummary}>
-              <View style={styles.routeSummaryItem}>
-                <View style={[styles.rsDot, { backgroundColor: Colors.success }]} />
-                <Text style={styles.rsTxt}>{depart}</Text>
+          <View style={styles.formSection}>
+            <View style={styles.itinerarySummary}>
+              <View style={styles.itineraryLine}>
+                <View style={[styles.itDot, { backgroundColor: Colors.success }]} />
+                <Text style={styles.itCity}>{depart}</Text>
+                <View style={styles.itArrow} />
+                <Text style={styles.itCity}>{arrivee}</Text>
+                <View style={[styles.itDot, { backgroundColor: Colors.danger }]} />
               </View>
-              <View style={styles.rsLine} />
-              <View style={styles.routeSummaryItem}>
-                <View style={[styles.rsDot, { backgroundColor: Colors.danger }]} />
-                <Text style={styles.rsTxt}>{arrivee}</Text>
-              </View>
-              <Text style={styles.rsDist}>{distance.toFixed(1)} km · {horaire}</Text>
+              <Text style={styles.itDetails}>{distance.toFixed(1)} km · {horaire}</Text>
             </View>
 
-            {/* Tarif & Bagages */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}><User size={14} color={Colors.textMid} /> Type de tarif</Text>
-              
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginBottom: 5}}>1. Catégorie</Text>
-              <View style={[styles.picker, {marginBottom: 10}]}>
-                  <TouchableOpacity style={{flex: 1}} onPress={() => {}}>
-                    <Text style={styles.pickerVal}>{selectedCategory === 'VOYAGEUR' ? 'Voyageur' : selectedCategory === 'CONVENTION' ? 'Convention' : 'Expédition'}</Text>
-                  </TouchableOpacity>
-                  <ChevronDown color={Colors.textMuted} size={18} />
-              </View>
-              <View style={styles.tarifGrid}>
-                  {['VOYAGEUR', 'CONVENTION', 'EXPEDITION'].map(cat => (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[styles.tarifCard, selectedCategory === cat && { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' }]}
-                        onPress={() => {
-                            setSelectedCategory(cat);
-                            const ops = tarifsDb.filter((t:any) => t.categorie === cat);
-                            if(ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification.toString());
-                            else setSelectedTarifId('');
-                        }}
-                      >
-                        <Text style={[styles.tarifLabel, selectedCategory === cat && { color: Colors.primary }]}>{cat.substring(0, 4)}.</Text>
-                      </TouchableOpacity>
-                  ))}
-              </View>
-
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginTop: 15, marginBottom: 5}}>2. Tarification</Text>
-              <View style={styles.tarifGrid}>
-                {tarifsDb.filter((t:any) => t.categorie === selectedCategory).map((t:any) => (
-                  <TouchableOpacity
-                    key={t.id_type_tarification}
-                    style={[styles.tarifCard, selectedTarifId == t.id_type_tarification && { borderColor: Colors.success, backgroundColor: Colors.success + '12' }]}
-                    onPress={() => setSelectedTarifId(t.id_type_tarification.toString())}
-                  >
-                    <Text style={[styles.tarifLabel, selectedTarifId == t.id_type_tarification && { color: Colors.success }]}>{t.libelle}</Text>
-                    <Text style={[styles.tarifReduc]}>{t.mode_calcul === 'PERCENT_RESTANT' ? t.valeur+'% R' : (parseFloat(t.valeur)/1000).toFixed(1)+' DT'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={{fontWeight:'bold', color: Colors.textMid, fontSize: 14, marginTop: 15, marginBottom: 5}}>3. Option Bagage</Text>
-              <View style={[styles.tarifGrid, {marginBottom: 10}]}>
-                <TouchableOpacity
-                    style={[styles.tarifCard, !selectedBagageId && { borderColor: Colors.textMid, backgroundColor: Colors.bgMid }]}
-                    onPress={() => setSelectedBagageId('')}
-                >
-                    <Text style={styles.tarifLabel}>Sans bg.</Text>
+            <Text style={styles.sectionLabel}>SÉLECTION DU TARIF</Text>
+            <View style={styles.categoryTabs}>
+              {['VOYAGEUR', 'CONVENTION', 'EXPEDITION'].map(cat => (
+                <TouchableOpacity key={cat} style={[styles.catTab, selectedCategory === cat && styles.catTabActive]} onPress={() => { setSelectedCategory(cat); const ops = tarifsDb.filter(t => t.categorie === cat); if(ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification.toString()); }}>
+                  <Text style={[styles.catTabText, selectedCategory === cat && styles.catTabTextActive]}>{cat.charAt(0) + cat.slice(1).toLowerCase()}</Text>
                 </TouchableOpacity>
-                {bagagesDb.map((b:any) => (
-                    <TouchableOpacity
-                        key={b.id_type_bagage}
-                        style={[styles.tarifCard, selectedBagageId == b.id_type_bagage && { borderColor: Colors.warning, backgroundColor: Colors.warning + '12' }]}
-                        onPress={() => setSelectedBagageId(b.id_type_bagage.toString())}
-                    >
-                        <Text style={[styles.tarifLabel, selectedBagageId == b.id_type_bagage && { color: Colors.warning }]}>{b.libelle}</Text>
-                        <Text style={[styles.tarifReduc]}>{'+'+(parseFloat(b.prix)/1000).toFixed(1)+' DT'}</Text>
-                    </TouchableOpacity>
-                ))}
-              </View>
+              ))}
             </View>
 
-            {/* Seat Grid */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}><Ticket size={14} color={Colors.textMid} /> Sélection du siège</Text>
-              <View style={styles.legend}>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.bgMid, borderColor: Colors.border, borderWidth: 1 }]} /><Text style={styles.legendTxt}>Libre</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.primary }]} /><Text style={styles.legendTxt}>Sélectionné</Text></View>
-                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.dangerLight }]} /><Text style={styles.legendTxt}>Occupé</Text></View>
-              </View>
-              {!horaire && (
-                <Text style={styles.seatWarn}>Choisissez un horaire pour voir les sièges disponibles</Text>
-              )}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tarifScroll}>
+              {tarifsDb.filter(t => t.categorie === selectedCategory).map(t => (
+                <TouchableOpacity key={t.id_type_tarification} style={[styles.tarifOption, selectedTarifId == t.id_type_tarification && styles.tarifOptionActive]} onPress={() => setSelectedTarifId(t.id_type_tarification.toString())}>
+                  <Text style={[styles.tarifOptLabel, selectedTarifId == t.id_type_tarification && styles.tarifOptLabelActive]}>{t.libelle}</Text>
+                  <Text style={styles.tarifOptVal}>{t.mode_calcul === 'PERCENT_RESTANT' ? `${t.valeur}%` : `${(t.valeur/1000).toFixed(1)} DT`}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.sectionLabel}>OPTIONS SUPPLÉMENTAIRES</Text>
+            <View style={styles.optionGrid}>
+              <TouchableOpacity style={[styles.optCard, !selectedBagageId && styles.optCardActive]} onPress={() => setSelectedBagageId('')}>
+                <ShoppingBag color={!selectedBagageId ? Colors.primary : Colors.textMuted} size={18} />
+                <Text style={[styles.optText, !selectedBagageId && styles.optTextActive]}>Sans Bagage</Text>
+              </TouchableOpacity>
+              {bagagesDb.map(b => (
+                <TouchableOpacity key={b.id_type_bagage} style={[styles.optCard, selectedBagageId == b.id_type_bagage && styles.optCardActive]} onPress={() => setSelectedBagageId(b.id_type_bagage.toString())}>
+                  <ShoppingBag color={selectedBagageId == b.id_type_bagage ? Colors.primary : Colors.textMuted} size={18} />
+                  <Text style={[styles.optText, selectedBagageId == b.id_type_bagage && styles.optTextActive]}>{b.libelle}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.sectionLabel}>PLAN DES SIÈGES</Text>
+            <View style={styles.seatContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10 }}>
                 <View style={styles.seatGrid}>{renderSeats()}</View>
               </ScrollView>
+              <View style={styles.seatLegend}>
+                 <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.bgMid }]} /><Text style={styles.legendLbl}>Libre</Text></View>
+                 <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.primary }]} /><Text style={styles.legendLbl}>Choisi</Text></View>
+                 <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.border }]} /><Text style={styles.legendLbl}>Occupé</Text></View>
+              </View>
             </View>
 
-            <View style={styles.navRow}>
-              <TouchableOpacity style={styles.backBtn} onPress={() => setStep(0)}>
-                <ChevronLeft color={Colors.textMid} size={18} />
-                <Text style={styles.backBtnText}>Retour</Text>
+            <View style={styles.footerNav}>
+              <TouchableOpacity style={styles.backButton} onPress={() => setStep(0)}>
+                <ChevronLeft color={Colors.textMuted} size={24} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.nextBtn, { flex: 1 }, !step1Valid && styles.nextBtnDisabled]}
-                onPress={() => setStep(2)}
-                disabled={!step1Valid}
-              >
-                <Text style={[styles.nextBtnText, !step1Valid && styles.nextBtnTextDis]}>Voir le récapitulatif</Text>
-                <ChevronRight color={step1Valid ? Colors.primary : Colors.textMuted} size={18} />
+              <TouchableOpacity style={[styles.mainBtn, { flex: 1 }, !step1Valid && styles.btnDis]} disabled={!step1Valid} onPress={() => setStep(2)}>
+                <Text style={styles.mainBtnTxt}>Vérifier le billet</Text>
+                <ChevronRight color={Colors.primary} size={20} strokeWidth={3} />
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
 
-        {/* ══ STEP 2: RÉCAPITULATIF ══════════════════════════════════ */}
+        {/* ══ STEP 2: VALIDATION ══ */}
         {step === 2 && (
-          <>
-            <View style={styles.recap}>
-              <Text style={styles.recapTitle}>Récapitulatif du billet</Text>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Bus</Text><Text style={styles.recapVal}>N° {numero_bus}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Ligne</Text><Text style={styles.recapVal}>{num_ligne}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Horaire</Text><Text style={styles.recapVal}>{horaire}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Départ</Text><Text style={styles.recapVal}>{depart}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Arrivée</Text><Text style={styles.recapVal}>{arrivee}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Distance</Text><Text style={styles.recapVal}>{distance.toFixed(1)} km</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Siège</Text><Text style={[styles.recapVal, { color: Colors.primary, fontWeight: '900', fontSize: 20 }]}>{selectedSeat}</Text></View>
-              <View style={styles.recapRow}><Text style={styles.recapLabel}>Tarif</Text>
-                <Text style={styles.recapVal}>
-                  {currentTarif ? currentTarif.libelle : 'Tarif Normal'}
-                </Text>
-              </View>
-              {currentBagage && (
-                <View style={styles.recapRow}><Text style={styles.recapLabel}>Bagage</Text>
-                    <Text style={styles.recapVal}>+ {(parseFloat(currentBagage.prix)/1000).toFixed(3)} TND</Text>
+          <View style={styles.formSection}>
+            <View style={styles.ticketRecap}>
+              <View style={styles.recapHeader}>
+                <Ticket color={Colors.primary} size={28} strokeWidth={2.5} />
+                <View>
+                  <Text style={styles.recapTitle}>Billet de Voyage</Text>
+                  <Text style={styles.recapSubtitle}>SNTRI · LIGNE {num_ligne}</Text>
                 </View>
-              )}
-              <View style={[styles.recapRow, styles.recapTotal]}>
-                <Text style={styles.recapTotalLabel}>TOTAL</Text>
-                <Text style={styles.recapTotalVal}>{prix.toFixed(3)} TND</Text>
+              </View>
+              
+              <View style={styles.recapDivider} />
+              
+              <View style={styles.recapGrid}>
+                <View style={styles.recapField}>
+                  <Text style={styles.rfLabel}>PASSAGER / TARIF</Text>
+                  <Text style={styles.rfValue}>{currentTarif?.libelle || 'Standard'}</Text>
+                </View>
+                <View style={styles.recapField}>
+                  <Text style={styles.rfLabel}>UNITÉ BUS</Text>
+                  <Text style={styles.rfValue}>{numero_bus}</Text>
+                </View>
+                <View style={styles.recapField}>
+                  <Text style={styles.rfLabel}>SIÈGE RÉSERVÉ</Text>
+                  <Text style={[styles.rfValue, { color: Colors.primary, fontSize: 20 }]}>{selectedSeat}</Text>
+                </View>
+                <View style={styles.recapField}>
+                  <Text style={styles.rfLabel}>HEURE DÉPART</Text>
+                  <Text style={styles.rfValue}>{horaire}</Text>
+                </View>
+              </View>
+
+              <View style={styles.recapPath}>
+                <View style={styles.pathNode}>
+                  <View style={[styles.pDot, { backgroundColor: Colors.success }]} />
+                  <Text style={styles.pCity}>{depart}</Text>
+                </View>
+                <View style={styles.pathLine} />
+                <View style={styles.pathNode}>
+                  <View style={[styles.pDot, { backgroundColor: Colors.danger }]} />
+                  <Text style={styles.pCity}>{arrivee}</Text>
+                </View>
+              </View>
+
+              <View style={styles.totalBlock}>
+                <Text style={styles.totalLabel}>MONTANT TOTAL</Text>
+                <Text style={styles.totalValue}>{prix.toFixed(3)} <Text style={styles.totalCurrency}>TND</Text></Text>
               </View>
             </View>
 
-            <View style={styles.navRow}>
-              <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
-                <ChevronLeft color={Colors.textMid} size={18} />
-                <Text style={styles.backBtnText}>Modifier</Text>
+            <View style={styles.footerNav}>
+              <TouchableOpacity style={styles.backButton} onPress={() => setStep(1)}>
+                <ChevronLeft color={Colors.textMuted} size={24} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sellBtn, selling && styles.nextBtnDisabled]}
-                onPress={handleSell}
-                disabled={selling}
-              >
-                {selling
-                  ? <ActivityIndicator color={Colors.primary} />
-                  : <><Printer color={Colors.primary} size={20} /><Text style={styles.sellBtnText}>Émettre le billet</Text></>
-                }
+              <TouchableOpacity style={[styles.sellBtn, selling && styles.btnDis]} disabled={selling} onPress={handleSell}>
+                {selling ? <ActivityIndicator color={Colors.white} /> : <><Printer color={Colors.white} size={20} strokeWidth={2.5} /><Text style={styles.sellBtnTxt}>Confirmer & Imprimer</Text></>}
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
 
-      {/* ── Ticket Modal ── */}
+      {/* ── Ticket Success Modal ── */}
       <Modal visible={ticketModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.ticketSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.ticketHeader}>
-              <CheckCircle color={Colors.success} size={32} strokeWidth={2} />
-              <Text style={styles.ticketHeaderTitle}>Billet émis avec succès !</Text>
-              <TouchableOpacity onPress={() => setModal(false)} style={styles.ticketClose}>
-                <X color={Colors.textMuted} size={22} />
-              </TouchableOpacity>
+          <ScrollView contentContainerStyle={styles.ticketScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.officialTicket}>
+              <Text style={styles.ticketLogo}>TuniMove</Text>
+              
+              <View style={styles.ticketGrid}>
+                <View style={styles.tRow}><Text style={styles.tLbl}>N° Ticket:</Text><Text style={styles.tVal}>T{String(lastTicket?.id_ticket || '0').padStart(3, '0')}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Receveur:</Text><Text style={styles.tVal}>{lastTicket?.matricule || '---'}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Bus:</Text><Text style={styles.tVal}>N° {lastTicket?.numero_bus}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Ligne:</Text><Text style={styles.tVal}>{lastTicket?.ligne_full}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Départ:</Text><Text style={styles.tVal}>{lastTicket?.station_depart}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Arrivée:</Text><Text style={styles.tVal}>{lastTicket?.station_arrivee}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Date:</Text><Text style={styles.tVal}>{lastTicket ? new Date(lastTicket.date_voyage).toLocaleDateString('fr-FR') : ''}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Heure:</Text><Text style={styles.tVal}>{lastTicket?.heure_depart}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Siège:</Text><Text style={styles.tVal}>{lastTicket?.siege}</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Distance:</Text><Text style={styles.tVal}>{lastTicket?.distance?.toFixed(0)} km</Text></View>
+                <View style={styles.tRow}><Text style={styles.tLbl}>Type Tarif:</Text><Text style={styles.tVal}>{lastTicket?.type_tarif}</Text></View>
+              </View>
+
+              <View style={styles.tDividerDashed} />
+
+              <View style={styles.tPriceRow}>
+                <Text style={styles.tPriceLbl}>Prix de base:</Text>
+                <Text style={styles.tPriceVal}>{lastTicket?.base_price?.toFixed(3)} TND</Text>
+              </View>
+
+              <Text style={styles.tGrandTotal}>{lastTicket?.montant_total?.toFixed(3)} TND</Text>
+
+              <View style={styles.tQrBox}>
+                <QRCode value={lastTicket?.code_ticket || 'TKT-000'} size={150} color="#000" />
+              </View>
+
+              <View style={styles.tDividerSolid} />
+
+              <Text style={styles.tFooterAgent}>Receveur: {prenom} {nom}</Text>
+              <Text style={styles.tFooterWish}>Bon Voyage !</Text>
             </View>
 
-            {lastTicket && (
-              <View style={styles.ticketBody}>
-                <Text style={styles.ticketBrand}>🚌 TuniMove</Text>
-                <Text style={styles.ticketSubtitle}>Transport Interurbain</Text>
-                <View style={styles.ticketDivider} />
-                <View style={styles.ticketGrid}>
-                  {[
-                    ['Agent', lastTicket.matricule || '—'],
-                    ['Ligne', lastTicket.num_ligne ? `Ligne ${lastTicket.num_ligne} (${ligne?.ville_depart || ''} - ${ligne?.ville_arrivee || ''})` : '—'],
-                    ['Bus', `N° ${lastTicket.numero_bus}`],
-                    ['Siège', lastTicket.siege],
-                    ['Départ', lastTicket.station_depart],
-                    ['Arrivée', lastTicket.station_arrivee],
-                    ['Date', new Date(lastTicket.date_emission).toLocaleDateString('fr-FR')],
-                    ['Heure', lastTicket.heure_depart],
-                    ['Tarif', lastTicket.type_tarif],
-                  ].map(([k, v]) => (
-                    <View key={k} style={styles.ticketField}>
-                      <Text style={styles.ticketKey}>{k}</Text>
-                      <Text style={[styles.ticketVal, k === 'Siège' && { fontSize: 24, color: Colors.primary }]}>{v}</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.ticketDivider} />
-                <View style={styles.ticketQR}>
-                  <Text style={styles.qrLabel}>CODE DE VALIDATION</Text>
-                  <View style={{ marginVertical: 12, alignItems: 'center' }}>
-                    <QRCode
-                      value={lastTicket.code_ticket}
-                      size={120}
-                      color={Colors.textDark}
-                      backgroundColor={Colors.white}
-                    />
-                  </View>
-                  <Text style={styles.qrCode}>{lastTicket.code_ticket}</Text>
-                  <Text style={styles.qrHint}>À présenter au contrôleur lors du contrôle</Text>
-                </View>
-                <View style={styles.ticketDivider} />
-                <Text style={styles.ticketTotal}>{(lastTicket.montant_total as number).toFixed(3)} TND</Text>
-                <Text style={styles.ticketFooter}>{prenom} {nom} · {new Date(lastTicket.date_emission).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.newTicketBtn} onPress={() => { setModal(false); }}>
-              <Ticket color={Colors.primary} size={18} />
-              <Text style={styles.newTicketBtnText}>Émettre un autre billet</Text>
+            <TouchableOpacity style={styles.ticketDoneBtn} onPress={() => { setModal(false); setStep(0); }}>
+              <Text style={styles.ticketDoneBtnText}>Terminer</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const SEAT_SZ = Math.min(40, (width - 80) / 5);
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bgLight },
-  content: { padding: Spacing.base, paddingBottom: 40 },
+  safe: { flex: 1, backgroundColor: Colors.primary },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgLight },
-
+  
   // Steps Bar
-  stepsBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.white, paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.divider,
-  },
-  stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  stepNum: {
-    width: 26, height: 26, borderRadius: 13,
-    backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center',
-  },
-  stepNumActive: { backgroundColor: Colors.primary },
-  stepNumDone: { backgroundColor: Colors.success },
-  stepNumText: { fontSize: 14, fontWeight: '800', color: Colors.textMuted },
-  stepNumTextActive: { color: Colors.white },
-  stepLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '700', marginLeft: 4 },
-  stepLabelActive: { color: Colors.primary, fontWeight: '800' },
-  stepConnector: { flex: 1, height: 2, backgroundColor: Colors.border, marginHorizontal: 4 },
-  stepConnectorDone: { backgroundColor: Colors.success },
+  stepsContainer: { flexDirection: 'row', backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center', justifyContent: 'space-between' },
+  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stepCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
+  stepActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  stepDone: { backgroundColor: Colors.success, borderColor: Colors.success },
+  stepText: { fontSize: 12, fontWeight: '900', color: 'rgba(255, 255, 255, 0.4)' },
+  stepTextActive: { color: Colors.primary },
+  stepLabel: { fontSize: 11, fontWeight: '800', color: 'rgba(255, 255, 255, 0.3)', letterSpacing: 0.5 },
+  stepLabelActive: { color: Colors.white },
+  stepLine: { width: 15, height: 2, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1 },
+  stepLineDone: { backgroundColor: Colors.success },
 
-  // Service Banner
-  serviceBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.primary + '10', borderRadius: Radius.md,
-    padding: Spacing.md, marginBottom: Spacing.md,
-    borderWidth: 1, borderColor: Colors.primary + '20',
-  },
-  bannerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.success },
-  bannerText: { fontSize: 14, color: Colors.primary, fontWeight: '800' },
+  scrollContent: { paddingBottom: 60, backgroundColor: Colors.bgLight, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, minHeight: '100%' },
+  formSection: { padding: Spacing.xl },
 
-  // Section
-  section: {
-    backgroundColor: Colors.white, borderRadius: Radius.lg,
-    padding: Spacing.base, marginBottom: Spacing.sm, ...Shadow.card,
-  },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
+  infoBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.primary + '10', padding: 14, borderRadius: Radius.lg, marginBottom: Spacing.xl, borderWidth: 1, borderColor: Colors.primary + '15' },
+  bannerTxt: { fontSize: 14, fontWeight: '800', color: Colors.primary },
 
-  // Picker
-  picker: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md,
-    height: 50, paddingHorizontal: 14, backgroundColor: Colors.bgLight,
-  },
-  pickerVal: { fontSize: 16, color: Colors.textDark, fontWeight: '700' },
-  pickerPh: { fontSize: 16, color: Colors.textLight },
+  inputGroup: { marginBottom: Spacing.xl },
+  inputLabel: { fontSize: 11, fontWeight: '900', color: Colors.textLight, letterSpacing: 1.5, marginBottom: 8 },
+  pickerField: { height: 56, backgroundColor: Colors.white, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12, ...Shadow.card, borderWidth: 1, borderColor: Colors.bgMid },
+  pickerDisabled: { opacity: 0.5 },
+  pickerValue: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  
+  dropdown: { marginTop: 8, backgroundColor: Colors.white, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.strong, borderWidth: 1, borderColor: Colors.bgMid },
+  ddItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.bgMid },
+  ddItemActive: { backgroundColor: Colors.primary + '05' },
+  ddItemTxt: { fontSize: 16, fontWeight: '700', color: Colors.textMid },
+  ddItemTxtActive: { color: Colors.primary, fontWeight: '900' },
+  ddItemKm: { fontSize: 13, color: Colors.textLight, fontWeight: '800' },
 
-  // Dropdown
-  dropdown: {
-    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
-    marginTop: 6, overflow: 'hidden', maxHeight: 200, backgroundColor: Colors.white,
-  },
-  ddItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 13, borderBottomWidth: 1, borderBottomColor: Colors.divider, gap: 8,
-  },
-  ddItemActive: { backgroundColor: Colors.primary + '10' },
-  ddItemText: { fontSize: 16, color: Colors.textMid, flex: 1 },
-  ddItemTextActive: { color: Colors.primary, fontWeight: '800' },
-  ddItemSub: { fontSize: 14, color: Colors.textLight },
+  mainBtn: { backgroundColor: Colors.accent, height: 60, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...Shadow.accent },
+  mainBtnTxt: { fontSize: 18, fontWeight: '900', color: Colors.primary, letterSpacing: -0.3 },
+  btnDis: { opacity: 0.5 },
 
-  // Distance badge
-  distBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.successLight, borderRadius: Radius.pill,
-    paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', marginTop: 8,
-  },
-  distText: { fontSize: 14, color: Colors.success, fontWeight: '800' },
+  // Step 1
+  itinerarySummary: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.xl, ...Shadow.card, borderWidth: 1, borderColor: Colors.bgMid },
+  itineraryLine: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'center' },
+  itDot: { width: 8, height: 8, borderRadius: 4 },
+  itCity: { fontSize: 16, fontWeight: '900', color: Colors.textDark },
+  itArrow: { flex: 1, height: 2, backgroundColor: Colors.bgMid, marginHorizontal: 4 },
+  itDetails: { fontSize: 13, color: Colors.textLight, fontWeight: '800', textAlign: 'center', marginTop: 8, letterSpacing: 0.5 },
 
-  // Route Summary (step 1)
-  routeSummary: {
-    backgroundColor: Colors.primary, borderRadius: Radius.xl,
-    padding: Spacing.base, marginBottom: Spacing.md, gap: 6, ...Shadow.strong,
-  },
-  routeSummaryItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rsDot: { width: 10, height: 10, borderRadius: 5 },
-  rsTxt: { fontSize: 16, color: Colors.white, fontWeight: '800' },
-  rsLine: { width: 2, height: 14, backgroundColor: Colors.white + '40', marginLeft: 4 },
-  rsDist: { fontSize: 14, color: Colors.accent, fontWeight: '700', marginTop: 4 },
+  sectionLabel: { fontSize: 12, fontWeight: '900', color: Colors.textLight, letterSpacing: 1.5, marginBottom: 12, marginTop: 8 },
+  categoryTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  catTab: { flex: 1, height: 40, borderRadius: Radius.pill, backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center' },
+  catTabActive: { backgroundColor: Colors.primary },
+  catTabText: { fontSize: 13, fontWeight: '900', color: Colors.textMuted },
+  catTabTextActive: { color: Colors.white },
 
-  // Tarif
-  tarifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  tarifCard: {
-    flex: 1, minWidth: '45%', alignItems: 'center', padding: 10,
-    borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.border,
-    backgroundColor: Colors.bgLight, gap: 3,
-  },
-  tarifLabel: { fontSize: 15, fontWeight: '800', color: Colors.textMid },
-  tarifReduc: { fontSize: 13, fontWeight: '800' },
+  tarifScroll: { gap: 10, paddingVertical: 4 },
+  tarifOption: { minWidth: 100, backgroundColor: Colors.white, borderRadius: Radius.lg, padding: 14, alignItems: 'center', gap: 4, ...Shadow.subtle, borderWidth: 1, borderColor: Colors.bgMid },
+  tarifOptionActive: { borderColor: Colors.success, backgroundColor: Colors.success + '08' },
+  tarifOptLabel: { fontSize: 13, fontWeight: '900', color: Colors.textMid },
+  tarifOptLabelActive: { color: Colors.success },
+  tarifOptVal: { fontSize: 14, fontWeight: '800', color: Colors.textLight },
 
-  // Seats
-  legend: { flexDirection: 'row', gap: 12, marginBottom: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 12, height: 12, borderRadius: 3 },
-  legendTxt: { fontSize: 13, color: Colors.textMuted },
-  seatWarn: { fontSize: 14, color: Colors.warning, fontWeight: '700', marginBottom: 8 },
-  seatGrid: { gap: 5, paddingVertical: 4 },
-  seatRow: { flexDirection: 'row', gap: 5 },
-  seat: {
-    width: SEAT_SZ, height: SEAT_SZ, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
-  },
-  seatFree: { backgroundColor: Colors.bgMid, borderColor: Colors.border },
+  optionGrid: { flexDirection: 'row', gap: 10, marginBottom: Spacing.xl },
+  optCard: { flex: 1, height: 70, backgroundColor: Colors.white, borderRadius: Radius.xl, alignItems: 'center', justifyContent: 'center', gap: 6, ...Shadow.subtle, borderWidth: 1, borderColor: Colors.bgMid },
+  optCardActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },
+  optText: { fontSize: 12, fontWeight: '800', color: Colors.textMuted },
+  optTextActive: { color: Colors.primary, fontWeight: '900' },
+
+  seatContainer: { backgroundColor: Colors.white, borderRadius: Radius.xl, paddingVertical: 20, ...Shadow.subtle, borderWidth: 1, borderColor: Colors.bgMid, marginBottom: Spacing.xl },
+  seatGrid: { gap: 8, alignItems: 'center' },
+  seatRow: { flexDirection: 'row', gap: 8 },
+  seat: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  seatFree: { backgroundColor: Colors.bgMid, borderColor: Colors.divider },
   seatSel: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  seatOcc: { backgroundColor: Colors.dangerLight, borderColor: Colors.danger + '50' },
-  seatTxt: { fontSize: 12, fontWeight: '800' },
-  seatTxtFree: { color: Colors.textMid },
+  seatOcc: { backgroundColor: Colors.border, borderColor: Colors.border },
+  seatTxt: { fontSize: 13, fontWeight: '800' },
+  seatTxtFree: { color: Colors.textMuted },
   seatTxtSel: { color: Colors.white },
-  seatTxtOcc: { color: Colors.danger },
+  seatTxtOcc: { color: Colors.textLight },
+  seatLegend: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 20 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 3 },
+  legendLbl: { fontSize: 11, fontWeight: '800', color: Colors.textLight },
 
-  // Recap
-  recap: {
-    backgroundColor: Colors.white, borderRadius: Radius.xl,
-    padding: Spacing.base, marginBottom: Spacing.md, ...Shadow.card,
-  },
-  recapTitle: { fontSize: 18, fontWeight: '800', color: Colors.textDark, marginBottom: Spacing.md },
-  recapRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.divider,
-  },
-  recapLabel: { fontSize: 15, color: Colors.textMuted },
-  recapVal: { fontSize: 15, fontWeight: '800', color: Colors.textDark },
-  recapTotal: { borderBottomWidth: 0, marginTop: 6 },
-  recapTotalLabel: { fontSize: 18, fontWeight: '800', color: Colors.textDark },
-  recapTotalVal: { fontSize: 26, fontWeight: '900', color: Colors.primary },
+  footerNav: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  backButton: { width: 60, height: 60, borderRadius: Radius.xl, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', ...Shadow.subtle, borderWidth: 1, borderColor: Colors.bgMid },
 
-  // Nav
-  navRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'stretch' },
-  nextBtn: {
-    flex: 1, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, ...Shadow.accent,
-  },
-  nextBtnDisabled: { backgroundColor: Colors.bgMid, ...Platform.select({ web: { boxShadow: 'none' }, default: { shadowOpacity: 0, elevation: 0 } }) },
-  nextBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
-  nextBtnTextDis: { color: Colors.textMuted },
-  backBtn: {
-    backgroundColor: Colors.white, height: 52, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingHorizontal: 16, borderWidth: 1.5, borderColor: Colors.border,
-  },
-  backBtnText: { fontSize: 16, fontWeight: '800', color: Colors.textMid },
-  sellBtn: {
-    flex: 1, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...Shadow.accent,
-  },
-  sellBtnText: { fontSize: 17, fontWeight: '800', color: Colors.primary },
+  // Step 2
+  ticketRecap: { backgroundColor: Colors.white, borderRadius: Radius.xxl, padding: Spacing.xl, ...Shadow.strong, borderWidth: 1, borderColor: Colors.bgMid },
+  recapHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  recapTitle: { fontSize: 22, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  recapSubtitle: { fontSize: 13, color: Colors.textLight, fontWeight: '800', letterSpacing: 1 },
+  recapDivider: { height: 1, backgroundColor: Colors.bgMid, marginVertical: Spacing.xl },
+  recapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
+  recapField: { width: '45%' },
+  rfLabel: { fontSize: 10, fontWeight: '900', color: Colors.textLight, letterSpacing: 1, marginBottom: 4 },
+  rfValue: { fontSize: 16, fontWeight: '800', color: Colors.textDark },
+  recapPath: { marginTop: Spacing.xl, gap: 10 },
+  pathNode: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pDot: { width: 10, height: 10, borderRadius: 5 },
+  pCity: { fontSize: 17, fontWeight: '900', color: Colors.textDark },
+  pathLine: { width: 2, height: 24, backgroundColor: Colors.bgMid, marginLeft: 4 },
+  totalBlock: { marginTop: Spacing.xxl, backgroundColor: Colors.primary, borderRadius: Radius.xl, padding: Spacing.xl, alignItems: 'center' },
+  totalLabel: { fontSize: 12, fontWeight: '900', color: 'rgba(255, 255, 255, 0.4)', letterSpacing: 2 },
+  totalValue: { fontSize: 32, fontWeight: '900', color: Colors.white, marginTop: 4 },
+  totalCurrency: { fontSize: 18, color: Colors.accent },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  ticketSheet: {
-    backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: Spacing.xl, maxHeight: '92%',
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: Spacing.base },
-  ticketHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.base },
-  ticketHeaderTitle: { flex: 1, fontSize: 19, fontWeight: '800', color: Colors.textDark },
-  ticketClose: { padding: 4 },
+  sellBtn: { flex: 1, backgroundColor: Colors.primary, height: 64, borderRadius: Radius.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, ...Shadow.strong },
+  sellBtnTxt: { fontSize: 18, fontWeight: '900', color: Colors.white, letterSpacing: -0.3 },
 
-  ticketBody: { alignItems: 'center' },
-  ticketBrand: { fontSize: 22, fontWeight: '900', color: Colors.primary },
-  ticketSubtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 2 },
-  ticketDivider: { width: '100%', height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
-  ticketGrid: { flexDirection: 'row', flexWrap: 'wrap', width: '100%', gap: 8 },
-  ticketField: { width: '48%', backgroundColor: Colors.bgLight, borderRadius: Radius.md, padding: 10 },
-  ticketKey: { fontSize: 12, color: Colors.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  ticketVal: { fontSize: 16, fontWeight: '800', color: Colors.textDark, marginTop: 2 },
-  ticketQR: { alignItems: 'center', width: '100%' },
-  qrLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
-  qrCode: {
-    fontFamily: 'monospace', fontSize: 20, fontWeight: '900', color: Colors.primary,
-    letterSpacing: 3, backgroundColor: Colors.bgLight, paddingHorizontal: 20,
-    paddingVertical: 12, borderRadius: 12, borderWidth: 2, borderColor: Colors.border,
+  // Official Ticket Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center' },
+  ticketScroll: { paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center' },
+  officialTicket: {
+    backgroundColor: Colors.white,
+    width: '100%',
+    maxWidth: 340,
+    padding: 24,
+    borderWidth: 2,
+    borderColor: '#000',
+    borderStyle: 'dashed',
+    alignItems: 'center',
   },
-  qrHint: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
-  ticketTotal: { fontSize: 30, fontWeight: '900', color: Colors.primary, marginBottom: 4 },
-  ticketFooter: { fontSize: 13, color: Colors.textLight },
-  newTicketBtn: {
-    backgroundColor: Colors.accent, height: 52, borderRadius: Radius.lg, marginTop: Spacing.lg,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-  },
-  newTicketBtnText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  ticketLogo: { fontSize: 28, fontWeight: '900', color: '#000', marginBottom: 20, textAlign: 'center' },
+  ticketGrid: { width: '100%', gap: 6 },
+  tRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  tLbl: { fontSize: 13, fontWeight: '700', color: '#000', flex: 0.4 },
+  tVal: { fontSize: 13, fontWeight: '900', color: '#000', flex: 0.6, textAlign: 'right' },
+  
+  tDividerDashed: { width: '100%', height: 1, borderBottomWidth: 1, borderColor: '#000', borderStyle: 'dashed', marginVertical: 15 },
+  
+  tPriceRow: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  tPriceLbl: { fontSize: 11, fontWeight: '700', color: '#000' },
+  tPriceVal: { fontSize: 11, fontWeight: '900', color: '#000' },
+  
+  tGrandTotal: { fontSize: 24, fontWeight: '900', color: '#000', marginVertical: 10, textAlign: 'center' },
+  
+  tQrBox: { marginVertical: 15, padding: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee' },
+  
+  tDividerSolid: { width: '100%', height: 1, backgroundColor: '#eee', marginVertical: 15 },
+  
+  tFooterAgent: { fontSize: 12, fontWeight: '700', color: '#000', textAlign: 'center', textTransform: 'capitalize' },
+  tFooterWish: { fontSize: 12, fontWeight: '700', color: '#000', textAlign: 'center', marginTop: 4 },
+  
+  ticketDoneBtn: { backgroundColor: Colors.accent, width: '100%', maxWidth: 340, height: 60, borderRadius: Radius.xl, alignItems: 'center', justifyContent: 'center', marginTop: 20, ...Shadow.accent },
+  ticketDoneBtnText: { fontSize: 18, fontWeight: '900', color: Colors.primary },
 });

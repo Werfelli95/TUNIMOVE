@@ -5,9 +5,9 @@ import './Users.css';
 
 /* ─── State badge ─────────────────────────────────────────── */
 const STATE_CFG = {
-  'en service':   { bg: 'rgba(16,185,129,0.1)',  color: '#065F46', dot: '#10B981', label: 'En service'  },
-  'maintenance':  { bg: 'rgba(245,158,11,0.12)', color: '#92400E', dot: '#F59E0B', label: 'Maintenance' },
-  'en panne':     { bg: 'rgba(239,68,68,0.1)',   color: '#991B1B', dot: '#EF4444', label: 'En panne'    },
+  'en service': { bg: 'rgba(16,185,129,0.1)', color: '#065F46', dot: '#10B981', label: 'En service' },
+  'maintenance': { bg: 'rgba(245,158,11,0.12)', color: '#92400E', dot: '#F59E0B', label: 'Maintenance' },
+  'en panne': { bg: 'rgba(239,68,68,0.1)', color: '#991B1B', dot: '#EF4444', label: 'En panne' },
 };
 
 const getStateCfg = (etat = '') => STATE_CFG[etat.toLowerCase()] || STATE_CFG['en service'];
@@ -56,14 +56,14 @@ const Fleet = () => {
   const [formData, setFormData] = useState({ numero_bus: '', capacite: '', etat: 'En service', num_ligne: '', horaire_affecte: '' });
 
   const fetchLines = async () => {
-    try { const r = await fetch('http://localhost:5000/api/network'); setLines(await r.json()); } catch {}
+    try { const r = await fetch('http://localhost:5000/api/network'); setLines(await r.json()); } catch { }
   };
   const fetchBuses = async () => {
     try {
       setLoading(true);
       const r = await fetch('http://localhost:5000/api/buses');
       setBuses(Array.isArray(await r.json()) ? await (await fetch('http://localhost:5000/api/buses')).json() : []);
-    } catch {} finally { setLoading(false); }
+    } catch { } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchBuses(); fetchLines(); }, []);
@@ -120,7 +120,7 @@ const Fleet = () => {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
     const tableHtml = document.querySelector('.enterprise-table').outerHTML;
-    
+
     printWindow.document.write(`
       <html>
         <head>
@@ -133,7 +133,7 @@ const Fleet = () => {
             th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 12px; }
             .user-info-cell { display: flex; align-items: center; gap: 10px; }
             .user-avatar { display: none; }
-            .row-actions, .btn-add-user, .search-wrapper, .action-btn { display: none !important; }
+            .row-actions, .btn-add-user, .search-wrapper, .action-btn, .actions-col { display: none !important; }
             .role-badge { border: 1px solid #ccc; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: bold; }
           </style>
         </head>
@@ -211,7 +211,7 @@ const Fleet = () => {
                         <th>Ligne Assignée</th>
                         <th>Horaire</th>
                         <th>État</th>
-                        <th style={{ textAlign: 'center' }}>Actions</th>
+                        <th style={{ textAlign: 'center' }} className="actions-col">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -266,10 +266,10 @@ const Fleet = () => {
                                 ) : <span style={{ color: '#CBD5E1', fontSize: 14 }}>—</span>}
                               </td>
                               <td><StateBadge etat={bus.etat} /></td>
-                              <td onClick={e => e.stopPropagation()}>
+                              <td className="actions-col" onClick={e => e.stopPropagation()}>
                                 <div className="row-actions" style={{ opacity: 1 }}>
                                   <button title="Éditer" className="action-btn btn-edit" onClick={() => handleOpenEdit(bus)}><Edit2 size={15} /></button>
-                                  <button title="Supprimer" className="action-btn btn-trash" onClick={() => handleDelete(bus.id_bus)}><Trash2 size={15} /></button>
+
                                 </div>
                               </td>
                             </motion.tr>

@@ -161,8 +161,13 @@ exports.getOccupiedSeats = async (req, res) => {
         const reqEnd = getDist(arrivee || '');
 
         const query = `
-            SELECT siege, station_depart, station_arrivee FROM ticket 
-            WHERE num_ligne = $1 AND date_voyage = $2 AND heure_depart = $3
+            SELECT t.siege, t.station_depart, t.station_arrivee 
+            FROM ticket t 
+            WHERE t.id_bus = (
+                SELECT id_bus FROM bus 
+                WHERE num_ligne = $1 AND horaire_affecte::text LIKE $3 || '%'
+                LIMIT 1
+            ) AND t.date_voyage = $2
         `;
         const result = await db.query(query, [num_ligne, date, heure]);
         
@@ -632,5 +637,74 @@ exports.getBusOccupancy = async (req, res) => {
     } catch (err) {
         console.error('Erreur getBusOccupancy:', err);
         res.status(500).json({ message: 'Erreur stats occupation' });
+    }
+};
+// Clôturer le service d'un agent de guichet
+exports.closeAgentService = async (req, res) => {
+    const { agentId } = req.params;
+    const { heure_connexion } = req.body;
+
+    try {
+        // 1. Vérifier si une clôture existe déjà pour aujourd'hui
+        const checkExisting = await db.query(`
+            SELECT id_fiche FROM fiche_cloture_service 
+            WHERE id_responsable_cloture = $1 
+            AND heure_cloture::date = CURRENT_DATE
+            AND id_service IS NULL
+        `, [agentId]);
+
+        if (checkExisting.rows.length > 0) {
+            return res.status(400).json({ message: "Le service pour aujourd'hui a déjà été clôturé." });
+        }
+
+        // 2. Calculer le total des ventes et le nombre de tickets
+        const stats = await db.query(`
+            SELECT 
+                COALESCE(SUM(montant_total), 0) as total,
+                COUNT(*) as count
+            FROM ticket 
+            WHERE id_agent = $1 
+            AND date_emission::date = CURRENT_DATE
+        `, [agentId]);
+
+        const totalRecette = parseFloat(stats.rows[0].total || 0);
+        const ticketCount = parseInt(stats.rows[0].count || 0);
+
+        // 3. Calculer la durée si possible
+        let dureeMinutes = null;
+        if (heure_connexion) {
+            const start = new Date(heure_connexion);
+            const end = new Date();
+            dureeMinutes = Math.floor((end.getTime() - start.getTime()) / 60000);
+        }
+
+        // 4. Insérer la fiche de clôture
+        const result = await db.query(`
+            INSERT INTO fiche_cloture_service (
+                id_responsable_cloture, 
+                total_collecte, 
+                heure_cloture, 
+                heure_connexion,
+                statut, 
+                duree_minutes, 
+                motif_cloture
+            )
+            VALUES ($1, $2, NOW(), $3, 'En attente', $4, 'Fin de service guichet')
+            RETURNING id_fiche
+        `, [agentId, totalRecette, heure_connexion || null, dureeMinutes]);
+
+        res.status(201).json({
+            message: "Service clôturé avec succès. Le rapport a été envoyé à l'administration.",
+            id_fiche: result.rows[0].id_fiche,
+            stats: {
+                totalRecette,
+                ticketCount,
+                dureeMinutes
+            }
+        });
+
+    } catch (err) {
+        console.error('Erreur closeAgentService:', err);
+        res.status(500).json({ message: 'Erreur lors de la clôture du service : ' + err.message });
     }
 };
