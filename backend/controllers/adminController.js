@@ -96,11 +96,47 @@ exports.getNotificationsCount = async (req, res) => {
             db.query("SELECT COUNT(*) FROM fiche_cloture_service WHERE statut = 'En attente'")
         ]);
 
+        const resetCount = parseInt(resets.rows[0].count);
+        const incidentCount = parseInt(incidents.rows[0].count);
+        const auditCount = parseInt(audits.rows[0].count);
+
+        const items = [
+            {
+                id: 'resets',
+                type: 'resets',
+                title: 'Réinitialisations',
+                description: `${resetCount} demande${resetCount > 1 ? 's' : ''} de mot de passe en attente`,
+                count: resetCount,
+                priority: resetCount >= 3 ? 'high' : 'medium',
+                path: '/admin-dashboard/password-resets'
+            },
+            {
+                id: 'audits',
+                type: 'audits',
+                title: 'Fiches de Service',
+                description: `${auditCount} fiche${auditCount > 1 ? 's' : ''} de clôture à valider`,
+                count: auditCount,
+                priority: auditCount >= 5 ? 'high' : 'medium',
+                path: '/admin-dashboard/audit'
+            },
+            {
+                id: 'incidents',
+                type: 'incidents',
+                title: 'Incidents',
+                description: `${incidentCount} incident${incidentCount > 1 ? 's' : ''} non résolu${incidentCount > 1 ? 's' : ''}`,
+                count: incidentCount,
+                priority: incidentCount > 0 ? 'high' : 'low',
+                path: '/admin-dashboard/incidents'
+            }
+        ].filter(item => item.count > 0);
+
         res.json({
-            resets: parseInt(resets.rows[0].count),
-            incidents: parseInt(incidents.rows[0].count),
-            audits: parseInt(audits.rows[0].count),
-            total: parseInt(resets.rows[0].count) + parseInt(incidents.rows[0].count) + parseInt(audits.rows[0].count)
+            resets: resetCount,
+            incidents: incidentCount,
+            audits: auditCount,
+            total: resetCount + incidentCount + auditCount,
+            items,
+            generatedAt: new Date().toISOString()
         });
     } catch (err) {
         console.error('Erreur getNotificationsCount:', err);

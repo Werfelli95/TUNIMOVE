@@ -98,7 +98,8 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true, onUpdate }
 
             } else {
 
-                alert("Erreur lors de la mise à jour");
+                const errorData = await response.json().catch(() => ({}));
+                alert(errorData.message || "Erreur lors de la mise à jour");
             }
         } catch (error) {
             console.error("Erreur save:", error);

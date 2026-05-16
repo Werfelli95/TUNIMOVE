@@ -344,6 +344,26 @@
     border-color: #e0e7ff;
 }
 
+.tarif-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-action-danger {
+    color: #e11d48;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+}
+
+.btn-action-danger:hover {
+    background: #fff1f2;
+    border-color: #fecdd3;
+}
+
 /* Info Tooltip */
 .info-icon-premium {
     color: #94a3b8;

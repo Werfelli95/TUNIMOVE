@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Tarifs.css';
 
@@ -124,6 +124,34 @@ const Tarifs = () => {
         setLoading(false);
     };
 
+    const handleDeleteTarif = async (ids, label = 'ce tarif') => {
+        const idArray = Array.isArray(ids) ? ids : [ids];
+        const confirmLabel = idArray.length > 1 ? `${idArray.length} tarifs groupés` : label;
+        if (!window.confirm(`Supprimer définitivement ${confirmLabel} ?`)) return;
+
+        setLoading(true);
+        try {
+            const responses = await Promise.all(idArray.map(id =>
+                fetch(`http://localhost:5000/api/tarification/${id}`, { method: 'DELETE' })
+            ));
+            const failed = responses.find(res => !res.ok);
+            if (failed) {
+                const data = await failed.json().catch(() => ({}));
+                alert(data.message || "Suppression impossible.");
+                return;
+            }
+
+            await fetchData();
+            setMessage('✅ Tarif supprimé !');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de la suppression.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Bagage Form Handlers
     const openAddBagageModal = () => {
         setBagageFormData({ id_type_bagage: null, code: '', libelle: '', prix: '' });
@@ -159,6 +187,31 @@ const Tarifs = () => {
             }
         } catch (err) { console.error(err); }
         setLoading(false);
+    };
+
+    const handleDeleteBagage = async (item) => {
+        if (!window.confirm(`Supprimer définitivement le supplément "${item.libelle}" ?`)) return;
+
+        setLoading(true);
+        try {
+            const res = await fetch(`http://localhost:5000/api/tarification/bagages/${item.id_type_bagage}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                alert(data.message || "Suppression impossible.");
+                return;
+            }
+
+            await fetchData();
+            setMessage('✅ Supplément supprimé !');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de la suppression.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const toggleTarification = async (ids, currentStatus) => {
@@ -415,6 +468,7 @@ const Tarifs = () => {
                                                             </div>
                                                         </td>
                                                         <td className="text-center">
+                                                            <div className="tarif-actions">
                                                             <button 
                                                                 className="btn-action-premium" 
                                                                 onClick={(e) => {
@@ -425,6 +479,20 @@ const Tarifs = () => {
                                                             >
                                                                 {hasMultiple ? (isExpanded ? 'Fermer' : 'Gérer') : 'Éditer'}
                                                             </button>
+                                                            <button
+                                                                className="btn-action-premium btn-action-danger"
+                                                                title="Supprimer"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteTarif(
+                                                                        group.items.map(i => i.id_type_tarification),
+                                                                        group.items[0].libelle
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                            </div>
                                                         </td>
                                                     </motion.tr>
 
@@ -456,12 +524,20 @@ const Tarifs = () => {
                                                                                             <span className="text-[10px] font-bold text-slate-400">{item.categorie}</span>
                                                                                         </td>
                                                                                         <td className="py-2 text-center">
+                                                                                            <div className="tarif-actions justify-center">
                                                                                             <button 
                                                                                                 className="text-indigo-600 font-bold hover:underline"
                                                                                                 onClick={() => openEditModal(item)}
                                                                                             >
                                                                                                 Éditer
                                                                                             </button>
+                                                                                            <button
+                                                                                                className="text-rose-600 font-bold hover:underline"
+                                                                                                onClick={() => handleDeleteTarif(item.id_type_tarification, item.libelle)}
+                                                                                            >
+                                                                                                Supprimer
+                                                                                            </button>
+                                                                                            </div>
                                                                                         </td>
                                                                                     </tr>
                                                                                 ))}
@@ -533,12 +609,21 @@ const Tarifs = () => {
                                             </div>
                                         </td>
                                         <td className="text-center">
+                                            <div className="tarif-actions">
                                             <button 
                                                 className="btn-action-premium"
                                                 onClick={() => openEditBagageModal(b)}
                                             >
                                                 Paramétrer
                                             </button>
+                                            <button
+                                                className="btn-action-premium btn-action-danger"
+                                                title="Supprimer"
+                                                onClick={() => handleDeleteBagage(b)}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 ))}

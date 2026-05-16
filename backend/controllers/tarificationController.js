@@ -50,6 +50,25 @@ exports.addTarification = async (req, res) => {
     }
 };
 
+exports.deleteTarification = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query(
+            'DELETE FROM type_tarification WHERE id_type_tarification = $1 RETURNING id_type_tarification',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Tarification introuvable' });
+        }
+
+        res.json({ message: 'Tarification supprimée' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Impossible de supprimer cette tarification. Désactivez-la si elle est déjà utilisée dans des ventes.' });
+    }
+};
+
 exports.updateBagage = async (req, res) => {
     const { id } = req.params;
     const { code, libelle, prix } = req.body;
@@ -76,6 +95,25 @@ exports.addBagage = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Erreur ajout bagage' });
+    }
+};
+
+exports.deleteBagage = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query(
+            'DELETE FROM type_bagage WHERE id_type_bagage = $1 RETURNING id_type_bagage',
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Supplément introuvable' });
+        }
+
+        res.json({ message: 'Supplément supprimé' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Impossible de supprimer ce supplément. Désactivez-le s’il est déjà utilisé dans des ventes.' });
     }
 };
 

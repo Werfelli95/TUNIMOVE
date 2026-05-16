@@ -12,6 +12,7 @@ const Network = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         ville_depart: '', ville_arrivee: '', horaires: [''], statut_ligne: 'Active',
@@ -53,17 +54,30 @@ const Network = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
         const url = editingId ? `http://localhost:5000/api/network/${editingId}` : 'http://localhost:5000/api/network';
         const method = editingId ? 'PUT' : 'POST';
 
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
-        });
-        if (res.ok) {
-            setIsModalOpen(false);
-            fetchNetwork();
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                setIsModalOpen(false);
+                fetchNetwork();
+            } else {
+                alert(data.message || "Impossible d'enregistrer cette ligne.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erreur de connexion au serveur.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -330,8 +344,10 @@ const Network = () => {
                                     <button type="button" className="st-add-btn" onClick={addStation}><Plus size={16} /> Ajouter station</button>
                                 </div>
                                 <div className="modal-actions-premium">
-                                    <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Annuler</button>
-                                    <button type="submit" className="btn-primary-gradient">{editingId ? 'Enregistrer' : 'Créer'}</button>
+                                    <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Annuler</button>
+                                    <button type="submit" className="btn-primary-gradient" disabled={isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : (editingId ? 'Enregistrer' : 'Créer')}
+                                    </button>
                                 </div>
                             </form>
                         </motion.div>

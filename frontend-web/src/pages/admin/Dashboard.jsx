@@ -107,6 +107,8 @@ const Dashboard = () => {
   const [busOccupancy, setBusOccupancy] = useState([]);
   const [period, setPeriod] = useState('week');
 
+  const formatTime = (time) => (time ? String(time).substring(0, 5) : '--:--');
+
   useEffect(() => {
     const fetchCounts = async () => {
       try {
@@ -284,7 +286,7 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <span style={{ fontSize: '14px', fontWeight: 900, display: 'block' }}>Bus {trip.numero_bus}</span>
-                        <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{trip.horaire_affecte.substring(0, 5)} • {trip.ville_depart}</span>
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{formatTime(trip.horaire_affecte)} • {trip.ville_depart || 'Départ non défini'}</span>
                       </div>
                     </div>
                     <span style={{ 

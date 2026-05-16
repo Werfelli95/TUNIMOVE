@@ -142,7 +142,17 @@ exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { nom, prenom, email, num_tel, matricule, role } = req.body;
-        let image_url = req.body.image_url;
+        const existing = await db.query(
+            'SELECT nom, prenom, email, num_tel, matricule, role, image_url FROM utilisateur WHERE id_utilisateur = $1',
+            [id]
+        );
+
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ message: "Utilisateur introuvable" });
+        }
+
+        const currentUser = existing.rows[0];
+        let image_url = req.body.image_url || currentUser.image_url;
         if (req.file) {
             image_url = req.file.path.replace(/\\/g, '/');
         }
@@ -155,7 +165,16 @@ exports.updateUser = async (req, res) => {
             RETURNING id_utilisateur, nom, prenom, email, num_tel, role, matricule, image_url;
         `;
 
-        const result = await db.query(query, [nom, prenom, email, num_tel, image_url, matricule, role, id]);
+        const result = await db.query(query, [
+            nom ?? currentUser.nom,
+            prenom ?? currentUser.prenom,
+            email ?? currentUser.email,
+            num_tel ?? currentUser.num_tel,
+            image_url,
+            matricule ?? currentUser.matricule,
+            role ?? currentUser.role,
+            id
+        ]);
 
 
         if (result.rows.length === 0) {

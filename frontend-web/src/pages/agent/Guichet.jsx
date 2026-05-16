@@ -21,6 +21,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from "react-qr-code";
 import './Guichet.css'; // We will create this
 
+const normalizePlace = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const placeTokens = (value) => normalizePlace(value)
+    .split(' ')
+    .filter(token => token.length > 2 && !['gare', 'station', 'centre', 'ville', 'routiere'].includes(token));
+
+const placesMatch = (a, b) => {
+    const normalizedA = normalizePlace(a);
+    const normalizedB = normalizePlace(b);
+    if (!normalizedA || !normalizedB) return false;
+    if (normalizedA.includes(normalizedB) || normalizedB.includes(normalizedA)) return true;
+
+    const tokensA = placeTokens(normalizedA);
+    const tokensB = placeTokens(normalizedB);
+    return tokensA.some(token => tokensB.includes(token));
+};
+
 const Guichet = () => {
     const { mode, setMode } = useOutletContext() || { mode: 'Vente Directe', setMode: () => { } };
     const navigate = useNavigate();
@@ -191,20 +213,17 @@ const Guichet = () => {
                                     if (ligne.statut_ligne?.toLowerCase() !== 'active') return false;
 
                                     // 2. Vérifier si elle correspond à l'emplacement du guichet
-                                    const loc = guichetData.emplacement?.toLowerCase() || '';
+                                    const loc = guichetData.station_depart || guichetData.emplacement || '';
                                     if (!loc) return true; // Si pas d'emplacement, on montre tout par sécurité
 
-                                    const dep = ligne.ville_depart?.toLowerCase() || '';
-                                    const arr = ligne.ville_arrivee?.toLowerCase() || '';
-
                                     // Si le guichet est au terminus de la ligne, on l'exclut
-                                    if (loc.includes(arr) || arr.includes(loc)) return false;
+                                    if (placesMatch(loc, ligne.ville_arrivee)) return false;
 
-                                    const isStart = loc.includes(dep) || dep.includes(loc);
+                                    const isStart = placesMatch(loc, ligne.ville_depart);
 
                                     // On vérifie aussi si une des stations intermédiaires correspond au guichet
                                     const isIntermediate = ligne.stations?.some(s =>
-                                        loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
+                                        placesMatch(loc, s.arret)
                                     );
 
                                     return isStart || isIntermediate;
@@ -217,9 +236,9 @@ const Guichet = () => {
                                     setSelectedLigne(l.num_ligne);
 
                                     // On fixe le départ de manière robuste
-                                    const loc = guichetData.emplacement.toLowerCase();
+                                    const loc = guichetData.station_depart || guichetData.emplacement || '';
                                     const match = l.stations.find(s =>
-                                        loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
+                                        placesMatch(loc, s.arret)
                                     );
                                     if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
                                     else setArretDepart(l.ville_depart);
@@ -688,9 +707,9 @@ const Guichet = () => {
                                     const foundLigne = lignes.find(l => String(l.num_ligne) === String(newLigneId));
                                     if (foundLigne && myGuichet) {
                                         // On cherche la station qui correspond à l'emplacement du guichet
-                                        const loc = myGuichet.emplacement.toLowerCase();
+                                        const loc = myGuichet.station_depart || myGuichet.emplacement || '';
                                         const match = foundLigne.stations.find(s =>
-                                            loc.includes(s.arret.toLowerCase()) || s.arret.toLowerCase().includes(loc)
+                                            placesMatch(loc, s.arret)
                                         );
                                         if (match) setArretDepart(match.arret); // On utilise le nom EXACT de la station
                                         else setArretDepart(foundLigne.ville_depart); // Fallback

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   PieChart, Users, Bus, Key, ClipboardList, Route, Tags, FileCheck, Receipt, Siren,
-  LogOut, Bell, Search, User, Mail, Phone, Hash, Shield, X, Loader2
+  LogOut, Bell, Search, User, Mail, Phone, Hash, Shield, X, Loader2, RefreshCw, CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProfileModal from '../components/ProfileModal';
@@ -18,31 +18,47 @@ const AdminLayout = () => {
   });
 
 
-  const [notifs, setNotifs] = useState({ resets: 0, incidents: 0, audits: 0, total: 0 });
-  const [dismissed, setDismissed] = useState({ resets: false, incidents: false, audits: false });
+  const [notifs, setNotifs] = useState({ resets: 0, incidents: 0, audits: 0, total: 0, items: [], generatedAt: null });
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('adminDismissedNotifications') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const [isNotifLoading, setIsNotifLoading] = useState(false);
   const prevNotifsRef = React.useRef({ resets: 0, incidents: 0, audits: 0 });
+
+  const fetchNotifications = React.useCallback(async () => {
+    setIsNotifLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/notifications');
+      if (res.ok) {
+        const data = await res.json();
+
+        setDismissed(prev => {
+          const next = { ...prev };
+          ['resets', 'incidents', 'audits'].forEach(type => {
+            if ((data[type] || 0) > (prevNotifsRef.current[type] || 0)) {
+              delete next[type];
+            }
+          });
+          localStorage.setItem('adminDismissedNotifications', JSON.stringify(next));
+          return next;
+        });
+
+        setNotifs({ ...data, items: data.items || [] });
+        prevNotifsRef.current = { resets: data.resets, incidents: data.incidents, audits: data.audits };
+      }
+    } catch (error) {
+      console.error("Erreur notifications:", error);
+    } finally {
+      setIsNotifLoading(false);
+    }
+  }, []);
 
   // Charger les notifications
   React.useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch('http://localhost:5000/api/admin/notifications');
-        if (res.ok) {
-          const data = await res.json();
-          
-          setDismissed(prev => ({
-            resets: data.resets > prevNotifsRef.current.resets ? false : prev.resets,
-            incidents: data.incidents > prevNotifsRef.current.incidents ? false : prev.incidents,
-            audits: data.audits > prevNotifsRef.current.audits ? false : prev.audits
-          }));
-
-          setNotifs(data);
-          prevNotifsRef.current = { resets: data.resets, incidents: data.incidents, audits: data.audits };
-        }
-      } catch (error) {
-        console.error("Erreur notifications:", error);
-      }
-    };
 
     // Rafraîchir les informations de l'utilisateur pour avoir la photo à jour
     const refreshUserInfo = async () => {
@@ -73,7 +89,7 @@ const AdminLayout = () => {
     // Rafraîchir toutes les 30 secondes pour les notifications
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNotifications, user?.id]);
 
   // État pour la modal de profil
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -105,14 +121,26 @@ const AdminLayout = () => {
 
   const handleDismiss = (e, type) => {
     e.stopPropagation();
-    setDismissed(prev => ({ ...prev, [type]: true }));
+    setDismissed(prev => {
+      const next = { ...prev, [type]: true };
+      localStorage.setItem('adminDismissedNotifications', JSON.stringify(next));
+      return next;
+    });
   };
 
-  const visibleNotifsCount = [
-    !dismissed.resets && notifs.resets > 0,
-    !dismissed.audits && notifs.audits > 0,
-    !dismissed.incidents && notifs.incidents > 0
-  ].filter(Boolean).length;
+  const handleDismissAll = () => {
+    const next = notificationItems.reduce((acc, item) => ({ ...acc, [item.type]: true }), {});
+    localStorage.setItem('adminDismissedNotifications', JSON.stringify(next));
+    setDismissed(next);
+  };
+
+  const notificationItems = (notifs.items && notifs.items.length > 0) ? notifs.items : [
+    { id: 'resets', type: 'resets', count: notifs.resets, path: '/admin-dashboard/password-resets' },
+    { id: 'audits', type: 'audits', count: notifs.audits, path: '/admin-dashboard/audit' },
+    { id: 'incidents', type: 'incidents', count: notifs.incidents, path: '/admin-dashboard/incidents' }
+  ].filter(item => item.count > 0);
+  const visibleNotifItems = notificationItems.filter(item => item.count > 0 && !dismissed[item.type]);
+  const visibleNotifsCount = visibleNotifItems.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="admin-layout">
@@ -173,7 +201,7 @@ const AdminLayout = () => {
                 <Bell size={28} />
                 {visibleNotifsCount > 0 && (
                   <span className="notif-badge">
-                    {visibleNotifsCount}
+                    {visibleNotifsCount > 99 ? '99+' : visibleNotifsCount}
                   </span>
                 )}
               </button>
@@ -194,7 +222,22 @@ const AdminLayout = () => {
                       }}
                     >
                       <div className="notif-header">
-                        <h3>Notifications</h3>
+                        <div>
+                          <h3>Notifications</h3>
+                          <span className="notif-status-tag">
+                            {visibleNotifsCount > 0 ? `${visibleNotifsCount} en attente` : 'A jour'}
+                          </span>
+                        </div>
+                        <div className="notif-header-actions">
+                          <button className="notif-tool-btn" onClick={fetchNotifications} title="Actualiser" disabled={isNotifLoading}>
+                            {isNotifLoading ? <Loader2 className="animate-spin" size={15} /> : <RefreshCw size={15} />}
+                          </button>
+                          {visibleNotifItems.length > 0 && (
+                            <button className="notif-tool-btn" onClick={handleDismissAll} title="Tout masquer">
+                              <CheckCheck size={15} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="notif-list">
@@ -275,7 +318,7 @@ const AdminLayout = () => {
 
                       {visibleNotifsCount > 0 && (
                         <div className="notif-footer">
-                          <span className="notif-total-label">Total: {visibleNotifsCount} Notifications</span>
+                          <span className="notif-total-label">Dernière vérification: {notifs.generatedAt ? new Date(notifs.generatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
                         </div>
                       )}
                     </motion.div>

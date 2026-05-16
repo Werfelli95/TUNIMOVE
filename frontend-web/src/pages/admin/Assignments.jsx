@@ -18,9 +18,7 @@ const Assignments = () => {
     const [selectedItem, setSelectedItem] = useState(null); // Peut être un bus ou un guichet
     const [availableStaff, setAvailableStaff] = useState([]);
     const [selectedStaffId, setSelectedStaffId] = useState('');
-    const [selectedLigne, setSelectedLigne] = useState('');
     const [stationDepart, setStationDepart] = useState('');
-    const [lignes, setLignes] = useState([]);
 
     // États pour l'Ajout de Guichet
     const [isAddGuichetModalOpen, setIsAddGuichetModalOpen] = useState(false);
@@ -28,14 +26,12 @@ const Assignments = () => {
 
     const fetchGuichetData = async () => {
         try {
-            const [guichetRes, statsRes, lignesRes] = await Promise.all([
+            const [guichetRes, statsRes] = await Promise.all([
                 fetch('http://localhost:5000/api/guichets'),
-                fetch('http://localhost:5000/api/guichets/stats'),
-                fetch('http://localhost:5000/api/network')
+                fetch('http://localhost:5000/api/guichets/stats')
             ]);
             setGuichets(await guichetRes.json());
             setGuichetStats(await statsRes.json());
-            setLignes(await lignesRes.json());
         } catch (error) {
             console.error("Erreur chargement guichets:", error);
         }
@@ -73,11 +69,9 @@ const Assignments = () => {
 
             if (currentStaffId) {
                 setSelectedStaffId(currentStaffId);
-                setSelectedLigne(item.num_ligne || '');
                 setStationDepart(item.station_depart || '');
             } else {
                 setSelectedStaffId('');
-                setSelectedLigne('');
                 setStationDepart(item.emplacement || '');
             }
 
@@ -94,7 +88,9 @@ const Assignments = () => {
 
             const body = {
                 id_guichet: selectedItem.id_guichet,
-                id_agent: selectedStaffId
+                id_agent: selectedStaffId,
+                num_ligne: null,
+                station_depart: stationDepart || selectedItem.emplacement || null
             };
 
             const res = await fetch(url, {
@@ -442,6 +438,18 @@ const Assignments = () => {
                                                     </option>
                                                 ))}
                                             </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                                                Point de départ du guichet
+                                            </label>
+                                            <input
+                                                className="form-input w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 transition-all outline-none"
+                                                value={stationDepart}
+                                                onChange={(e) => setStationDepart(e.target.value)}
+                                                placeholder={selectedItem?.emplacement || 'Ex: Tunis'}
+                                            />
                                         </div>
 
                                         <button
