@@ -4,6 +4,7 @@ import {
     ChevronRight, Search, Loader2, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './Users.css';
 
 const Network = () => {
@@ -47,7 +48,12 @@ const Network = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("🗑️ Supprimer cette ligne et tous ses trajets ?")) return;
+        const isConfirmed = await showConfirm(
+            "Supprimer la ligne",
+            "Voulez-vous vraiment supprimer cette ligne et tous ses trajets ?",
+            "Oui, Supprimer"
+        );
+        if (!isConfirmed) return;
         const res = await fetch(`http://localhost:5000/api/network/${id}`, { method: 'DELETE' });
         if (res.ok) fetchNetwork();
     };
@@ -235,14 +241,10 @@ const Network = () => {
                                                     >
                                                         <option value="" disabled> {line.stations.length} Stations</option>
                                                         {line.stations.map((st, idx) => {
-                                                            const cumulativeMinutes = line.stations.slice(0, idx + 1).reduce((acc, s) => acc + (parseInt(s.duree_minutes) || 0), 0);
-                                                            const firstHoraire = (line.horaires && line.horaires.length > 0) ? line.horaires[0] : null;
-                                                            const arrivalTime = firstHoraire ? calculateArrivalTime(firstHoraire, cumulativeMinutes) : null;
                                                             return (
                                                                 <option key={idx} value={st.arret} disabled>
                                                                     {idx + 1}. {st.arret} 
                                                                     {st.distance_km ? ` - ${st.distance_km} km` : ''} 
-                                                                    {arrivalTime ? ` - 🕒 ${arrivalTime}` : ''}
                                                                 </option>
                                                             );
                                                         })}
@@ -250,10 +252,6 @@ const Network = () => {
                                                     <div className="print-only" style={{ display: 'none', margin: '4px 0' }}>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                             {line.stations.map((st, idx) => {
-                                                                const cumulativeMinutes = line.stations.slice(0, idx + 1).reduce((acc, s) => acc + (parseInt(s.duree_minutes) || 0), 0);
-                                                                const firstHoraire = (line.horaires && line.horaires.length > 0) ? line.horaires[0] : null;
-                                                                const arrivalTime = firstHoraire ? calculateArrivalTime(firstHoraire, cumulativeMinutes) : null;
-                                                                
                                                                 return (
                                                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
                                                                         <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0' }}>
@@ -268,11 +266,6 @@ const Network = () => {
                                                                         {st.duree_minutes && (
                                                                             <span style={{ color: '#0f172a', fontSize: '11px', fontWeight: 'bold' }}>
                                                                                 ⏱️ {st.duree_minutes} min
-                                                                            </span>
-                                                                        )}
-                                                                        {arrivalTime && (
-                                                                            <span style={{ color: '#2563eb', fontSize: '11px', fontWeight: 'bold' }}>
-                                                                                (Est: {arrivalTime})
                                                                             </span>
                                                                         )}
                                                                     </div>

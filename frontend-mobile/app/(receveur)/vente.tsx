@@ -408,7 +408,7 @@ export default function VenteScreen() {
                 <Ticket color={Colors.primary} size={28} strokeWidth={2.5} />
                 <View>
                   <Text style={styles.recapTitle}>Billet de Voyage</Text>
-                  <Text style={styles.recapSubtitle}>SNTRI · LIGNE {num_ligne}</Text>
+                  <Text style={styles.recapSubtitle}>LIGNE {num_ligne}</Text>
                 </View>
               </View>
               

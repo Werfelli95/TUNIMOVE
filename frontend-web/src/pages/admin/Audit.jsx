@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, Loader2, History, Bus, AlertCircle, Search, Eye, X, User, MapPin, Tag, FileText, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './Users.css'; // On utilise tes styles existants
 
 const Audit = () => {
@@ -20,7 +21,12 @@ const Audit = () => {
     useEffect(() => { fetchRecords(); }, []);
 
     const handleAction = async (id, statut) => {
-        if (!window.confirm(`Confirmer le statut : ${statut} ?`)) return;
+        const isConfirmed = await showConfirm(
+            "Confirmer le statut",
+            `Confirmer le statut : ${statut} ?`,
+            "Oui, Confirmer"
+        );
+        if (!isConfirmed) return;
         try {
             await fetch(`http://localhost:5000/api/audit/${id}/status`, {
                 method: 'PUT',
@@ -28,7 +34,7 @@ const Audit = () => {
                 body: JSON.stringify({ statut })
             });
             fetchRecords();
-        } catch (e) { alert("Erreur"); }
+        } catch (e) { showAlert("Erreur", "Une erreur est survenue.", "error"); }
     };
 
     return (
@@ -69,7 +75,6 @@ const Audit = () => {
                         <table className="enterprise-table">
                             <thead>
                                 <tr>
-                                    <th>ID Fiche</th>
                                     <th>Personnel</th>
                                     <th>Affectation / Guichet</th>
                                     <th>Connexion / Clôture</th>
@@ -88,7 +93,6 @@ const Audit = () => {
                                             `${r.receveur_prenom} ${r.receveur_nom} ${r.num_ligne} ${r.numero_bus} ${r.nom_guichet} ${r.ville_depart} ${r.ville_arrivee}`.toLowerCase().includes(searchQuery.toLowerCase())
                                         ).map(r => (
                                             <motion.tr key={r.id_fiche} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                                <td style={{ fontWeight: 700, color: '#64748b', fontSize: '1.05rem' }}>#{r.agent_role === 'AGENT' ? 'A' : (r.agent_role === 'RECEVEUR' ? 'R' : 'C')}{String(r.id_fiche).padStart(3, '0')}</td>
                                                 <td>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <div style={{ 
@@ -124,7 +128,7 @@ const Audit = () => {
                                                             <span style={{ fontWeight: 800, color: '#059669' }}>Ligne {r.num_ligne}</span>
                                                             <div style={{ fontSize: '0.85rem' }}>{r.ville_depart} ↔ {r.ville_arrivee}</div>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                                                                <Bus size={14} /> <span>N° {r.numero_bus}</span>
+                                                                 <Bus size={14} /> <span>N° {r.numero_bus}</span>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -173,7 +177,7 @@ const Audit = () => {
                                             </motion.tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="9" className="empty-state">Aucune fiche trouvée.</td></tr>
+                                        <tr><td colSpan="8" className="empty-state">Aucune fiche trouvée.</td></tr>
                                     )}
                                 </AnimatePresence>
                             </tbody>
@@ -200,9 +204,6 @@ const Audit = () => {
                                         <FileText className="text-indigo-600" size={24} />
                                         Fiche de Clôture #{selectedRecord.agent_role === 'AGENT' ? 'A' : (selectedRecord.agent_role === 'RECEVEUR' ? 'R' : 'C')}{String(selectedRecord.id_fiche).padStart(3, '0')}
                                     </h2>
-                                    <p style={{ margin: '0.5rem 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-                                        Validée par le système le {new Date(selectedRecord.heure_cloture).toLocaleString()}
-                                    </p>
                                 </div>
                                 <button className="btn-close" onClick={() => setSelectedRecord(null)} style={{ background: 'white', border: '1px solid #e2e8f0' }}><X size={20} /></button>
                             </div>
@@ -215,12 +216,38 @@ const Audit = () => {
                                         <h3 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <User size={14} /> Personnel
                                         </h3>
-                                        <p style={{ fontWeight: '800', fontSize: '1.15rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                                            {selectedRecord.receveur_prenom} {selectedRecord.receveur_nom}
-                                        </p>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                            <span style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>Rôle: <span style={{ color: '#4f46e5' }}>{selectedRecord.agent_role}</span></span>
-                                            <span style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>Matricule: <span style={{ color: '#1e293b' }}>{selectedRecord.receveur_matricule || '—'}</span></span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                            <div style={{
+                                                width: '56px',
+                                                height: '56px',
+                                                borderRadius: '50%',
+                                                background: selectedRecord.agent_role === 'AGENT' ? '#eef2ff' : (selectedRecord.agent_role === 'RECEVEUR' ? '#ecfdf5' : '#fff7ed'),
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: selectedRecord.agent_role === 'AGENT' ? '#4f46e5' : (selectedRecord.agent_role === 'RECEVEUR' ? '#059669' : '#f97316'),
+                                                fontSize: '1.2rem',
+                                                fontWeight: 800,
+                                                border: '2px solid #fff',
+                                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                                                overflow: 'hidden',
+                                                flexShrink: 0
+                                            }}>
+                                                {selectedRecord.receveur_image_url ? (
+                                                    <img src={`http://localhost:5000/${selectedRecord.receveur_image_url}`} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    (selectedRecord.receveur_prenom ? selectedRecord.receveur_prenom[0]?.toUpperCase() : '') + (selectedRecord.receveur_nom ? selectedRecord.receveur_nom[0]?.toUpperCase() : '')
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p style={{ fontWeight: '800', fontSize: '1.15rem', color: '#1e293b', margin: 0, lineHeight: 1.2 }}>
+                                                    {selectedRecord.receveur_prenom} {selectedRecord.receveur_nom}
+                                                </p>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                                                    <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: 600 }}>Rôle: <span style={{ color: '#4f46e5' }}>{selectedRecord.agent_role}</span></span>
+                                                    <span style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: 600 }}>Matricule: <span style={{ color: '#1e293b' }}>{selectedRecord.receveur_matricule || '—'}</span></span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

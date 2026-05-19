@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bus, Plus, Edit2, Trash2, Loader2, X, Search, Eye, MapPin, Clock, ShieldCheck, ChevronRight, Users, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './Users.css';
 
 /* ─── State badge ─────────────────────────────────────────── */
@@ -102,12 +103,17 @@ const Fleet = () => {
       else if (editingBus?.image_url) data.append('image_url', editingBus.image_url);
       const r = await fetch(url, { method: editingBus ? 'PUT' : 'POST', body: data });
       if (r.ok) { await fetchBuses(); setIsModalOpen(false); }
-      else { const err = await r.json(); alert(err.message || 'Erreur'); }
-    } catch { alert('Erreur de connexion'); } finally { setIsSubmitting(false); }
+      else { const err = await r.json(); showAlert("Erreur", err.message || 'Erreur', "error"); }
+    } catch { showAlert("Erreur", 'Erreur de connexion', "error"); } finally { setIsSubmitting(false); }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('🗑️ Supprimer ce bus ?')) return;
+    const isConfirmed = await showConfirm(
+      "Supprimer le bus",
+      "Voulez-vous vraiment supprimer ce bus ? Cette action est irréversible.",
+      "Oui, Supprimer"
+    );
+    if (!isConfirmed) return;
     const r = await fetch(`http://localhost:5000/api/buses/${id}`, { method: 'DELETE' });
     if (r.ok) {
       setBuses(prev => prev.filter(b => b.id_bus !== id));

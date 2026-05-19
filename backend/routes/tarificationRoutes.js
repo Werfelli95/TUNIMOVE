@@ -16,4 +16,5 @@ router.put('/:id/toggle', tarificationController.toggleTarification);
 router.put('/bagages/:id', tarificationController.updateBagage);
 router.put('/bagages/:id/toggle', tarificationController.toggleBagage);
 
+
 module.exports = router;

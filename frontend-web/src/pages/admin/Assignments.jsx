@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bus, UserPlus, Search, Loader2, CheckCircle, XCircle, Users, X, Edit2, Store, Plus, Trash2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './Users.css'; // On réutilise vos styles premium
 
 const Assignments = () => {
@@ -77,7 +78,7 @@ const Assignments = () => {
 
             setIsModalOpen(true);
         } catch (error) {
-            alert("Erreur lors de la récupération du personnel disponible");
+            showAlert("Erreur", "Erreur lors de la récupération du personnel disponible", "error");
         }
     };
 
@@ -104,7 +105,7 @@ const Assignments = () => {
                 setIsModalOpen(false);
             }
         } catch (error) {
-            alert("Erreur d'affectation");
+            showAlert("Erreur", "Erreur lors de l'affectation", "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -112,8 +113,8 @@ const Assignments = () => {
 
     const handleUnassign = async (id) => {
         const msg = "Voulez-vous vraiment retirer cet agent de ce guichet ?";
-
-        if (!window.confirm(msg)) return;
+        const isConfirmed = await showConfirm("Retirer l'affectation", msg, "Oui, Retirer");
+        if (!isConfirmed) return;
 
         try {
             const url = 'http://localhost:5000/api/guichets/update';
@@ -130,7 +131,7 @@ const Assignments = () => {
                 await fetchData();
             }
         } catch (error) {
-            alert("Erreur lors de la suppression de l'affectation");
+            showAlert("Erreur", "Erreur lors de la suppression de l'affectation", "error");
         }
     };
 
@@ -146,7 +147,7 @@ const Assignments = () => {
                 await fetchGuichetData();
             }
         } catch (error) {
-            alert("Erreur lors de la mise à jour du statut");
+            showAlert("Erreur", "Erreur lors de la mise à jour du statut", "error");
         }
     };
 
@@ -165,17 +166,22 @@ const Assignments = () => {
                 setNewGuichet({ nom_guichet: '', emplacement: '' });
             } else {
                 const data = await res.json();
-                alert(data.message || "Erreur lors de la création");
+                showAlert("Erreur", data.message || "Erreur lors de la création", "error");
             }
         } catch (error) {
-            alert("Erreur de connexion au serveur");
+            showAlert("Erreur", "Erreur de connexion au serveur", "error");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDeleteGuichet = async (id) => {
-        if (!window.confirm("Voulez-vous vraiment supprimer ce guichet ? Cette action est irréversible.")) return;
+        const isConfirmed = await showConfirm(
+            "Supprimer le guichet",
+            "Voulez-vous vraiment supprimer ce guichet ? Cette action est irréversible.",
+            "Oui, Supprimer"
+        );
+        if (!isConfirmed) return;
 
         try {
             const res = await fetch(`http://localhost:5000/api/guichets/${id}`, {
@@ -185,10 +191,10 @@ const Assignments = () => {
                 await fetchGuichetData();
             } else {
                 const data = await res.json();
-                alert(data.message || "Erreur lors de la suppression");
+                showAlert("Erreur", data.message || "Erreur lors de la suppression", "error");
             }
         } catch (error) {
-            alert("Erreur lors de la suppression");
+            showAlert("Erreur", "Erreur lors de la suppression", "error");
         }
     };
 

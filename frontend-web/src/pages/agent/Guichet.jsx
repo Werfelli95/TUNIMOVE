@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from "react-qr-code";
+import { showAlert } from '../../utils/alert';
 import './Guichet.css'; // We will create this
 
 const normalizePlace = (value) => String(value || '')
@@ -85,36 +86,26 @@ const Guichet = () => {
 
     const handleCloseService = async () => {
         const userId = agentInfo.id || agentInfo.id_utilisateur;
-        if (!userId) return;
+        if (!userId) {
+            localStorage.clear();
+            window.location.href = '/login';
+            return;
+        }
 
         setIsClosing(true);
         setShowConfirmModal(false);
         try {
             const loginTime = localStorage.getItem('login_time');
-            const res = await fetch(`http://localhost:5000/api/Sales/agent/${userId}/close-service`, {
+            await fetch(`http://localhost:5000/api/Sales/agent/${userId}/close-service`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ heure_connexion: loginTime })
             });
-
-            if (res.ok) {
-                const data = await res.json();
-                setClosureResult(data);
-                
-                // Déconnexion automatique après un court délai pour voir le message de succès
-                setTimeout(() => {
-                    localStorage.clear();
-                    navigate('/login');
-                }, 1500);
-            } else {
-                const err = await res.json();
-                alert(err.message || "Erreur lors de la clôture.");
-            }
         } catch (err) {
             console.error(err);
-            alert("Erreur réseau");
         } finally {
-            setIsClosing(false);
+            localStorage.clear();
+            window.location.href = '/login';
         }
     };
 
@@ -294,6 +285,7 @@ const Guichet = () => {
     };
 
     useEffect(() => {
+        if (closureResult) return; // Service déjà clôturé, on ne recharge pas les données
         if (mode === 'Historique' || mode === 'Clôture') {
             fetchDailySales();
         } else if (mode === 'Réservations') {
@@ -464,7 +456,7 @@ const Guichet = () => {
                 bus: selectedBus,
                 date_voyage: dateVoyage,
                 heure: getLocalTime(horaire),
-                siege: selectedSeat,
+                siege: selectedCategory === 'EXPEDITION' ? 'Soute' : selectedSeat,
                 prix: calculatedTotal,
                 arret_depart: arretDepart,
                 arret_arrivee: arretArrivee,
@@ -504,12 +496,12 @@ const Guichet = () => {
                     // On garde la ligne et l'horaire car l'agent vend souvent plusieurs tickets pour le même bus.
                 }, 700);
             } else {
-                alert("Erreur lors de l'enregistrement de la vente.");
+                showAlert("Erreur", "Erreur lors de l'enregistrement de la vente.", "error");
                 setIsPrinting(false);
             }
         } catch (err) {
             console.error(err);
-            alert("Erreur réseau");
+            showAlert("Erreur", "Une erreur réseau est survenue lors de la vente.", "error");
             setIsPrinting(false);
         }
     };
@@ -898,22 +890,7 @@ const Guichet = () => {
                             </div>
                         )}
 
-                        {/* SECTION 4: Sièges */}
-                        <div className="form-section">
-                            <h3>Sélection du Siège *</h3>
-                            <div className="seat-grid-container" style={{ opacity: (activeLigne && !canProceed) ? 0.5 : 1, pointerEvents: (activeLigne && !canProceed) ? 'none' : 'auto' }}>
-                                <div className="seat-grid">
-                                    {renderSeats()}
-                                </div>
-                                <div className="seat-legend">
-                                    <div><span className="box available"></span> Disponible</div>
-                                    <div><span className="box occupied"></span> Occupé</div>
-                                    <div><span className="box selected"></span> Sélectionné</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* SECTION 5: Tarif & Bagage */}
+                        {/* SECTION 4: Tarif & Bagage */}
                         <div className="form-section mb-5 bg-indigo-50 border-indigo-100" style={{ border: '1px solid #e0e7ff', padding: '15px', borderRadius: '8px' }}>
                             <h3 style={{ color: '#4f46e5' }}><User size={20} /> Tarification et Suppléments</h3>
 
@@ -930,6 +907,8 @@ const Guichet = () => {
                                         // On réinitialise les bagages si c'est une expédition
                                         if (cat === 'EXPEDITION') {
                                             setSelectedBagageId('');
+                                            // Optional: reset seat selection when switching to expedition
+                                            setSelectedSeat(null);
                                         }
                                     }}>
                                         <option value="VOYAGEUR">Voyageur (Réductions & Base)</option>
@@ -967,6 +946,30 @@ const Guichet = () => {
                             )}
                         </div>
 
+                        {/* SECTION 5: Sièges */}
+                        {selectedCategory !== 'EXPEDITION' ? (
+                            <div className="form-section">
+                                <h3>Sélection du Siège *</h3>
+                                <div className="seat-grid-container" style={{ opacity: (activeLigne && !canProceed) ? 0.5 : 1, pointerEvents: (activeLigne && !canProceed) ? 'none' : 'auto' }}>
+                                    <div className="seat-grid">
+                                        {renderSeats()}
+                                    </div>
+                                    <div className="seat-legend">
+                                        <div><span className="box available"></span> Disponible</div>
+                                        <div><span className="box occupied"></span> Occupé</div>
+                                        <div><span className="box selected"></span> Sélectionné</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="form-section">
+                                <h3>Sélection du Siège</h3>
+                                <div className="info-bar bg-blue-light" style={{ marginBottom: 0 }}>
+                                    Pour une expédition, la sélection de siège n'est pas nécessaire. Le colis sera placé dans la soute.
+                                </div>
+                            </div>
+                        )}
+
                     </div>
 
                     {/* Right Panel: Résumé */}
@@ -995,7 +998,7 @@ const Guichet = () => {
                                 </div>
                                 <div className="row">
                                     <span>Siège:</span>
-                                    <strong>{selectedSeat || '-'}</strong>
+                                    <strong>{selectedCategory === 'EXPEDITION' ? 'Soute' : (selectedSeat || '-')}</strong>
                                 </div>
                                 <div className="row">
                                     <span>Départ:</span>
@@ -1045,13 +1048,37 @@ const Guichet = () => {
                                 <h2>{calculatedTotal.toFixed(3)} TND</h2>
                             </div>
 
-                            <button
-                                className="print-btn"
-                                disabled={!selectedSeat || !selectedLigne || !arretDepart || !arretArrivee || calculatedTotal <= 0}
-                                onClick={handlePrint}
-                            >
-                                <Printer size={18} /> {mode === 'Réservations' ? 'Confirmer Réservation' : 'Imprimer le Ticket'}
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                <button
+                                    className="print-btn"
+                                    style={{ flex: 1, margin: 0 }}
+                                    disabled={(!selectedSeat && selectedCategory !== 'EXPEDITION') || !selectedLigne || !arretDepart || !arretArrivee || calculatedTotal <= 0}
+                                    onClick={handlePrint}
+                                >
+                                    <Printer size={18} /> {mode === 'Réservations' ? 'Confirmer Réservation' : 'Imprimer le Ticket'}
+                                </button>
+                                <button
+                                    className="print-btn"
+                                    style={{ flex: 1, margin: 0, background: '#e2e8f0', color: '#475569', boxShadow: 'none' }}
+                                    onClick={() => {
+                                        setSelectedLigne('');
+                                        setHoraire('');
+                                        setSelectedBus('');
+                                        setSelectedSeat(null);
+                                        setArretDepart('');
+                                        setArretArrivee('');
+                                        setSelectedBagageId('');
+                                        setSelectedCategory('VOYAGEUR');
+                                        setDateVoyage('');
+                                        const defaultTarif = tarifsDb.find(t => t.actif && t.categorie === 'VOYAGEUR');
+                                        if (defaultTarif) setSelectedTarifId(defaultTarif.id_type_tarification);
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#dc2626'; e.currentTarget.style.color = 'white'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+                                >
+                                    Annuler
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1080,7 +1107,7 @@ const Guichet = () => {
 
                         <h2 className="t-price">{parseFloat(reprintTicket.prix).toFixed(3)} TND</h2>
 
-                        <div className="t-qr" style={{ margin: '20px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', margin: '20px 0' }}>
                             <QRCode value={reprintTicket.qr_code} size={120} level="H" />
                         </div>
                         <p className="t-footer">Agent: {agentInfo.prenom} {agentInfo.nom}<br />Réimpression - Bon voyage !</p>
@@ -1100,7 +1127,7 @@ const Guichet = () => {
                             <span>Arrivée:</span><strong>{arretArrivee}</strong>
                             <span>Date:</span><strong>{typeof dateVoyage === 'string' ? dateVoyage.split('-').reverse().join('/') : ''}</strong>
                             <span>Heure:</span><strong>{getLocalTime(horaire)}</strong>
-                            <span>Siège:</span><strong>{selectedSeat}</strong>
+                            <span>Siège:</span><strong>{selectedCategory === 'EXPEDITION' ? 'Soute' : selectedSeat}</strong>
                             <span>Bus:</span><strong>N° {selectedBus}</strong>
                             <span>Distance:</span><strong>{distance.toFixed(0)} km</strong>
                             <span>Type Tarif:</span><strong>{currentTarif ? currentTarif.libelle : '-'}</strong>
@@ -1132,7 +1159,7 @@ const Guichet = () => {
 
                         <h2 className="t-price" style={{ marginTop: '5px' }}>{calculatedTotal.toFixed(3)} TND</h2>
 
-                        <div className="t-qr" style={{ margin: '15px auto', textAlign: 'center', background: 'white', padding: '10px', display: 'inline-block' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0' }}>
                             <QRCode
                                 value={qrDataString}
                                 size={120}
