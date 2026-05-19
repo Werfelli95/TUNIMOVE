@@ -58,6 +58,7 @@ export default function ReceveurDashboard() {
   const [busDetails, setBusDetails] = useState<any>(null);
   const [loadingSvc, setLoadingSvc] = useState(true);
   const [closing, setClosing] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const userId = params.userId as string;
@@ -151,34 +152,29 @@ export default function ReceveurDashboard() {
       Alert.alert('Service inactif', 'Il n\'y a pas de service actif.');
       return;
     }
-    router.push({ pathname: '/(receveur)/manifeste', params: { ...navParams, service_id: String(activeService.id_service) } });
+    router.push({ pathname: '/(receveur)/manifeste', params: { ...navParams, service_id: String(activeService.id_service), station_actuelle: activeService.station_actuelle || displayDepart } });
   };
   
   const handleCloseService = () => {
     if (!activeService) return;
-    const proceed = async () => {
-      setClosing(true);
-      try {
-        await axios.post(`${RECEVEUR_SERVICE_API}/${activeService.id_service}/close`, {});
-        setActiveService(null);
-        Alert.alert('Succès', 'Mission clôturée avec succès.', [
-          { text: 'OK', onPress: () => router.replace('/') }
-        ]);
-        if (Platform.OS === 'web') router.replace('/');
-      } catch (e: any) {
-        Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
-      } finally {
-        setClosing(false);
-      }
-    };
+    setShowCloseModal(true);
+  };
 
-    if (Platform.OS === 'web') {
-      if (confirm('Voulez-vous vraiment terminer cette mission ?')) proceed();
-    } else {
-      Alert.alert('Clôturer le service', 'Voulez-vous terminer cette mission ?', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Clôturer', style: 'destructive', onPress: proceed }
+  const proceedCloseService = async () => {
+    if (!activeService) return;
+    setClosing(true);
+    try {
+      await axios.post(`${RECEVEUR_SERVICE_API}/${activeService.id_service}/close`, {});
+      setActiveService(null);
+      setShowCloseModal(false);
+      Alert.alert('Succès', 'Mission clôturée avec succès.', [
+        { text: 'OK', onPress: () => router.replace('/') }
       ]);
+      if (Platform.OS === 'web') router.replace('/');
+    } catch (e: any) {
+      Alert.alert('Erreur', e.response?.data?.message ?? 'Impossible de clôturer');
+    } finally {
+      setClosing(false);
     }
   };
 
@@ -328,6 +324,73 @@ export default function ReceveurDashboard() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Modal visible={showCloseModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIconWrap, { backgroundColor: Colors.primary + '12' }]}>
+                <Square color={Colors.primary} size={24} strokeWidth={2.5} />
+              </View>
+              <View>
+                <Text style={styles.modalTitle}>Fiche de fin service</Text>
+                <Text style={styles.modalSub}>Vérifiez votre rapport de mission</Text>
+              </View>
+            </View>
+            
+            <View style={styles.ficheContainer}>
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Bus N°</Text>
+                <Text style={styles.ficheValue}>{currentBus}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Ligne</Text>
+                <Text style={styles.ficheValue}>{displayLigne}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Trajet</Text>
+                <Text style={styles.ficheValue} numberOfLines={1}>{displayDepart} - {displayArrivee}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Durée</Text>
+                <Text style={styles.ficheValue}>{elapsedLabel}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Billets vendus</Text>
+                <Text style={styles.ficheValue}>{activeService?.nb_tickets || 0}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Recette totale</Text>
+                <Text style={[styles.ficheValue, { color: Colors.success, fontWeight: '900' }]}>
+                  {activeService ? parseFloat(String(activeService.recette)).toFixed(3) : '0.000'} TND
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12, marginTop: Spacing.xl }}>
+              <TouchableOpacity 
+                style={[styles.modalSubmit, closing && styles.modalSubmitDisabled]} 
+                onPress={proceedCloseService} 
+                disabled={closing}
+              >
+                {closing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.modalSubmitText}>Clôturer le service</Text>}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalCancel} 
+                onPress={() => setShowCloseModal(false)}
+                disabled={closing}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -401,4 +464,9 @@ const styles = StyleSheet.create({
   modalCancel: { height: 50, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
   modalCancelText: { fontSize: 15, fontWeight: '800', color: Colors.textMuted },
   busErrorText: { color: Colors.danger, fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: Spacing.md },
+  ficheContainer: { backgroundColor: Colors.bgLight, borderRadius: Radius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.bgMid },
+  ficheRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
+  ficheDivider: { height: 1, backgroundColor: Colors.border },
+  ficheLabel: { fontSize: 14, color: Colors.textMuted, fontWeight: '700' },
+  ficheValue: { fontSize: 16, color: Colors.textDark, fontWeight: '800', maxWidth: '60%', textAlign: 'right' },
 });

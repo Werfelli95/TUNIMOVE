@@ -102,7 +102,7 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.brandTitle}>TUNIMOVE <Text style={styles.brandAccent}>FIELD</Text></Text>
               <View style={styles.brandLine} />
-              <Text style={styles.brandSubtitle}>GESTION DU RÉSEAU SNTRI</Text>
+              <Text style={styles.brandSubtitle}>GESTION DU RÉSEAU</Text>
             </View>
 
             {/* ── Role Selection (Premium Horizontal Cards) ── */}
@@ -202,7 +202,7 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <Text style={styles.footer}>© 2026 SNTRI · UNITÉ DE GESTION DIGITALE</Text>
+            <Text style={styles.footer}>© 2026 · UNITÉ DE GESTION DIGITALE</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -239,7 +239,7 @@ export default function LoginScreen() {
                 <Mail color={Colors.textMuted} size={18} />
                 <TextInput 
                   style={styles.modalTextInput} 
-                  placeholder="agent@sntri.com.tn" 
+                  placeholder="agent@tunimove.com.tn" 
                   keyboardType="email-address" 
                   autoCapitalize="none"
                   value={forgotEmail}

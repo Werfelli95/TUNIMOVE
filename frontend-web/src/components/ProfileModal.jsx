@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, Hash, Mail, Phone, Shield, UserCircle, Edit2, Check, RotateCcw } from 'lucide-react';
+import { showAlert } from '../utils/alert';
 
 const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true, onUpdate }) => {
 
@@ -94,11 +95,11 @@ const ProfileModal = ({ isOpen, onClose, userId, canEditNames = true, onUpdate }
                 setIsEditing(false);
                 setSelectedImage(null);
                 if (onUpdate) onUpdate(updated.user);
-                alert("Profil mis à jour !");
+                showAlert("Succès", "Profil mis à jour avec succès !", "success");
 
             } else {
 
-                alert("Erreur lors de la mise à jour");
+                showAlert("Erreur", "Erreur lors de la mise à jour", "error");
             }
         } catch (error) {
             console.error("Erreur save:", error);

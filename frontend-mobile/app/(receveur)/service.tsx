@@ -57,7 +57,13 @@ export default function ServiceScreen() {
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   });
   const [isReversed, setIsReversed] = useState(params.isReversed === 'true');
-  const [showPicker, setShowPicker] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: () => void;
+  }>({ visible: false, title: '', message: '', confirmText: 'Confirmer', onConfirm: () => {} });
 
   const load = async () => {
     if (!numero_bus) { setLoading(false); return; }
@@ -153,14 +159,13 @@ export default function ServiceScreen() {
       } finally { setStarting(false); }
     };
 
-    if (Platform.OS === 'web') {
-      if (confirm(msg)) proceed();
-    } else {
-      Alert.alert('🚌 Démarrer le service', msg, [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Démarrer', onPress: proceed }
-      ]);
-    }
+    setConfirmModal({
+      visible: true,
+      title: '🚌 Démarrer le service',
+      message: msg,
+      confirmText: 'Démarrer',
+      onConfirm: proceed
+    });
   };
 
   const handleAvancer = () => {
@@ -182,14 +187,13 @@ export default function ServiceScreen() {
       } finally { setAdv(false); }
     };
 
-    if (Platform.OS === 'web') {
-      if (confirm(`${title}\n\n${msg}`)) proceed();
-    } else {
-      Alert.alert(title, msg, [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: proceed }
-      ]);
-    }
+    setConfirmModal({
+      visible: true,
+      title: title,
+      message: msg,
+      confirmText: 'Confirmer',
+      onConfirm: proceed
+    });
   };
 
   const handleStartReturn = async () => {
@@ -438,26 +442,10 @@ export default function ServiceScreen() {
 
               <View style={styles.pickerSection}>
                 <Text style={styles.pickerLabel}>HORAIRE DE DÉPART</Text>
-                <TouchableOpacity style={styles.timePicker} onPress={() => setShowPicker(!showPicker)}>
+                <View style={styles.timePicker}>
                   <Clock color={Colors.primary} size={20} strokeWidth={2.5} />
-                  <Text style={styles.timeValue}>{selHoraire || 'Choisir l\'horaire'}</Text>
-                  <ChevronDown color={Colors.textMuted} size={20} />
-                </TouchableOpacity>
-                
-                {showPicker && (
-                  <View style={styles.timeDropdown}>
-                    {horaires.map(h => (
-                      <TouchableOpacity 
-                        key={h} 
-                        style={[styles.timeItem, selHoraire === h && styles.timeItemActive]}
-                        onPress={() => { setSelHoraire(h); setShowPicker(false); }}
-                      >
-                        <Text style={[styles.timeItemText, selHoraire === h && styles.timeItemTextActive]}>{h}</Text>
-                        {selHoraire === h && <CheckCircle color={Colors.primary} size={16} />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                  <Text style={styles.timeValue}>{selHoraire}</Text>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -467,13 +455,51 @@ export default function ServiceScreen() {
               >
                 {starting 
                   ? <ActivityIndicator color={Colors.primary} />
-                  : <><Play color={Colors.primary} size={24} strokeWidth={3} /><Text style={styles.startBtnText}>Démarrer la mission</Text></>
+                  : <><Play color={Colors.primary} size={24} strokeWidth={3} /><Text style={styles.startBtnText}>Démarrer le service</Text></>
                 }
               </TouchableOpacity>
             </View>
           </>
         )}
       </ScrollView>
+
+      {/* ── Custom Professional Confirm Modal ── */}
+      <Modal
+        visible={confirmModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconWrap}>
+                <AlertTriangle color={Colors.warning} size={28} strokeWidth={2.5} />
+              </View>
+              <Text style={styles.modalTitle}>{confirmModal.title}</Text>
+            </View>
+            <Text style={styles.modalMessage}>{confirmModal.message}</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalBtnCancel} 
+                onPress={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
+              >
+                <Text style={styles.modalBtnCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalBtnConfirm} 
+                onPress={() => {
+                  setConfirmModal(prev => ({ ...prev, visible: false }));
+                  confirmModal.onConfirm();
+                }}
+              >
+                <Text style={styles.modalBtnConfirmText}>{confirmModal.confirmText}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -606,4 +632,77 @@ const styles = StyleSheet.create({
   },
   startBtnText: { fontSize: 20, fontWeight: '900', color: Colors.primary, letterSpacing: 0.5 },
   btnDis: { opacity: 0.6 },
+
+  // Custom Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    ...Shadow.strong,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.warning + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: Colors.textDark,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: Colors.textMid,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: 24,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.bgMid,
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    color: Colors.textDark,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  modalBtnConfirmText: {
+    color: Colors.white,
+    fontWeight: '800',
+    fontSize: 16,
+  },
 });

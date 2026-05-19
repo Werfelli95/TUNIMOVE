@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { CircleDollarSign, Calculator, Save, Info, Plus, Percent, CheckCircle, XCircle, TrendingUp, Briefcase, Package, ArrowRight, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './Tarifs.css';
 
@@ -103,7 +103,7 @@ const Tarifs = () => {
     const handleSubmitTarif = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const url = isEdit 
+        const url = isEdit
             ? `http://localhost:5000/api/tarification/${formData.id_type_tarification}`
             : 'http://localhost:5000/api/tarification';
         const method = isEdit ? 'PUT' : 'POST';
@@ -140,7 +140,7 @@ const Tarifs = () => {
     const handleSubmitBagage = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const url = isEditBagage 
+        const url = isEditBagage
             ? `http://localhost:5000/api/tarification/bagages/${bagageFormData.id_type_bagage}`
             : 'http://localhost:5000/api/tarification/bagages';
         const method = isEditBagage ? 'PUT' : 'POST';
@@ -184,6 +184,46 @@ const Tarifs = () => {
             });
             fetchData();
         } catch (err) { console.error(err); }
+    };
+
+    const handleDeleteBagage = async (id) => {
+        const isConfirmed = window.confirm("Voulez-vous vraiment supprimer cette règle de bagage ?");
+        if (!isConfirmed) return;
+        try {
+            const res = await fetch(`http://localhost:5000/api/tarification/bagages/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                fetchData();
+                setMessage('✅ Règle supprimée !');
+                setTimeout(() => setMessage(''), 3000);
+            } else {
+                const err = await res.json();
+                alert(err.message || "Erreur de suppression");
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleDeleteTarification = async (id) => {
+        const isConfirmed = window.confirm("Voulez-vous vraiment supprimer ce type de tarif ?");
+        if (!isConfirmed) return;
+        try {
+            const res = await fetch(`http://localhost:5000/api/tarification/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                fetchData();
+                setMessage('✅ Tarif supprimé !');
+                setTimeout(() => setMessage(''), 3000);
+            } else {
+                const err = await res.json();
+                alert(err.message || "Erreur de suppression");
+            }
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     // Animation variants
@@ -264,12 +304,6 @@ const Tarifs = () => {
                         </div>
                         <div className="formula-body">
                             Prix Final = (Distance × <span className="formula-highlight">{config.prix_par_km}</span>) + <span className="formula-highlight">{config.frais_fixes}</span>
-                        </div>
-                        <div className="formula-example">
-                            <Info size={16} className="text-sky-500" />
-                            <span>
-                                Simulation : Un trajet de <b>100 km</b> sera facturé <b className="text-indigo-600">{(100 * config.prix_par_km + parseFloat(config.frais_fixes)).toFixed(3)} TND</b>
-                            </span>
                         </div>
                     </div>
 
@@ -415,16 +449,30 @@ const Tarifs = () => {
                                                             </div>
                                                         </td>
                                                         <td className="text-center">
-                                                            <button 
-                                                                className="btn-action-premium" 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (hasMultiple) toggleGroup(group.key);
-                                                                    else openEditModal(group.items[0]);
-                                                                }}
-                                                            >
-                                                                {hasMultiple ? (isExpanded ? 'Fermer' : 'Gérer') : 'Éditer'}
-                                                            </button>
+                                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                                                <button
+                                                                    className="btn-action-premium"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (hasMultiple) toggleGroup(group.key);
+                                                                        else openEditModal(group.items[0]);
+                                                                    }}
+                                                                >
+                                                                    {hasMultiple ? (isExpanded ? 'Fermer' : 'Gérer') : 'Éditer'}
+                                                                </button>
+                                                                {!hasMultiple && (
+                                                                    <button
+                                                                        className="btn-action-premium"
+                                                                        style={{ background: '#ef4444', borderColor: '#ef4444' }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteTarification(group.items[0].id_type_tarification);
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 size={14} style={{ color: 'white' }} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </motion.tr>
 
@@ -456,12 +504,20 @@ const Tarifs = () => {
                                                                                             <span className="text-[10px] font-bold text-slate-400">{item.categorie}</span>
                                                                                         </td>
                                                                                         <td className="py-2 text-center">
-                                                                                            <button 
-                                                                                                className="text-indigo-600 font-bold hover:underline"
-                                                                                                onClick={() => openEditModal(item)}
-                                                                                            >
-                                                                                                Éditer
-                                                                                            </button>
+                                                                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                                                                                <button
+                                                                                                    className="text-indigo-600 font-bold hover:underline"
+                                                                                                    onClick={() => openEditModal(item)}
+                                                                                                >
+                                                                                                    Éditer
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    className="text-red-600 font-bold hover:underline"
+                                                                                                    onClick={() => handleDeleteTarification(item.id_type_tarification)}
+                                                                                                >
+                                                                                                    Supprimer
+                                                                                                </button>
+                                                                                            </div>
                                                                                         </td>
                                                                                     </tr>
                                                                                 ))}
@@ -533,12 +589,21 @@ const Tarifs = () => {
                                             </div>
                                         </td>
                                         <td className="text-center">
-                                            <button 
-                                                className="btn-action-premium"
-                                                onClick={() => openEditBagageModal(b)}
-                                            >
-                                                Paramétrer
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                                <button
+                                                    className="btn-action-premium"
+                                                    onClick={() => openEditBagageModal(b)}
+                                                >
+                                                    Paramétrer
+                                                </button>
+                                                <button
+                                                    className="btn-action-premium"
+                                                    style={{ background: '#ef4444', borderColor: '#ef4444' }}
+                                                    onClick={() => handleDeleteBagage(b.id_type_bagage)}
+                                                >
+                                                    <Trash2 size={14} style={{ color: 'white' }} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 ))}
@@ -558,7 +623,7 @@ const Tarifs = () => {
             <AnimatePresence>
                 {showModal && (
                     <div className="modal-overlay-premium">
-                        <motion.div 
+                        <motion.div
                             className="modal-content-premium"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -572,22 +637,22 @@ const Tarifs = () => {
                             <form onSubmit={handleSubmitTarif} className="modal-form">
                                 <div className="form-group">
                                     <label>Code (ex: RED_25, PLEIN)</label>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        value={formData.code} 
-                                        onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})}
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.code}
+                                        onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                                         placeholder="CODE_UNIQUE"
                                     />
                                 </div>
 
                                 <div className="form-group">
                                     <label>Libellé / Désignation</label>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        value={formData.libelle} 
-                                        onChange={e => setFormData({...formData, libelle: e.target.value})}
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.libelle}
+                                        onChange={e => setFormData({ ...formData, libelle: e.target.value })}
                                         placeholder="Ex: 25% Réduction Étudiant"
                                     />
                                 </div>
@@ -595,9 +660,9 @@ const Tarifs = () => {
                                 <div className="form-grid">
                                     <div className="form-group">
                                         <label>Catégorie</label>
-                                        <select 
-                                            value={formData.categorie} 
-                                            onChange={e => setFormData({...formData, categorie: e.target.value})}
+                                        <select
+                                            value={formData.categorie}
+                                            onChange={e => setFormData({ ...formData, categorie: e.target.value })}
                                         >
                                             <option value="VOYAGEUR">VOYAGEUR</option>
                                             <option value="CONVENTION">CONVENTION</option>
@@ -606,9 +671,9 @@ const Tarifs = () => {
                                     </div>
                                     <div className="form-group">
                                         <label>Mode de calcul</label>
-                                        <select 
-                                            value={formData.mode_calcul} 
-                                            onChange={e => setFormData({...formData, mode_calcul: e.target.value})}
+                                        <select
+                                            value={formData.mode_calcul}
+                                            onChange={e => setFormData({ ...formData, mode_calcul: e.target.value })}
                                         >
                                             <option value="PERCENT_RESTANT">% Restant à payer</option>
                                             <option value="FIXE">Forfait Fixe (TND)</option>
@@ -618,16 +683,16 @@ const Tarifs = () => {
 
                                 <div className="form-group">
                                     <label>Valeur ({formData.mode_calcul === 'PERCENT_RESTANT' ? '%' : 'Millimes'})</label>
-                                    <input 
-                                        type="number" 
-                                        required 
-                                        value={formData.valeur} 
-                                        onChange={e => setFormData({...formData, valeur: e.target.value})}
+                                    <input
+                                        type="number"
+                                        required
+                                        value={formData.valeur}
+                                        onChange={e => setFormData({ ...formData, valeur: e.target.value })}
                                         placeholder={formData.mode_calcul === 'PERCENT_RESTANT' ? "75 pour payer 75%" : "3000 pour 3 DT"}
                                     />
                                     <p className="form-hint">
-                                        {formData.mode_calcul === 'PERCENT_RESTANT' 
-                                            ? "Entrez le pourcentage du prix final (ex: 75 pour 25% de réduction)" 
+                                        {formData.mode_calcul === 'PERCENT_RESTANT'
+                                            ? "Entrez le pourcentage du prix final (ex: 75 pour 25% de réduction)"
                                             : "Entrez la valeur en millimes (ex: 5000 pour 5 TND)"}
                                     </p>
                                 </div>
@@ -648,7 +713,7 @@ const Tarifs = () => {
             <AnimatePresence>
                 {showBagageModal && (
                     <div className="modal-overlay-premium">
-                        <motion.div 
+                        <motion.div
                             className="modal-content-premium"
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -662,33 +727,33 @@ const Tarifs = () => {
                             <form onSubmit={handleSubmitBagage} className="modal-form">
                                 <div className="form-group">
                                     <label>Code Flux (ex: BAG_30)</label>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        value={bagageFormData.code} 
-                                        onChange={e => setBagageFormData({...bagageFormData, code: e.target.value.toUpperCase()})}
+                                    <input
+                                        type="text"
+                                        required
+                                        value={bagageFormData.code}
+                                        onChange={e => setBagageFormData({ ...bagageFormData, code: e.target.value.toUpperCase() })}
                                         placeholder="BAG_CODE"
                                     />
                                 </div>
 
                                 <div className="form-group">
                                     <label>Description du Bagage</label>
-                                    <input 
-                                        type="text" 
-                                        required 
-                                        value={bagageFormData.libelle} 
-                                        onChange={e => setBagageFormData({...bagageFormData, libelle: e.target.value})}
+                                    <input
+                                        type="text"
+                                        required
+                                        value={bagageFormData.libelle}
+                                        onChange={e => setBagageFormData({ ...bagageFormData, libelle: e.target.value })}
                                         placeholder="Ex: Bagage volumineux > 30kg"
                                     />
                                 </div>
 
                                 <div className="form-group">
                                     <label>Tarif Additionnel (Millimes)</label>
-                                    <input 
-                                        type="number" 
-                                        required 
-                                        value={bagageFormData.prix} 
-                                        onChange={e => setBagageFormData({...bagageFormData, prix: e.target.value})}
+                                    <input
+                                        type="number"
+                                        required
+                                        value={bagageFormData.prix}
+                                        onChange={e => setBagageFormData({ ...bagageFormData, prix: e.target.value })}
                                         placeholder="Ex: 2000 pour 2 DT"
                                     />
                                     <p className="form-hint">Entrez la valeur en millimes (ex: 1500 pour 1.500 TND)</p>

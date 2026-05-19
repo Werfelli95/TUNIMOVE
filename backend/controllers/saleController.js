@@ -153,23 +153,37 @@ exports.getOccupiedSeats = async (req, res) => {
         }
         
         const getDist = (arr) => {
+            if (!arr) return null;
             const st = stationsList.find(s => s.arret.toLowerCase() === arr.toLowerCase());
-            return st ? st.distance_km : null;
+            return st ? parseFloat(st.distance_km) : null;
         };
 
-        const reqStart = getDist(depart || '');
-        const reqEnd = getDist(arrivee || '');
+        const reqStart = getDist(depart);
+        const reqEnd = getDist(arrivee);
 
-        const query = `
-            SELECT t.siege, t.station_depart, t.station_arrivee 
-            FROM ticket t 
-            WHERE t.id_bus = (
-                SELECT id_bus FROM bus 
-                WHERE num_ligne = $1 AND horaire_affecte::text LIKE $3 || '%'
-                LIMIT 1
-            ) AND t.date_voyage = $2
-        `;
-        const result = await db.query(query, [num_ligne, date, heure]);
+        // Recherche directe par num_ligne + date_voyage + heure_depart
+        // (plus fiable que passer par bus.horaire_affecte qui peut ne rien retourner)
+        let query;
+        let params;
+        if (heure) {
+            query = `
+                SELECT t.siege, t.station_depart, t.station_arrivee 
+                FROM ticket t 
+                WHERE t.num_ligne::text = $1
+                  AND t.date_voyage::date = $2::date
+                  AND t.heure_depart::text LIKE $3 || '%'
+            `;
+            params = [String(num_ligne), date, String(heure).substring(0, 5)];
+        } else {
+            query = `
+                SELECT t.siege, t.station_depart, t.station_arrivee 
+                FROM ticket t 
+                WHERE t.num_ligne::text = $1
+                  AND t.date_voyage::date = $2::date
+            `;
+            params = [String(num_ligne), date];
+        }
+        const result = await db.query(query, params);
         
         const occupied = [];
         
@@ -272,10 +286,22 @@ exports.getPassengerStats = async (req, res) => {
     }
 };
 
-// Récupérer les ventes du jour pour un agent spécifique
 exports.getAgentDailySales = async (req, res) => {
     const { agentId } = req.params;
     try {
+        // 1. Vérifier si le service a déjà été clôturé aujourd'hui
+        const checkClosed = await db.query(`
+            SELECT id_fiche FROM fiche_cloture_service
+            WHERE id_responsable_cloture = $1
+              AND heure_cloture::date = CURRENT_DATE
+              AND id_service IS NULL
+        `, [agentId]);
+
+        if (checkClosed.rows.length > 0) {
+            // Si clôturé, on renvoie une liste vide pour ne plus rien afficher
+            return res.json([]);
+        }
+
         const query = `
             SELECT 
                 t.id_ticket,

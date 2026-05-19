@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  Animated, Dimensions, Image, TouchableWithoutFeedback,
+  Animated, Dimensions, Image, TouchableWithoutFeedback, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { User, LogOut, X, ChevronRight, Shield, Bus, TrendingUp, Search } from 'lucide-react-native';
@@ -110,7 +110,7 @@ export default function SideDrawer({
           </View>
 
           {/* ── Immersive Menu ── */}
-          <View style={styles.menuContainer}>
+          <ScrollView style={styles.menuContainer} contentContainerStyle={styles.menuContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.sectionTitle}>Opérations</Text>
 
             <TouchableOpacity style={styles.menuItem} onPress={goProfile} activeOpacity={0.7}>
@@ -171,7 +171,7 @@ export default function SideDrawer({
                 <ChevronRight color={Colors.danger} size={18} strokeWidth={2} />
               </TouchableOpacity>
             )}
-          </View>
+          </ScrollView>
 
           {/* ── Premium Footer ── */}
           <View style={styles.footer}>
@@ -179,7 +179,7 @@ export default function SideDrawer({
               <LogOut color={Colors.danger} size={20} strokeWidth={2.5} />
               <Text style={styles.logoutText}>Déconnexion</Text>
             </TouchableOpacity>
-            <Text style={styles.copyright}>TuniMove Field v2.1.0 · SNTRI</Text>
+            <Text style={styles.copyright}>TuniMove Field v2.1.0</Text>
           </View>
 
         </SafeAreaView>
@@ -249,7 +249,8 @@ const styles = StyleSheet.create({
   roleText: { fontSize: 12, fontWeight: '900', color: Colors.white, textTransform: 'uppercase', letterSpacing: 1 },
 
   // Menu
-  menuContainer: { flex: 1, padding: Spacing.xl, paddingTop: Spacing.xxl },
+  menuContainer: { flex: 1 },
+  menuContent: { padding: Spacing.xl, paddingTop: Spacing.xxl, paddingBottom: Spacing.xl },
   sectionTitle: {
     fontSize: 11, fontWeight: '900', color: Colors.textLight,
     letterSpacing: 2, textTransform: 'uppercase',

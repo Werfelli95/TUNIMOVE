@@ -13,4 +13,7 @@ router.put('/:id/toggle', tarificationController.toggleTarification);
 router.put('/bagages/:id', tarificationController.updateBagage);
 router.put('/bagages/:id/toggle', tarificationController.toggleBagage);
 
+router.delete('/:id', tarificationController.deleteTarification);
+router.delete('/bagages/:id', tarificationController.deleteBagage);
+
 module.exports = router;

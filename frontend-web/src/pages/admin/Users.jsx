@@ -5,6 +5,7 @@ import {
   ShieldCheck, User, Users as UsersIcon, Store, Eye,
   Mail, Phone, Hash, ChevronRight, Printer
 } from 'lucide-react';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './Users.css';
 
 /* ─── Role config ─────────────────────────────────────────── */
@@ -170,7 +171,7 @@ const Users = () => {
         const updated = await response.json();
         setUsers(prev => prev.map(u => u.id_utilisateur === selectedUser.id_utilisateur ? updated.user : u));
         handleCloseModal();
-        alert("Utilisateur mis à jour avec succès !");
+        showAlert("Succès", "Utilisateur mis à jour avec succès !", "success");
       } else {
         const data = await response.json();
         setFormError(data.message || "Erreur lors de la mise à jour");
@@ -183,19 +184,29 @@ const Users = () => {
   };
 
   const handleDeleteUser = async (id_utilisateur) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.')) return;
+    const isConfirmed = await showConfirm(
+      "Supprimer l'utilisateur",
+      "Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.",
+      "Oui, Supprimer"
+    );
+    if (!isConfirmed) return;
     try {
       await fetch(`http://localhost:5000/api/users/${id_utilisateur}`, { method: 'DELETE' });
       setUsers(prev => prev.filter(u => u.id_utilisateur !== id_utilisateur));
       if (selectedUser?.id_utilisateur === id_utilisateur) setSelectedUser(null);
     } catch (err) {
-      alert(err.message);
+      showAlert("Erreur", err.message, "error");
     }
   };
 
   const handleToggleBlock = async (id_utilisateur, estBloqueActuellement) => {
     const action = estBloqueActuellement ? 'débloquer' : 'bloquer';
-    if (!window.confirm(`Êtes-vous sûr de vouloir ${action} cet utilisateur ?`)) return;
+    const isConfirmed = await showConfirm(
+      `${estBloqueActuellement ? 'Débloquer' : 'Bloquer'} l'utilisateur`,
+      `Êtes-vous sûr de vouloir ${action} cet utilisateur ?`,
+      `Oui, ${estBloqueActuellement ? 'Débloquer' : 'Bloquer'}`
+    );
+    if (!isConfirmed) return;
     try {
       const response = await fetch(`http://localhost:5000/api/users/${id_utilisateur}/block`, { method: 'PUT' });
       if (!response.ok) {
@@ -204,7 +215,7 @@ const Users = () => {
       }
       setUsers(prev => prev.map(u => u.id_utilisateur === id_utilisateur ? { ...u, est_bloque: !estBloqueActuellement } : u));
       if (selectedUser?.id_utilisateur === id_utilisateur) setSelectedUser(prev => ({ ...prev, est_bloque: !estBloqueActuellement }));
-    } catch (err) { alert(err.message); }
+    } catch (err) { showAlert("Erreur", err.message, "error"); }
   };
 
   const fetchUsers = async () => {

@@ -102,3 +102,25 @@ exports.toggleBagage = async (req, res) => {
         res.status(500).json({ message: 'Erreur modification statut' });
     }
 };
+
+exports.deleteTarification = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM type_tarification WHERE id_type_tarification = $1', [id]);
+        res.json({ message: 'Tarification supprimée' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erreur lors de la suppression de la tarification' });
+    }
+};
+
+exports.deleteBagage = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM type_bagage WHERE id_type_bagage = $1', [id]);
+        res.json({ message: 'Bagage supprimé' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Erreur lors de la suppression du bagage' });
+    }
+};

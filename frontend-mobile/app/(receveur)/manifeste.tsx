@@ -44,6 +44,7 @@ export default function ManifesteScreen() {
   const num_ligne = params.num_ligne as string;
   const nom = params.nom as string;
   const prenom = params.prenom as string;
+  const station_actuelle = params.station_actuelle as string;
 
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [filtered, setFiltered] = useState<TicketItem[]>([]);
@@ -57,8 +58,14 @@ export default function ManifesteScreen() {
         ? `${RECEVEUR_SERVICE_API}/${service_id}/tickets`
         : `${SALES_API}/bus/${encodeURIComponent(numero_bus)}/manifeste`;
       const res = await axios.get<TicketItem[]>(url);
-      setTickets(res.data);
-      setFiltered(res.data);
+      
+      let fetchedTickets = res.data;
+      if (station_actuelle) {
+        fetchedTickets = fetchedTickets.filter(t => t.station_depart === station_actuelle);
+      }
+
+      setTickets(fetchedTickets);
+      setFiltered(fetchedTickets);
     } catch {
       setTickets([]);
       setFiltered([]);
@@ -135,7 +142,7 @@ export default function ManifesteScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Manifeste Voyageurs</Text>
-            <Text style={styles.headerSub}>Bus {numero_bus} · Ligne {num_ligne}</Text>
+            <Text style={styles.headerSub}>Bus {numero_bus} · Station: {station_actuelle || ville_depart}</Text>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={() => { setRefreshing(true); fetchManifeste(); }}>
              <RefreshCw color={Colors.white} size={20} strokeWidth={2.5} />

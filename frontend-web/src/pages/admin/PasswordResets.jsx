@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Mail, CheckCircle, Clock, Trash2, RefreshCw, ShieldAlert, History, CalendarCheck, ArrowRight, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { showConfirm, showAlert } from '../../utils/alert';
 import './PasswordResets.css';
 
 const PasswordResets = () => {
@@ -32,7 +33,12 @@ const PasswordResets = () => {
     }, []);
 
     const handleApprove = async (id_demande) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet utilisateur ? Un mail lui sera envoyé automatiquement.")) return;
+        const isConfirmed = await showConfirm(
+            "Confirmer la réinitialisation",
+            "Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet utilisateur ? Un mail lui sera envoyé automatiquement.",
+            "Oui, Réinitialiser"
+        );
+        if (!isConfirmed) return;
 
         setActionLoading(id_demande);
         try {
@@ -48,7 +54,12 @@ const PasswordResets = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Supprimer cette demande sans la traiter ?")) return;
+        const isConfirmed = await showConfirm(
+            "Supprimer la demande",
+            "Voulez-vous supprimer cette demande sans la traiter ?",
+            "Oui, Supprimer"
+        );
+        if (!isConfirmed) return;
         try {
             await axios.delete(`http://localhost:5000/api/password-reset/${id}`);
             fetchData();

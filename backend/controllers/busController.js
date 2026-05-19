@@ -157,7 +157,7 @@ exports.getTrackingData = async (req, res) => {
             JOIN service s ON b.id_bus = s.id_bus
             JOIN ligne l ON b.num_ligne = l.num_ligne
             LEFT JOIN utilisateur u ON s.id_receveur = u.id_utilisateur
-            WHERE s.statut = 'En cours'
+            WHERE s.statut = 'En cours' AND DATE(s.date_debut) = CURRENT_DATE
             ORDER BY s.date_debut DESC
         `;
         const result = await db.query(query);

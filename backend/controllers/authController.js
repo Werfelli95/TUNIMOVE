@@ -38,6 +38,18 @@ exports.loginAgent = async (req, res) => {
             return res.status(403).json({ message: "Votre compte a été suspendu par un administrateur." });
         }
 
+        // Vérifier si l'agent a déjà clôturé son service aujourd'hui
+        const checkClosed = await db.query(`
+            SELECT id_fiche FROM fiche_cloture_service 
+            WHERE id_responsable_cloture = $1 
+              AND heure_cloture::date = CURRENT_DATE
+              AND id_service IS NULL
+        `, [user.id_utilisateur]);
+
+        if (checkClosed.rows.length > 0) {
+            return res.status(403).json({ message: "Vous avez déjà clôturé votre service pour aujourd'hui." });
+        }
+
         // Vérifier si l'agent est affecté à un guichet
         const guichetResult = await db.query('SELECT id_guichet FROM guichet WHERE id_agent = $1', [user.id_utilisateur]);
         if (guichetResult.rows.length === 0) {
