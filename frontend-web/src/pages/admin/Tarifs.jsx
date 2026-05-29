@@ -460,18 +460,7 @@ const Tarifs = () => {
                                                                 >
                                                                     {hasMultiple ? (isExpanded ? 'Fermer' : 'Gérer') : 'Éditer'}
                                                                 </button>
-                                                                {!hasMultiple && (
-                                                                    <button
-                                                                        className="btn-action-premium"
-                                                                        style={{ background: '#ef4444', borderColor: '#ef4444' }}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteTarification(group.items[0].id_type_tarification);
-                                                                        }}
-                                                                    >
-                                                                        <Trash2 size={14} style={{ color: 'white' }} />
-                                                                    </button>
-                                                                )}
+                                                                
                                                             </div>
                                                         </td>
                                                     </motion.tr>
@@ -511,12 +500,7 @@ const Tarifs = () => {
                                                                                                 >
                                                                                                     Éditer
                                                                                                 </button>
-                                                                                                <button
-                                                                                                    className="text-red-600 font-bold hover:underline"
-                                                                                                    onClick={() => handleDeleteTarification(item.id_type_tarification)}
-                                                                                                >
-                                                                                                    Supprimer
-                                                                                                </button>
+                                                                                                
                                                                                             </div>
                                                                                         </td>
                                                                                     </tr>
@@ -596,13 +580,7 @@ const Tarifs = () => {
                                                 >
                                                     Paramétrer
                                                 </button>
-                                                <button
-                                                    className="btn-action-premium"
-                                                    style={{ background: '#ef4444', borderColor: '#ef4444' }}
-                                                    onClick={() => handleDeleteBagage(b.id_type_bagage)}
-                                                >
-                                                    <Trash2 size={14} style={{ color: 'white' }} />
-                                                </button>
+                                                
                                             </div>
                                         </td>
                                     </motion.tr>

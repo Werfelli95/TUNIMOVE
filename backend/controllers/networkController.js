@@ -48,7 +48,7 @@ exports.createLineWithTrajets = async (req, res) => {
         if (stations && stations.length > 0) {
             for (let st of stations) {
                 if (st.arret) {
-                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne) VALUES ($1, $2, $3, $4)",
+                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne, statut) VALUES ($1, $2, $3, $4, 'Actif')",
                         [st.arret, parseFloat(st.distance_km) || 0, parseInt(st.duree_minutes) || 0, num_ligne]);
                 }
             }
@@ -82,8 +82,8 @@ exports.updateLine = async (req, res) => {
         if (stations && stations.length > 0) {
             for (let st of stations) {
                 if (st.arret) {
-                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne) VALUES ($1, $2, $3, $4)",
-                        [st.arret, parseFloat(st.distance_km) || 0, parseInt(st.duree_minutes) || 0, id]);
+                    await db.query("INSERT INTO trajet (arret, distance_km, duree_minutes, num_ligne, statut) VALUES ($1, $2, $3, $4, $5)",
+                        [st.arret, parseFloat(st.distance_km) || 0, parseInt(st.duree_minutes) || 0, id, st.statut || 'Actif']);
                 }
             }
         }
@@ -132,7 +132,22 @@ exports.deleteLine = async (req, res) => {
     }
 };
 
-// 5. Compter les lignes actives (Dashboard)
+// 5. Basculer le statut actif/inactif d'une station
+exports.toggleStationStatus = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Récupérer le statut actuel
+        const current = await db.query("SELECT statut FROM trajet WHERE id_trajet = $1", [id]);
+        if (current.rows.length === 0) return res.status(404).json({ message: "Station introuvable" });
+        const newStatut = current.rows[0].statut === 'Actif' ? 'Inactif' : 'Actif';
+        await db.query("UPDATE trajet SET statut = $1 WHERE id_trajet = $2", [newStatut, id]);
+        res.json({ message: `Station ${newStatut}`, statut: newStatut });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// 6. Compter les lignes actives (Dashboard)
 exports.getLineCount = async (req, res) => {
     try {
         const result = await db.query("SELECT COUNT(*) FROM ligne WHERE statut_ligne = 'Active'");

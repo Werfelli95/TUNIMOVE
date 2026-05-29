@@ -121,7 +121,7 @@ const AgentLogin = () => {
 
 
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#163A59', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Espace Agent de Guichet</h2>
-                    <p style={{ margin: '0 0 32px', color: '#64748B', fontSize: '0.95rem', lineHeight: 1.5 }}>Accès à la vente directe, aux réservations et à l’historique des tickets.</p>
+                    <p style={{ margin: '0 0 32px', color: '#64748B', fontSize: '0.95rem', lineHeight: 1.5 }}>Accès à la vente, aux réservations et à l’historique des tickets.</p>
 
                     <AnimatePresence>
                         {error && (

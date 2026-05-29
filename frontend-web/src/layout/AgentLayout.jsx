@@ -5,7 +5,7 @@ import ProfileModal from '../components/ProfileModal';
 
 const AgentLayout = () => {
     const navigate = useNavigate();
-    const [mode, setMode] = useState('Vente Directe'); // Vente Directe, Réservations, Historique
+    const [mode, setMode] = useState('Vente'); // Vente, Réservations, Historique
     const [agentInfo, setAgentInfo] = useState({ nom: 'Agent', prenom: '', matricule: '', image_url: null });
     const [guichetNom, setGuichetNom] = useState(null);
 
@@ -162,8 +162,8 @@ const AgentLayout = () => {
                 <nav style={{ flex: 1, padding: '24px 16px' }}>
                     <ul style={{ padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <li style={{ listStyle: 'none' }}>
-                            <button onClick={() => setMode('Vente Directe')} style={getBtnStyle(mode === 'Vente Directe')}>
-                                <Ticket size={20} /> Vente Directe
+                            <button onClick={() => setMode('Vente')} style={getBtnStyle(mode === 'Vente')}>
+                                <Ticket size={20} /> Vente
                             </button>
                         </li>
                         <li style={{ listStyle: 'none' }}>

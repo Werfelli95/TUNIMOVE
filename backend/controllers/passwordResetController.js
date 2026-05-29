@@ -113,7 +113,6 @@ exports.approveReset = async (req, res) => {
                     <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; font-size: 20px; font-family: monospace; text-align: center; margin: 20px 0; color: #111; font-weight: bold;">
                         ${tempPassword}
                     </div>
-                    <p style="color: #6b7280; font-size: 14px;">Nous vous conseillons de le changer dès votre première connexion.</p>
                     <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
                     <p style="font-size: 12px; color: #9ca3af;">Il s'agit d'un e-mail automatique, merci de ne pas y répondre.</p>
                 </div>
