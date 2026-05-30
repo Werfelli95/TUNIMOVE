@@ -41,13 +41,17 @@ exports.createIncident = async (req, res) => {
 exports.getAllIncidents = async (req, res) => {
     try {
         const { statut } = req.query;
-        let query = `SELECT * FROM incident`;
+        let query = `
+            SELECT i.*, l.ville_depart, l.ville_arrivee 
+            FROM incident i
+            LEFT JOIN ligne l ON (CASE WHEN i.ligne ~ '^[0-9]+$' THEN i.ligne::integer = l.num_ligne ELSE FALSE END)
+        `;
         const params = [];
         if (statut && statut !== 'all') {
             params.push(statut);
-            query += ` WHERE statut = $1`;
+            query += ` WHERE i.statut = $1`;
         }
-        query += ` ORDER BY date_incident DESC`;
+        query += ` ORDER BY i.date_incident DESC`;
         const result = await db.query(query, params);
         res.json(result.rows);
     } catch (err) {

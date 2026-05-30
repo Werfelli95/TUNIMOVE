@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Network as NetIcon, MapPin, Clock, Plus, Trash2, X, Edit2,
-    ChevronRight, Search, Loader2, Printer
+    ChevronRight, Search, Loader2, Printer, Power, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { showConfirm, showAlert } from '../../utils/alert';
@@ -88,8 +88,13 @@ const Network = () => {
     };
 
     // Fonctions stations
-    const addStation = () => setFormData({ ...formData, stations: [...formData.stations, { arret: '', distance_km: '', duree_minutes: '' }] });
+    const addStation = () => setFormData({ ...formData, stations: [...formData.stations, { arret: '', distance_km: '', duree_minutes: '', statut: 'Actif' }] });
     const removeStation = (idx) => setFormData({ ...formData, stations: formData.stations.filter((_, i) => i !== idx) });
+    const toggleStationStatut = (idx) => {
+        const newSt = [...formData.stations];
+        newSt[idx].statut = newSt[idx].statut === 'Actif' ? 'Inactif' : 'Actif';
+        setFormData({ ...formData, stations: newSt });
+    };
     const updateSt = (idx, field, val) => {
         const newSt = [...formData.stations];
         newSt[idx][field] = val;
@@ -245,6 +250,7 @@ const Network = () => {
                                                                 <option key={idx} value={st.arret} disabled>
                                                                     {idx + 1}. {st.arret} 
                                                                     {st.distance_km ? ` - ${st.distance_km} km` : ''} 
+                                                                    {st.statut === 'Inactif' ? ' ⛔ Inactif' : ''}
                                                                 </option>
                                                             );
                                                         })}
@@ -283,7 +289,6 @@ const Network = () => {
                                     <td className="actions-col">
                                         <div className="row-actions">
                                             <button className="action-btn btn-edit" onClick={() => handleOpenModal(line)}><Edit2 size={16} /></button>
-                                            <button className="action-btn btn-trash" onClick={() => handleDelete(line.num_ligne)}><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -325,12 +330,28 @@ const Network = () => {
                                     <h3>Stations de passage <span className="st-count">{formData.stations.length}</span></h3>
                                     <div className="st-list">
                                         {formData.stations.map((st, i) => (
-                                            <div key={i} className="st-item">
+                                            <div key={i} className="st-item" style={{ opacity: st.statut === 'Inactif' ? 0.55 : 1, transition: 'opacity 0.2s' }}>
                                                 <span className="st-number">{i + 1}</span>
                                                 <input className="st-name-input" placeholder="Nom station" value={st.arret} onChange={e => updateSt(i, 'arret', e.target.value)} required />
                                                 <div className="st-km" style={{width: '100px'}}><input type="number" placeholder="Km" value={st.distance_km} onChange={e => updateSt(i, 'distance_km', e.target.value)} /><span style={{fontSize: '10px', marginLeft: '4px'}}>km</span></div>
                                                 <div className="st-km" style={{width: '120px'}}><Clock size={14} style={{marginRight: '5px'}} /><input type="number" placeholder="Min" value={st.duree_minutes} onChange={e => updateSt(i, 'duree_minutes', e.target.value)} /><span style={{fontSize: '10px', marginLeft: '4px'}}>min</span></div>
-                                                <button type="button" className="st-remove" onClick={() => removeStation(i)}><Trash2 size={16} /></button>
+                                                {/* Toggle Actif/Inactif */}
+                                                <button
+                                                    type="button"
+                                                    title={st.statut === 'Actif' ? 'Désactiver la station' : 'Activer la station'}
+                                                    onClick={() => toggleStationStatut(i)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                                        padding: '5px 10px', borderRadius: '8px', border: 'none',
+                                                        cursor: 'pointer', fontSize: '11px', fontWeight: 800,
+                                                        background: st.statut === 'Actif' ? '#ecfdf5' : '#fef2f2',
+                                                        color: st.statut === 'Actif' ? '#059669' : '#dc2626',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    {st.statut === 'Actif' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                                    {st.statut === 'Actif' ? 'Actif' : 'Inactif'}
+                                                </button>
                                             </div>
                                         ))}
                                     </div>

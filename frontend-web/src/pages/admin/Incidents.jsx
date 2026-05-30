@@ -158,7 +158,7 @@ const Incidents = () => {
       if (filterStatus !== 'all' && inc.statut !== filterStatus) return false;
       if (search) {
         const q = search.toLowerCase();
-        return ['type_incident', 'description', 'numero_bus', 'ligne', 'rapporte_par']
+        return ['type_incident', 'description', 'numero_bus', 'ligne', 'rapporte_par', 'ville_depart', 'ville_arrivee']
           .some(k => (inc[k] || '').toLowerCase().includes(q));
       }
       return true;
@@ -431,10 +431,10 @@ const Incidents = () => {
                       >
                         {/* Date */}
                         <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: '#334155' }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: '#334155' }}>
                             {new Date(inc.date_incident).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                           </div>
-                          <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 2 }}>
+                          <div style={{ fontSize: 15, color: '#94A3B8', marginTop: 2 }}>
                             {new Date(inc.date_incident).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </td>
@@ -449,7 +449,7 @@ const Incidents = () => {
                             }}>
                               <TypeIcon size={16} color={tc.color} />
                             </div>
-                            <span style={{ fontSize: 16, fontWeight: 700, color: '#1E293B', maxWidth: 160 }}>
+                            <span style={{ fontSize: 18, fontWeight: 700, color: '#1E293B', maxWidth: 160 }}>
                               {inc.type_incident || '—'}
                             </span>
                           </div>
@@ -459,17 +459,20 @@ const Incidents = () => {
                         <td style={{ padding: '16px 20px' }}>
                           {inc.numero_bus ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: '#4F46E5' }}>
-                                <Bus size={12} />Bus N° {inc.numero_bus}
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 15, fontWeight: 800, color: '#4F46E5' }}>
+                                <Bus size={14} />Bus N° {inc.numero_bus}
                               </span>
                               {inc.ligne && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>
-                                  <MapPin size={11} />{inc.ligne}
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 15, color: '#94A3B8', fontWeight: 600 }}>
+                                  <MapPin size={13} />
+                                  {inc.ville_depart && inc.ville_arrivee 
+                                    ? `${inc.ville_depart} ➔ ${inc.ville_arrivee}`
+                                    : `Ligne ${inc.ligne}`}
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span style={{ color: '#CBD5E1', fontSize: 13 }}>—</span>
+                            <span style={{ color: '#CBD5E1', fontSize: 15 }}>—</span>
                           )}
                         </td>
 
@@ -483,7 +486,7 @@ const Incidents = () => {
                             }}>
                               <User size={13} color="#64748B" />
                             </div>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: '#475569' }}>
+                            <span style={{ fontSize: 17, fontWeight: 700, color: '#475569' }}>
                               {inc.rapporte_par || '—'}
                             </span>
                           </div>
@@ -503,7 +506,7 @@ const Incidents = () => {
                               value={inc.statut || 'En attente'}
                               onChange={e => updateStatus(inc.id_incident, e.target.value)}
                               style={{
-                                fontSize: 14, fontWeight: 700, padding: '6px 10px',
+                                fontSize: 16, fontWeight: 700, padding: '6px 10px',
                                 border: '1.5px solid #E2E8F0', borderRadius: '10px',
                                 background: 'white', color: '#475569',
                                 cursor: 'pointer', outline: 'none',
@@ -612,7 +615,14 @@ const Incidents = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
                 {[
                   { label: 'Bus', value: selected.numero_bus ? `N° ${selected.numero_bus}` : '—', icon: Bus, color: '#4F46E5' },
-                  { label: 'Ligne', value: selected.ligne || '—', icon: MapPin, color: '#F97316' },
+                  { 
+                    label: 'Ligne', 
+                    value: selected.ville_depart && selected.ville_arrivee 
+                      ? `${selected.ville_depart} ➔ ${selected.ville_arrivee}` 
+                      : (selected.ligne || '—'), 
+                    icon: MapPin, 
+                    color: '#F97316' 
+                  },
                   { label: 'Signalé par', value: selected.rapporte_par || '—', icon: User, color: '#10B981' },
                   { label: 'Heure', value: new Date(selected.date_incident).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), icon: Clock, color: '#6366F1' },
                 ].map(({ label, value, icon: Icon, color }) => (

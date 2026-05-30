@@ -142,7 +142,7 @@ exports.getOccupiedSeats = async (req, res) => {
         if (ligneRes.rows.length === 0) return res.json([]);
         const ligne = ligneRes.rows[0];
         
-        const stationsRes = await db.query("SELECT arret, distance_km FROM trajet WHERE num_ligne = $1 ORDER BY distance_km", [num_ligne]);
+        const stationsRes = await db.query("SELECT arret, distance_km FROM trajet WHERE num_ligne = $1 AND statut = 'Actif' ORDER BY distance_km", [num_ligne]);
         let stationsList = stationsRes.rows;
         
         if (!stationsList.some(s => s.arret.toLowerCase() === ligne.ville_depart.toLowerCase())) {

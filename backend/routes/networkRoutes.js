@@ -7,5 +7,6 @@ router.get('/', networkController.getNetwork);
 router.post('/', networkController.createLineWithTrajets);
 router.put('/:id', networkController.updateLine);
 router.delete('/:id', networkController.deleteLine);
+router.patch('/stations/:id/toggle', networkController.toggleStationStatus);
 
 module.exports = router;

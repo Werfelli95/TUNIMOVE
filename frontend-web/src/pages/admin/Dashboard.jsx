@@ -105,9 +105,8 @@ const Dashboard = () => {
   const [avgPrice, setAvgPrice] = useState(0);
   const [advancedStats, setAdvancedStats] = useState({ topLine: null, avgOccupancy: 0, peakHour: null, todayRevenue: 0 });
   const [busOccupancy, setBusOccupancy] = useState([]);
+  const [selectedBus, setSelectedBus] = useState('all');
   const [period, setPeriod] = useState('week');
-
-  const formatTime = (time) => (time ? String(time).substring(0, 5) : '--:--');
 
   useEffect(() => {
     const fetchCounts = async () => {
@@ -191,6 +190,22 @@ const Dashboard = () => {
 
   return (
     <div className="users-container" style={{ paddingBottom: '40px' }}>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 99px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 99px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+      `}</style>
       
       {/* PREMIUM HEADER CARD */}
       <div className="users-header-card" style={{ marginBottom: '32px' }}>
@@ -271,47 +286,99 @@ const Dashboard = () => {
             <Bus size={250} color="white" />
           </div>
           <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Occupation des Voyages</h2>
-          <p style={{ margin: '4px 0 30px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Taux de remplissage en temps réel</p>
+          <p style={{ margin: '4px 0 20px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Taux de remplissage en temps réel</p>
           
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {busOccupancy.length > 0 ? busOccupancy.map((trip, idx) => {
-              const pct = (trip.tickets_vendus / trip.capacite) * 100;
-              const isFull = pct >= 90;
-              return (
-                <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '32px', height: '32px', background: isFull ? '#F87171' : '#4F46E5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Bus size={18} color="white" />
+          {busOccupancy.length > 0 && (
+            <div style={{ marginBottom: '20px', position: 'relative', zIndex: 2 }}>
+              <select
+                value={selectedBus}
+                onChange={(e) => setSelectedBus(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="all" style={{ background: '#0F172A', color: 'white' }}>
+                  Tous les voyages ({busOccupancy.length})
+                </option>
+                {busOccupancy.map((trip, idx) => (
+                  <option key={idx} value={idx} style={{ background: '#0F172A', color: 'white' }}>
+                    Bus {trip.numero_bus} — {trip.horaire_affecte.substring(0, 5)} • {trip.ville_depart}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div 
+            className="custom-scrollbar"
+            style={{ 
+              position: 'relative', 
+              zIndex: 1, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '18px',
+              maxHeight: '340px',
+              overflowY: 'auto',
+              paddingRight: '6px'
+            }}
+          >
+            {(() => {
+              const displayTrips = selectedBus === 'all' 
+                ? busOccupancy 
+                : [busOccupancy[parseInt(selectedBus)]].filter(Boolean);
+
+              if (displayTrips.length === 0) {
+                return (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8' }}>
+                    Aucun voyage actif aujourd'hui.
+                  </div>
+                );
+              }
+
+              return displayTrips.map((trip, idx) => {
+                const pct = (trip.tickets_vendus / trip.capacite) * 100;
+                const isFull = pct >= 90;
+                return (
+                  <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', background: isFull ? '#F87171' : '#4F46E5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Bus size={18} color="white" />
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '16px', fontWeight: 900, display: 'block' }}>Bus {trip.numero_bus}</span>
+                          <span style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 600 }}>{trip.horaire_affecte.substring(0, 5)} • {trip.ville_depart}</span>
+                        </div>
                       </div>
-                      <div>
-                        <span style={{ fontSize: '14px', fontWeight: 900, display: 'block' }}>Bus {trip.numero_bus}</span>
-                        <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>{formatTime(trip.horaire_affecte)} • {trip.ville_depart || 'Départ non défini'}</span>
-                      </div>
+                      <span style={{ 
+                        fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', 
+                        background: isFull ? 'rgba(248,113,113,0.2)' : 'rgba(16,185,129,0.2)',
+                        color: isFull ? '#F87171' : '#34D399',
+                        padding: '4px 8px', borderRadius: '6px'
+                      }}>
+                        {isFull ? 'Quasi Plein' : 'Disponible'}
+                      </span>
                     </div>
-                    <span style={{ 
-                      fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', 
-                      background: isFull ? 'rgba(248,113,113,0.2)' : 'rgba(16,185,129,0.2)',
-                      color: isFull ? '#F87171' : '#34D399',
-                      padding: '4px 8px', borderRadius: '6px'
-                    }}>
-                      {isFull ? 'Quasi Plein' : 'Disponible'}
-                    </span>
+                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
+                      <div style={{ height: '100%', background: isFull ? '#F87171' : '#4F46E5', width: `${pct}%`, borderRadius: '99px', transition: 'width 1s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#94A3B8' }}>
+                      <span>{trip.tickets_vendus} sièges occupés</span>
+                      <span>{Math.round(pct)}%</span>
+                    </div>
                   </div>
-                  <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
-                    <div style={{ height: '100%', background: isFull ? '#F87171' : '#4F46E5', width: `${pct}%`, borderRadius: '99px', transition: 'width 1s ease' }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, color: '#94A3B8' }}>
-                    <span>{trip.tickets_vendus} sièges occupés</span>
-                    <span>{Math.round(pct)}%</span>
-                  </div>
-                </div>
-              );
-            }) : (
-              <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8' }}>
-                Aucun voyage actif aujourd'hui.
-              </div>
-            )}
+                );
+              });
+            })()}
           </div>
 
           <div style={{ marginTop: '30px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>

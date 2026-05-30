@@ -121,7 +121,7 @@ const Audit = () => {
                                                     {r.agent_role === 'AGENT' ? (
                                                         <div style={{ fontSize: '1rem', color: '#64748b' }}>
                                                             <span style={{ fontWeight: 800, color: '#4f46e5' }}>{r.nom_guichet || 'Guichet Principal'}</span>
-                                                            <div style={{ fontSize: '0.85rem' }}>Vente Directe</div>
+                                                            <div style={{ fontSize: '0.85rem' }}>Vente</div>
                                                         </div>
                                                     ) : r.agent_role === 'RECEVEUR' ? (
                                                         <div style={{ fontSize: '1rem', color: '#64748b' }}>
@@ -282,7 +282,7 @@ const Audit = () => {
                                                 <p style={{ fontWeight: '800', fontSize: '1.1rem', color: '#4f46e5', marginBottom: '0.25rem' }}>
                                                     {selectedRecord.nom_guichet || 'Guichet Principal'}
                                                 </p>
-                                                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Vente Directe en station</p>
+                                                <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Vente en station</p>
                                             </div>
                                         ) : selectedRecord.agent_role === 'RECEVEUR' ? (
                                             <>

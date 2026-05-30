@@ -45,7 +45,7 @@ const placesMatch = (a, b) => {
 };
 
 const Guichet = () => {
-    const { mode, setMode } = useOutletContext() || { mode: 'Vente Directe', setMode: () => { } };
+    const { mode, setMode } = useOutletContext() || { mode: 'Vente', setMode: () => { } };
     const navigate = useNavigate();
     const [lignes, setLignes] = useState([]);
     const [buses, setBuses] = useState([]);
@@ -291,8 +291,8 @@ const Guichet = () => {
         } else if (mode === 'Réservations') {
             // Pour les réservations, on force au moins demain
             setDateVoyage(tomorrowStr);
-        } else if (mode === 'Vente Directe') {
-            // Pour la vente directe, c'est aujourd'hui
+        } else if (mode === 'Vente') {
+            // Pour la vente, c'est aujourd'hui
             setDateVoyage(todayStr);
         }
     }, [mode]);
@@ -321,7 +321,7 @@ const Guichet = () => {
 
     // Sécurité : Si on est en mode Vente et que l'horaire sélectionné est déjà passé à NOTRE station, on le réinitialise
     useEffect(() => {
-        if (mode === 'Vente Directe' && horaire && horaire !== "" && activeLigne && arretDepart) {
+        if (mode === 'Vente' && horaire && horaire !== "" && activeLigne && arretDepart) {
             const arrivalDate = getLocalArrivalDate(horaire);
             const now = new Date();
 
@@ -338,7 +338,8 @@ const Guichet = () => {
     // On construit la liste des stations en incluant le point de départ et d'arrivée s'ils n'existent pas
     const activeStations = React.useMemo(() => {
         if (!activeLigne) return [];
-        let stations = [...(activeLigne.stations || [])];
+        // On exclut les stations avec statut 'Inactif'
+        let stations = (activeLigne.stations || []).filter(s => s.statut !== 'Inactif');
 
         // 1. S'assurer que le départ (ville_depart) est présent
         const hasStart = stations.some(s => Number(s.distance_km) === 0 || s.arret.toLowerCase() === activeLigne.ville_depart.toLowerCase());
@@ -775,8 +776,8 @@ const Guichet = () => {
                                                 const arrivalDate = getLocalArrivalDate(h);
                                                 const now = new Date();
 
-                                                // En mode Vente Directe, on bloque si l'heure d'arrivée à NOTRE station est passée (avec marge 5min)
-                                                const isPast = mode === 'Vente Directe' && arrivalDate && (now - arrivalDate > 5 * 60000);
+                                                // En mode Vente, on bloque si l'heure d'arrivée à NOTRE station est passée (avec marge 5min)
+                                                const isPast = mode === 'Vente' && arrivalDate && (now - arrivalDate > 5 * 60000);
 
                                                 return (
                                                     <option
@@ -808,7 +809,7 @@ const Guichet = () => {
                                                 
                                                 const arrivalDate = getLocalArrivalDate(h);
                                                 const now = new Date();
-                                                const isPast = mode === 'Vente Directe' && arrivalDate && (now - arrivalDate > 5 * 60000);
+                                                const isPast = mode === 'Vente' && arrivalDate && (now - arrivalDate > 5 * 60000);
                                                 
                                                 return (
                                                     <option
