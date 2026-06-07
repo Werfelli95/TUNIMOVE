@@ -79,22 +79,25 @@ exports.loginReceveur = async (req, res) => {
             return res.status(403).json({ message: "Votre compte a été suspendu." });
         }
 
-        // Fetch assignment (bus and line) with date validation
-        const affectationResult = await db.query(`
-            SELECT b.numero_bus, l.num_ligne, l.ville_depart, l.ville_arrivee
-            FROM bus b
-            LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
-            WHERE b.id_receveur = $1
-            AND (b.date_debut_affectation IS NULL OR CURRENT_DATE >= b.date_debut_affectation::date)
-            AND (b.date_fin_affectation IS NULL OR CURRENT_DATE <= b.date_fin_affectation::date)
-            LIMIT 1
-        `, [user.id_utilisateur]);
+        // Fetch assignment (bus and line) with date validation (optional)
+        let affectation = null;
+        try {
+            const affectationResult = await db.query(`
+                SELECT b.numero_bus, l.num_ligne, l.ville_depart, l.ville_arrivee
+                FROM bus b
+                LEFT JOIN ligne l ON b.num_ligne = l.num_ligne
+                WHERE b.id_receveur = $1
+                AND (b.date_debut_affectation IS NULL OR CURRENT_DATE >= b.date_debut_affectation::date)
+                AND (b.date_fin_affectation IS NULL OR CURRENT_DATE <= b.date_fin_affectation::date)
+                LIMIT 1
+            `, [user.id_utilisateur]);
 
-        if (affectationResult.rows.length === 0) {
-            return res.status(403).json({ message: "Aucune affectation valide trouvée pour aujourd'hui." });
+            if (affectationResult.rows.length > 0) {
+                affectation = affectationResult.rows[0];
+            }
+        } catch (err) {
+            console.error("Erreur lors de la récupération de l'affectation:", err);
         }
-
-        const affectation = affectationResult.rows[0];
 
         const token = jwt.sign({ id: user.id_utilisateur, role: 'RECEVEUR' }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({ 
