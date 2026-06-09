@@ -338,6 +338,15 @@ const Network = () => {
                                                     {st.statut === 'Actif' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                                                     {st.statut === 'Actif' ? 'Actif' : 'Inactif'}
                                                 </button>
+                                                {/* Bouton Supprimer */}
+                                                <button
+                                                    type="button"
+                                                    className="st-remove"
+                                                    title="Supprimer la station"
+                                                    onClick={() => removeStation(i)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
