@@ -15,11 +15,11 @@ import './Users.css'; // Use the new premium shared design system
 const getColorPalette = (color) => {
   const palettes = {
     indigo: { bg: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', text: '#4338CA', dot: '#6366F1' },
-    green:  { bg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', text: '#047857', dot: '#10B981' },
-    blue:   { bg: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', text: '#1D4ED8', dot: '#3B82F6' },
+    green: { bg: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', text: '#047857', dot: '#10B981' },
+    blue: { bg: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', text: '#1D4ED8', dot: '#3B82F6' },
     purple: { bg: 'linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%)', text: '#7E22CE', dot: '#A855F7' },
-    rose:   { bg: 'linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 100%)', text: '#BE123C', dot: '#F43F5E' },
-    amber:  { bg: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)', text: '#B45309', dot: '#F59E0B' },
+    rose: { bg: 'linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 100%)', text: '#BE123C', dot: '#F43F5E' },
+    amber: { bg: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)', text: '#B45309', dot: '#F59E0B' },
   };
   return palettes[color] || palettes.indigo;
 };
@@ -37,15 +37,15 @@ const PremiumStatCard = ({ title, value, subtext, icon, color, trend, onClick })
       transition: 'all 0.2s',
       cursor: onClick ? 'pointer' : 'default'
     }}
-    onClick={onClick}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-4px)';
-      if (onClick) e.currentTarget.style.boxShadow = '0 12px 30px rgba(0,0,0,0.06)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      if (onClick) e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02)';
-    }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        if (onClick) e.currentTarget.style.boxShadow = '0 12px 30px rgba(0,0,0,0.06)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        if (onClick) e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02)';
+      }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{
@@ -127,7 +127,7 @@ const Dashboard = () => {
         if (busRes.ok) setActiveBusCount((await busRes.json()).count);
         if (lineRes.ok) setActiveLineCount((await lineRes.json()).count);
         if (guichetRes.ok) setActiveGuichetCount((await guichetRes.json()).activeCount);
-        
+
         if (rolesRes.ok) setRolesData(await rolesRes.json());
         if (advRes && advRes.ok) {
           const advData = await advRes.json();
@@ -162,29 +162,61 @@ const Dashboard = () => {
 
   const downloadPDF = () => {
     const doc = new jsPDF();
+    const periodLabel = period === 'week' ? '7 derniers jours' : '30 derniers jours';
+    const total = revenueData.reduce((acc, curr) => acc + Number(curr.value), 0);
+
+    // ── En-tête du document ──
     doc.setFontSize(22);
     doc.setTextColor(67, 56, 202);
-    doc.text('TUNIMOVE - Tableau de Bord Exécutif', 14, 22);
+    doc.text('TUNIMOVE – Rapport des Recettes', 14, 22);
+
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`Période : ${period === 'week' ? '7 derniers jours' : '30 derniers jours'}`, 14, 32);
+    doc.text(`Période : ${periodLabel}`, 14, 32);
     doc.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, 14, 38);
+    doc.text(`Total général : ${total.toFixed(3)} TND`, 14, 44);
 
+    // ── Lignes de données + ligne de total fusionnée ──
+    const bodyRows = revenueData.map((row, idx) => [
+      idx + 1,
+      row.full_date,
+      row.name,
+      `${Number(row.value).toFixed(3)} TND`
+    ]);
+
+    // Ligne de total en bas du tableau
+    bodyRows.push([
+      { content: 'TOTAL', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [224, 231, 255], textColor: [67, 56, 202], halign: 'right' } },
+      { content: `${total.toFixed(3)} TND`, styles: { fontStyle: 'bold', fillColor: [224, 231, 255], textColor: [67, 56, 202], halign: 'right' } }
+    ]);
+
+    // ── Tableau unique ──
     autoTable(doc, {
-      head: [['Date', 'Jour', 'Recette (TND)']],
-      body: revenueData.map(row => [row.full_date, row.name, Number(row.value).toFixed(3)]),
-      startY: 48,
+      head: [['N°', 'Date', 'Jour', 'Recette (TND)']],
+      body: bodyRows,
+      startY: 52,
       theme: 'grid',
-      headStyles: { fillColor: [67, 56, 202], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 6 },
-      alternateRowStyles: { fillColor: [248, 250, 252] }
+      headStyles: {
+        fillColor: [67, 56, 202],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10,
+        halign: 'center'
+      },
+      styles: { fontSize: 10, cellPadding: 5 },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 15 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 25, halign: 'center' },
+        3: { halign: 'right' }
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      // Pas de coupure de tableau entre pages
+      pageBreak: 'auto',
+      rowPageBreak: 'auto',
+      showHead: 'everyPage'
     });
 
-    const total = revenueData.reduce((acc, curr) => acc + Number(curr.value), 0);
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Total des Recettes générées : ${total.toFixed(3)} TND`, 14, finalY);
     doc.save(`TuniMove_Rapport_${period}.pdf`);
   };
 
@@ -206,7 +238,7 @@ const Dashboard = () => {
           background: rgba(255, 255, 255, 0.3);
         }
       `}</style>
-      
+
       {/* PREMIUM HEADER CARD */}
       <div className="users-header-card" style={{ marginBottom: '32px' }}>
         <div className="header-titles">
@@ -255,7 +287,7 @@ const Dashboard = () => {
               }}>30 derniers jours</button>
             </div>
           </div>
-          
+
           <div style={{ height: '320px', width: '100%' }}>
             {revenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -287,7 +319,7 @@ const Dashboard = () => {
           </div>
           <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Occupation des Voyages</h2>
           <p style={{ margin: '4px 0 20px', fontSize: '15px', color: '#94A3B8', fontWeight: 600 }}>Taux de remplissage en temps réel</p>
-          
+
           {busOccupancy.length > 0 && (
             <div style={{ marginBottom: '20px', position: 'relative', zIndex: 2 }}>
               <select
@@ -318,13 +350,13 @@ const Dashboard = () => {
             </div>
           )}
 
-          <div 
+          <div
             className="custom-scrollbar"
-            style={{ 
-              position: 'relative', 
-              zIndex: 1, 
-              display: 'flex', 
-              flexDirection: 'column', 
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: 'column',
               gap: '18px',
               maxHeight: '340px',
               overflowY: 'auto',
@@ -332,8 +364,8 @@ const Dashboard = () => {
             }}
           >
             {(() => {
-              const displayTrips = selectedBus === 'all' 
-                ? busOccupancy 
+              const displayTrips = selectedBus === 'all'
+                ? busOccupancy
                 : [busOccupancy[parseInt(selectedBus)]].filter(Boolean);
 
               if (displayTrips.length === 0) {
@@ -359,8 +391,8 @@ const Dashboard = () => {
                           <span style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 600 }}>{trip.horaire_affecte.substring(0, 5)} • {trip.ville_depart}</span>
                         </div>
                       </div>
-                      <span style={{ 
-                        fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', 
+                      <span style={{
+                        fontSize: '12px', fontWeight: 800, textTransform: 'uppercase',
                         background: isFull ? 'rgba(248,113,113,0.2)' : 'rgba(16,185,129,0.2)',
                         color: isFull ? '#F87171' : '#34D399',
                         padding: '4px 8px', borderRadius: '6px'
@@ -382,13 +414,13 @@ const Dashboard = () => {
           </div>
 
           <div style={{ marginTop: '30px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', padding: '15px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-             <div style={{ width: '40px', height: '40px', background: '#4F46E5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={20} />
-             </div>
-             <div>
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase' }}>Total Tickets Jour</p>
-                <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>{advancedStats?.todayTicketCount || 0}</h3>
-             </div>
+            <div style={{ width: '40px', height: '40px', background: '#4F46E5', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={20} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase' }}>Total Tickets Jour</p>
+              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>{advancedStats?.todayTicketCount || 0}</h3>
+            </div>
           </div>
         </div>
       </div>
@@ -399,7 +431,7 @@ const Dashboard = () => {
             <h2 style={{ margin: '0 0 20px', fontSize: '20px', fontWeight: 900, color: '#0F172A', width: '100%' }}>Supervision des Équipes</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '40px' }}>
-            <div 
+            <div
               onClick={() => navigate('/admin-dashboard/users')}
               style={{ background: 'white', border: '1px solid #E0E7FF', padding: '20px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 15px rgba(99,102,241,0.05)', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(99,102,241,0.1)'; }}
@@ -414,8 +446,8 @@ const Dashboard = () => {
                 <div style={{ width: '40px', height: '40px', background: '#EEF2FF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Store size={20} color="#6366F1" /></div>
               </div>
             </div>
-            
-            <div 
+
+            <div
               onClick={() => navigate('/admin-dashboard/users')}
               style={{ background: 'white', border: '1px solid #DBEAFE', padding: '20px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 15px rgba(59,130,246,0.05)', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(59,130,246,0.1)'; }}
@@ -432,7 +464,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div 
+            <div
               onClick={() => navigate('/admin-dashboard/users')}
               style={{ background: 'white', border: '1px solid #D1FAE5', padding: '20px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 15px rgba(16,185,129,0.05)', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(16,185,129,0.1)'; }}
@@ -448,7 +480,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div 
+            <div
               onClick={() => navigate('/admin-dashboard/incidents')}
               style={{ background: '#FFF1F2', border: '1px solid #FFE4E6', padding: '20px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 15px rgba(244,63,94,0.05)', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(244,63,94,0.1)'; }}

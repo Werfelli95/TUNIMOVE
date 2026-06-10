@@ -54,12 +54,15 @@ export default function LoginScreen() {
     try {
       if (role === 'receveur') {
         const res = await axios.post<any>(`${AUTH_API}/login/receveur`, { matricule: matricule.trim(), password });
-        const { user } = res.data;
+        const { user, affectation } = res.data;
         router.replace({
           pathname: '/(receveur)/dashboard',
           params: {
             userId: user.id, nom: user.nom, prenom: user.prenom, matricule: user.matricule,
-            numero_bus: '', ville_depart: '', ville_arrivee: '', num_ligne: '',
+            numero_bus: affectation?.numero_bus || '',
+            ville_depart: affectation?.ville_depart || '',
+            ville_arrivee: affectation?.ville_arrivee || '',
+            num_ligne: affectation?.num_ligne || '',
             login_time: Date.now().toString(),
           }
         });

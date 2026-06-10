@@ -339,10 +339,10 @@ const Assignments = () => {
                                                         <div className="text-slate-700 font-bold text-lg">
                                                             {`${item.agent_prenom} ${item.agent_nom}`}
                                                         </div>
-                                                        {item.emplacement && (
+                                                        {item.emplacemen && (
                                                             <div className="flex flex-col gap-1 mt-2">
                                                                 <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-[13px] font-bold border border-slate-200 w-fit">
-                                                                    Emplacement: {item.emplacement}
+                                                                    Emplacement: {item.agent_nom}
                                                                 </span>
                                                             </div>
                                                         )}

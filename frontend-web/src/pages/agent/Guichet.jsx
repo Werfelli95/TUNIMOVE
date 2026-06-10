@@ -117,7 +117,7 @@ const Guichet = () => {
 
         let cumulativeMinutes = 0;
         if (arretDepart.toLowerCase().trim() !== activeLigne.ville_depart.toLowerCase().trim()) {
-            const stationIdx = (activeLigne.stations || []).findIndex(s => 
+            const stationIdx = (activeLigne.stations || []).findIndex(s =>
                 s.arret.toLowerCase().trim() === arretDepart.toLowerCase().trim()
             );
             if (stationIdx !== -1) {
@@ -133,14 +133,14 @@ const Guichet = () => {
         if (now - arrivalDate > 12 * 60 * 60 * 1000) {
             arrivalDate.setDate(arrivalDate.getDate() + 1);
         }
-        
+
         return arrivalDate;
     };
 
     const getLocalTime = (baseHoraire) => {
         const arrivalDate = getLocalArrivalDate(baseHoraire);
         if (!arrivalDate) return baseHoraire;
-        
+
         const hh = String(arrivalDate.getHours()).padStart(2, '0');
         const mm = String(arrivalDate.getMinutes()).padStart(2, '0');
         return `${hh}:${mm}`;
@@ -401,7 +401,7 @@ const Guichet = () => {
 
     // Derived Bus capacities
     const busObj = buses.find(b => String(b.numero_bus) === String(selectedBus));
-    const capaciteBus = busObj ? parseInt(busObj.capacite, 10) : 50;
+    const capaciteBus = 10;
 
     // Grid Seats Generation dynamically based on real capacity
     const renderSeats = () => {
@@ -594,8 +594,8 @@ const Guichet = () => {
                                 <p style={{ color: '#166534', margin: '0.5rem 0 0' }}>La fiche #A{String(closureResult.id_fiche).padStart(3, '0')} a été envoyée.</p>
                             </div>
                         ) : (
-                            <button 
-                                className="print-btn" 
+                            <button
+                                className="print-btn"
                                 style={{ width: '100%', height: '60px', fontSize: '1.1rem', background: '#4f46e5' }}
                                 onClick={() => setShowConfirmModal(true)}
                                 disabled={isClosing}
@@ -773,23 +773,23 @@ const Guichet = () => {
                                                     return dateA - dateB;
                                                 })
                                                 .map((h, i) => {
-                                                const arrivalDate = getLocalArrivalDate(h);
-                                                const now = new Date();
+                                                    const arrivalDate = getLocalArrivalDate(h);
+                                                    const now = new Date();
 
-                                                // En mode Vente, on bloque si l'heure d'arrivée à NOTRE station est passée (avec marge 5min)
-                                                const isPast = mode === 'Vente' && arrivalDate && (now - arrivalDate > 5 * 60000);
+                                                    // En mode Vente, on bloque si l'heure d'arrivée à NOTRE station est passée (avec marge 5min)
+                                                    const isPast = mode === 'Vente' && arrivalDate && (now - arrivalDate > 5 * 60000);
 
-                                                return (
-                                                    <option
-                                                        key={i}
-                                                        value={h}
-                                                        disabled={isPast}
-                                                        style={isPast ? { color: '#ccc', fontStyle: 'italic' } : {}}
-                                                    >
-                                                        {getLocalTime(h)} {isPast ? ' (Passé)' : ''}
-                                                    </option>
-                                                );
-                                            })}
+                                                    return (
+                                                        <option
+                                                            key={i}
+                                                            value={h}
+                                                            disabled={isPast}
+                                                            style={isPast ? { color: '#ccc', fontStyle: 'italic' } : {}}
+                                                        >
+                                                            {getLocalTime(h)} {isPast ? ' (Passé)' : ''}
+                                                        </option>
+                                                    );
+                                                })}
                                         </select>
                                     ) : activeLigne && activeLigne.horaire ? (
                                         <select className="g-select" value={horaire} onChange={e => {
@@ -806,11 +806,11 @@ const Guichet = () => {
                                             {(() => {
                                                 const h = activeLigne.horaire;
                                                 if (!h) return null;
-                                                
+
                                                 const arrivalDate = getLocalArrivalDate(h);
                                                 const now = new Date();
                                                 const isPast = mode === 'Vente' && arrivalDate && (now - arrivalDate > 5 * 60000);
-                                                
+
                                                 return (
                                                     <option
                                                         value={h}
@@ -904,7 +904,7 @@ const Guichet = () => {
                                         const ops = tarifsDb.filter(t => t.categorie === cat);
                                         if (ops.length > 0) setSelectedTarifId(ops[0].id_type_tarification);
                                         else setSelectedTarifId('');
-                                        
+
                                         // On réinitialise les bagages si c'est une expédition
                                         if (cat === 'EXPEDITION') {
                                             setSelectedBagageId('');
@@ -1175,7 +1175,7 @@ const Guichet = () => {
             {/* MODAL DE CONFIRMATION CLÔTURE */}
             <AnimatePresence>
                 {showConfirmModal && (
-                    <motion.div 
+                    <motion.div
                         className="modal-overlay"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1193,7 +1193,7 @@ const Guichet = () => {
                         }}
                         onClick={() => setShowConfirmModal(false)}
                     >
-                        <motion.div 
+                        <motion.div
                             className="glass-card"
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -1207,15 +1207,15 @@ const Guichet = () => {
                             }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div style={{ 
-                                background: '#fef2f2', 
-                                width: '64px', 
-                                height: '64px', 
-                                borderRadius: '50%', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                margin: '0 auto 1.5rem' 
+                            <div style={{
+                                background: '#fef2f2',
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 1.5rem'
                             }}>
                                 <AlertTriangle size={32} color="#dc2626" />
                             </div>
@@ -1223,22 +1223,22 @@ const Guichet = () => {
                             <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '1rem' }}>
                                 Confirmer la clôture ?
                             </h3>
-                            
+
                             <p style={{ color: '#64748b', lineHeight: 1.6, marginBottom: '2rem', fontSize: '1.05rem' }}>
-                                Êtes-vous sûr de vouloir clôturer votre service pour aujourd'hui ? <br/>
+                                Êtes-vous sûr de vouloir clôturer votre service pour aujourd'hui ? <br />
                                 <strong style={{ color: '#475569' }}>Cette action enverra votre bilan financier final à l'administration.</strong>
                             </p>
 
                             <div style={{ display: 'flex', gap: '1rem' }}>
-                                <button 
-                                    style={{ 
-                                        flex: 1, 
-                                        padding: '12px', 
-                                        borderRadius: '12px', 
-                                        border: '1px solid #e2e8f0', 
-                                        background: 'white', 
-                                        color: '#64748b', 
-                                        fontWeight: 700, 
+                                <button
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px',
+                                        borderRadius: '12px',
+                                        border: '1px solid #e2e8f0',
+                                        background: 'white',
+                                        color: '#64748b',
+                                        fontWeight: 700,
                                         cursor: 'pointer',
                                         transition: 'all 0.2s'
                                     }}
@@ -1248,15 +1248,15 @@ const Guichet = () => {
                                 >
                                     Annuler
                                 </button>
-                                <button 
-                                    style={{ 
-                                        flex: 1, 
-                                        padding: '12px', 
-                                        borderRadius: '12px', 
-                                        border: 'none', 
-                                        background: '#dc2626', 
-                                        color: 'white', 
-                                        fontWeight: 700, 
+                                <button
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: '#dc2626',
+                                        color: 'white',
+                                        fontWeight: 700,
                                         cursor: 'pointer',
                                         transition: 'all 0.2s',
                                         boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'

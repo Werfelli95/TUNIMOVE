@@ -68,6 +68,20 @@ export default function ScannerScreen() {
   const [userData, setUserData] = useState<any>(null);
   const [totalScanned, setTotalScanned] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const elapsed = params.login_time
+    ? Math.max(0, Math.floor((now - Number(params.login_time)) / 60000))
+    : 0;
+  const elapsedLabel = elapsed >= 60
+    ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}m`
+    : `${elapsed}m`;
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -144,33 +158,27 @@ export default function ScannerScreen() {
   };
 
   const handleCloseService = () => {
-    const proceed = async () => {
-      setIsClosing(true);
-      try {
-        await axios.post(`${SALES_API.replace('/sales', '/controleur-service')}/close`, {
-          id_controleur: userId,
-          heure_connexion: params.login_time,
-          nb_tickets_scannes: totalScanned
-        });
-        Alert.alert('Service clôturé', 'Votre fiche de service a été envoyée à l\'administration.', [
-          { text: 'OK', onPress: () => router.replace('/') }
-        ]);
-        if (Platform.OS === 'web') router.replace('/');
-      } catch (err: any) {
-        const errorMsg = err.response?.data?.message || err.message || 'Impossible de clôturer le service';
-        Alert.alert('Erreur', errorMsg);
-      } finally {
-        setIsClosing(false);
-      }
-    };
+    setShowCloseModal(true);
+  };
 
-    if (Platform.OS === 'web') {
-      if (confirm('Voulez-vous clôturer votre service et envoyer votre rapport ?')) proceed();
-    } else {
-      Alert.alert('Clôturer le service', 'Voulez-vous clôturer votre service et envoyer votre rapport ?', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Clôturer', style: 'destructive', onPress: proceed }
+  const proceedCloseService = async () => {
+    setIsClosing(true);
+    try {
+      await axios.post(`${SALES_API.replace('/sales', '/controleur-service')}/close`, {
+        id_controleur: userId,
+        heure_connexion: params.login_time,
+        nb_tickets_scannes: totalScanned
+      });
+      setShowCloseModal(false);
+      Alert.alert('Service clôturé', 'Votre fiche de service a été envoyée à l\'administration.', [
+        { text: 'OK', onPress: () => router.replace('/') }
       ]);
+      if (Platform.OS === 'web') router.replace('/');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Impossible de clôturer le service';
+      Alert.alert('Erreur', errorMsg);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -427,6 +435,84 @@ export default function ScannerScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* ── Close Service Modal ── */}
+      <Modal visible={showCloseModal} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: Colors.overlay }]}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIconWrap, { backgroundColor: Colors.info + '12' }]}>
+                <Clock color={Colors.info} size={24} strokeWidth={2.5} />
+              </View>
+              <View>
+                <Text style={styles.modalTitle}>Fiche de fin service</Text>
+                <Text style={styles.modalSub}>Vérifiez votre rapport de mission</Text>
+              </View>
+            </View>
+
+            <View style={styles.ficheContainer}>
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Contrôleur</Text>
+                <Text style={styles.ficheValue}>{prenom} {nom}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+              
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Matricule</Text>
+                <Text style={styles.ficheValue}>{matricule}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Date</Text>
+                <Text style={styles.ficheValue}>
+                  {params.login_time ? new Date(Number(params.login_time)).toLocaleDateString('fr-FR') : '—'}
+                </Text>
+              </View>
+              <View style={styles.ficheDivider} />
+
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Heure de début</Text>
+                <Text style={styles.ficheValue}>
+                  {params.login_time ? new Date(Number(params.login_time)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </Text>
+              </View>
+              <View style={styles.ficheDivider} />
+
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Durée de service</Text>
+                <Text style={styles.ficheValue}>{elapsedLabel}</Text>
+              </View>
+              <View style={styles.ficheDivider} />
+
+              <View style={styles.ficheRow}>
+                <Text style={styles.ficheLabel}>Tickets scannés</Text>
+                <Text style={[styles.ficheValue, { color: Colors.info, fontWeight: '900' }]}>
+                  {totalScanned}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12, marginTop: Spacing.xl }}>
+              <TouchableOpacity 
+                style={[styles.modalSubmit, isClosing && styles.modalSubmitDisabled]} 
+                onPress={proceedCloseService} 
+                disabled={isClosing}
+              >
+                {isClosing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.modalSubmitText}>Clôturer le service</Text>}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalCancel} 
+                onPress={() => setShowCloseModal(false)}
+                disabled={isClosing}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -584,4 +670,21 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginHorizontal: Spacing.base,
   },
   sheetCloseText: { color: Colors.white, fontWeight: '800', fontSize: 17 },
+  
+  // Close Service Modal Styles
+  modalCard: { backgroundColor: Colors.white, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, padding: Spacing.xl, ...Shadow.strong },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xl },
+  modalIconWrap: { width: 52, height: 52, borderRadius: 16, backgroundColor: Colors.bgMid, alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: Colors.textDark, letterSpacing: -0.5 },
+  modalSub: { fontSize: 14, color: Colors.textMuted, fontWeight: '600' },
+  modalSubmit: { backgroundColor: Colors.primary, height: 60, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', ...Shadow.strong },
+  modalSubmitDisabled: { opacity: 0.5 },
+  modalSubmitText: { fontSize: 17, fontWeight: '900', color: Colors.white },
+  modalCancel: { height: 50, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  modalCancelText: { fontSize: 15, fontWeight: '800', color: Colors.textMuted },
+  ficheContainer: { backgroundColor: Colors.bgLight, borderRadius: Radius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.bgMid, marginBottom: Spacing.base },
+  ficheRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
+  ficheDivider: { height: 1, backgroundColor: Colors.border },
+  ficheLabel: { fontSize: 14, color: Colors.textMuted, fontWeight: '700' },
+  ficheValue: { fontSize: 16, color: Colors.textDark, fontWeight: '800', maxWidth: '60%', textAlign: 'right' },
 });
