@@ -29,7 +29,6 @@ interface ActiveService {
   recette: number;
 }
 
-// Helper for Changing Bus icon (Rotated Navigation)
 const CustomRefreshIcon = ({ color, size }: { color: string; size: number }) => (
   <View style={{ transform: [{ rotate: '45deg' }] }}>
     <Navigation color={color} size={size} strokeWidth={3} />
@@ -48,9 +47,9 @@ export default function ReceveurDashboard() {
   const login_time = params.login_time as string;
   const matricule = params.matricule as string;
 
-  const [currentBus, setCurrentBus] = useState(numero_bus || '');
-  const [showBusModal, setShowBusModal] = useState(!numero_bus);
-  const [busInput, setBusInput] = useState('');
+  const [currentBus, setCurrentBus] = useState('');
+  const [showBusModal, setShowBusModal] = useState(true);
+  const [busInput, setBusInput] = useState(numero_bus || '');
   const [busError, setBusError] = useState('');
   const [verifying, setVerifying] = useState(false);
 
@@ -186,17 +185,14 @@ export default function ReceveurDashboard() {
     setBusError('');
 
     try {
-      // 1. Check if bus exists and get details
       const busRes = await axios.get(`${BASE.replace('/receveur-service', '/buses')}/details/${encodeURIComponent(input)}`);
       const busData = busRes.data;
 
-      // 2. Check if assigned to a line
       if (!busData.num_ligne) {
         setBusError("bus n'est pas affecté à aucune ligne");
         return;
       }
 
-      // Success
       setCurrentBus(input);
       setShowBusModal(false);
     } catch (err: any) {
@@ -310,17 +306,44 @@ export default function ReceveurDashboard() {
       <Modal visible={showBusModal} animationType="fade" transparent>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <View style={styles.modalHeader}><View style={styles.modalIconWrap}><Bus color={Colors.primary} size={24} /></View><View><Text style={styles.modalTitle}>Affectation Bus</Text><Text style={styles.modalSub}>Saisissez le numéro du bus actuel</Text></View></View>
-            <View style={styles.modalInputWrap}><Bus color={Colors.textLight} size={20} /><TextInput style={styles.modalTextInput} placeholder="Ex: 1045" value={busInput} onChangeText={v => { setBusInput(v); setBusError(''); }} placeholderTextColor={Colors.textLight} autoCapitalize="characters" onSubmitEditing={handleBusSubmit} /></View>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconWrap}><Bus color={Colors.primary} size={24} /></View>
+              <View>
+                <Text style={styles.modalTitle}>Saisir Numéro de Bus</Text>
+                <Text style={styles.modalSub}>
+                  {numero_bus
+                    ? `Bus affecté : ${numero_bus} — Confirmez ou modifiez`
+                    : 'Saisissez le numéro du bus pour ce service'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.modalInputWrap}>
+              <Bus color={Colors.textLight} size={20} />
+              <TextInput
+                style={styles.modalTextInput}
+                placeholder="Ex: 1045"
+                value={busInput}
+                onChangeText={v => { setBusInput(v); setBusError(''); }}
+                placeholderTextColor={Colors.textLight}
+                autoCapitalize="characters"
+                onSubmitEditing={handleBusSubmit}
+                autoFocus
+              />
+            </View>
             {busError ? <Text style={styles.busErrorText}>{busError}</Text> : null}
-            <TouchableOpacity 
-              style={[styles.modalSubmit, (!busInput.trim() || verifying) && styles.modalSubmitDisabled]} 
-              onPress={handleBusSubmit} 
+            <TouchableOpacity
+              style={[styles.modalSubmit, (!busInput.trim() || verifying) && styles.modalSubmitDisabled]}
+              onPress={handleBusSubmit}
               disabled={!busInput.trim() || verifying}
             >
-              {verifying ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.modalSubmitText}>Confirmer affectation</Text>}
+              {verifying ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.modalSubmitText}>Confirmer et démarrer</Text>}
             </TouchableOpacity>
-            {currentBus ? <TouchableOpacity style={styles.modalCancel} onPress={() => setShowBusModal(false)}><Text style={styles.modalCancelText}>Annuler</Text></TouchableOpacity> : null}
+            {}
+            {currentBus ? (
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowBusModal(false)}>
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </KeyboardAvoidingView>
       </Modal>

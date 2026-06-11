@@ -9,9 +9,8 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import './Users.css'; // Use the new premium shared design system
+import './Users.css'; 
 
-// Helper to generate gradient colors based on base color
 const getColorPalette = (color) => {
   const palettes = {
     indigo: { bg: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', text: '#4338CA', dot: '#6366F1' },
@@ -108,6 +107,7 @@ const Dashboard = () => {
   const [selectedBus, setSelectedBus] = useState('all');
   const [period, setPeriod] = useState('week');
 
+  // Au chargement, appelle toutes les APIs en parallèle pour remplir le Dashboard en une seule requête
   useEffect(() => {
     const fetchCounts = async () => {
       try {
@@ -131,7 +131,6 @@ const Dashboard = () => {
         if (rolesRes.ok) setRolesData(await rolesRes.json());
         if (advRes && advRes.ok) {
           const advData = await advRes.json();
-          console.log("Données reçues de l'API (Advanced):", advData);
           if (advData) {
             setAdvancedStats(advData);
           }
@@ -160,12 +159,12 @@ const Dashboard = () => {
     fetchCounts();
   }, [period]);
 
+  // Génère et télécharge un rapport PDF détaillé des recettes pour la période choisie
   const downloadPDF = () => {
     const doc = new jsPDF();
     const periodLabel = period === 'week' ? '7 derniers jours' : '30 derniers jours';
     const total = revenueData.reduce((acc, curr) => acc + Number(curr.value), 0);
 
-    // ── En-tête du document ──
     doc.setFontSize(22);
     doc.setTextColor(67, 56, 202);
     doc.text('TUNIMOVE – Rapport des Recettes', 14, 22);
@@ -176,7 +175,6 @@ const Dashboard = () => {
     doc.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, 14, 38);
     doc.text(`Total général : ${total.toFixed(3)} TND`, 14, 44);
 
-    // ── Lignes de données + ligne de total fusionnée ──
     const bodyRows = revenueData.map((row, idx) => [
       idx + 1,
       row.full_date,
@@ -184,13 +182,11 @@ const Dashboard = () => {
       `${Number(row.value).toFixed(3)} TND`
     ]);
 
-    // Ligne de total en bas du tableau
     bodyRows.push([
       { content: 'TOTAL', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [224, 231, 255], textColor: [67, 56, 202], halign: 'right' } },
       { content: `${total.toFixed(3)} TND`, styles: { fontStyle: 'bold', fillColor: [224, 231, 255], textColor: [67, 56, 202], halign: 'right' } }
     ]);
 
-    // ── Tableau unique ──
     autoTable(doc, {
       head: [['N°', 'Date', 'Jour', 'Recette (TND)']],
       body: bodyRows,
@@ -211,7 +207,6 @@ const Dashboard = () => {
         3: { halign: 'right' }
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
-      // Pas de coupure de tableau entre pages
       pageBreak: 'auto',
       rowPageBreak: 'auto',
       showHead: 'everyPage'
@@ -239,7 +234,7 @@ const Dashboard = () => {
         }
       `}</style>
 
-      {/* PREMIUM HEADER CARD */}
+      {}
       <div className="users-header-card" style={{ marginBottom: '32px' }}>
         <div className="header-titles">
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -255,7 +250,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* TOP 5 KPIs */}
+      {}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '20px', marginBottom: '32px' }}>
         <PremiumStatCard title="Recette du jour" value={`${(advancedStats?.todayRevenue || 0).toFixed(3)} TND`} subtext="Chiffre d'affaires aujourd'hui" icon={<TrendingUp size={28} />} color="amber" />
         <PremiumStatCard title="Guichets actifs" value={activeGuichetCount} subtext="Stations ouvertes à la vente" icon={<Store size={28} />} color="indigo" onClick={() => navigate('/admin-dashboard/assignments')} />
@@ -265,7 +260,7 @@ const Dashboard = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '24px', marginBottom: '32px' }}>
-        {/* MAIN CHART */}
+        {}
         <div style={{ flex: 2, background: 'white', borderRadius: '24px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1px solid #F1F5F9' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
             <div>

@@ -8,9 +8,20 @@ exports.requestReset = async (req, res) => {
     try {
         // Vérifier si l'utilisateur existe avec ce matricule et cet email
         // On permet les rôles RECEVEUR, CONTROLEUR et AGENT (ou tout rôle non-admin par sécurité)
+        const normalizedMatricule = (matricule || '').trim();
+        const normalizedEmail = (email || '').trim().toLowerCase();
+        const normalizedRole = (role || '').trim().toLowerCase();
+
         const userResult = await db.query(
-            "SELECT id_utilisateur FROM utilisateur WHERE matricule = $1 AND email = $2 AND (LOWER(role) = LOWER($3) OR LOWER(role) = 'agent')",
-            [matricule, email, role || '']
+            `SELECT id_utilisateur
+             FROM utilisateur
+             WHERE TRIM(matricule) = $1
+               AND LOWER(TRIM(email)) = $2
+               AND (
+                    ($3 <> '' AND LOWER(role) = $3)
+                    OR ($3 = '' AND LOWER(role) IN ('agent', 'receveur', 'controleur'))
+               )`,
+            [normalizedMatricule, normalizedEmail, normalizedRole]
         );
 
         if (userResult.rows.length === 0) {
@@ -32,7 +43,7 @@ exports.requestReset = async (req, res) => {
         // Créer la demande
         await db.query(
             "INSERT INTO demande_reinitialisation (id_utilisateur, matricule, email) VALUES ($1, $2, $3)",
-            [userId, matricule, email]
+            [userId, normalizedMatricule, normalizedEmail]
         );
 
         res.status(201).json({ message: "Votre demande a été envoyée à l'administrateur." });

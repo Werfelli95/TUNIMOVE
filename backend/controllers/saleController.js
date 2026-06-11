@@ -1,6 +1,6 @@
 const db = require('../config/db');
 
-// Récupérer tout l'historique des ventes avec les détails de la ligne
+// Récupère la liste complète des tickets vendus pour l'affichage dans le tableau d'historique
 exports.getSalesHistory = async (req, res) => {
     try {
         const query = `
@@ -24,7 +24,6 @@ exports.getSalesHistory = async (req, res) => {
         `;
         const result = await db.query(query);
 
-        // Formater l'ID pour qu'il ressemble à T001, T002...
         const formattedSales = result.rows.map(sale => ({
             id: 'T' + String(sale.id_ticket).padStart(3, '0'),
             ligne: `${sale.ville_depart} - ${sale.ville_arrivee}`,
@@ -52,6 +51,7 @@ exports.getSalesHistory = async (req, res) => {
     }
 };
 
+// Crée un nouveau ticket, génère son QR Code unique et l'enregistre en base de données
 exports.sellTicket = async (req, res) => {
     const {
         num_ligne,
@@ -74,7 +74,6 @@ exports.sellTicket = async (req, res) => {
     try {
         let id_service = provided_id_service;
 
-        // 1. Si l'id_service n'est pas fourni, tenter de trouver un service correspondant
         if (!id_service) {
             const serviceLookup = await db.query(
                 "SELECT id_service FROM service WHERE num_ligne = $1 AND date_service = $2 AND id_bus = (SELECT id_bus FROM bus WHERE numero_bus = $3 LIMIT 1) AND statut = 'En cours' LIMIT 1",
@@ -84,7 +83,7 @@ exports.sellTicket = async (req, res) => {
         }
 
         const code_ticket = 'TKT' + Math.floor(Math.random() * 1000000);
-        const qr_code = code_ticket; // Utiliser le code ticket comme QR code unique
+        const qr_code = code_ticket; 
 
         const query = `
             INSERT INTO ticket (
@@ -114,7 +113,7 @@ exports.sellTicket = async (req, res) => {
             arret_depart,
             arret_arrivee,
             agent_id || null,
-            type_tarif, // Libellé existant pour la compatibilité
+            type_tarif, 
             code_ticket,
             qr_code,
             id_service,
@@ -135,6 +134,7 @@ exports.sellTicket = async (req, res) => {
     }
 };
 
+// Identifie les places déjà occupées pour un trajet spécifique afin d'éviter le double placement
 exports.getOccupiedSeats = async (req, res) => {
     const { num_ligne, date, heure, depart, arrivee } = req.query;
     try {
@@ -161,8 +161,6 @@ exports.getOccupiedSeats = async (req, res) => {
         const reqStart = getDist(depart);
         const reqEnd = getDist(arrivee);
 
-        // Recherche directe par num_ligne + date_voyage + heure_depart
-        // (plus fiable que passer par bus.horaire_affecte qui peut ne rien retourner)
         let query;
         let params;
         if (heure) {
@@ -189,20 +187,17 @@ exports.getOccupiedSeats = async (req, res) => {
         
         result.rows.forEach(t => {
             if (!depart || !arrivee) {
-                // If the client didn't specify the segment, consider it occupied to be safe
                 occupied.push(t.siege);
             } else {
                 const tStart = getDist(t.station_depart);
                 const tEnd = getDist(t.station_arrivee);
                 
                 if (tStart !== null && tEnd !== null && reqStart !== null && reqEnd !== null) {
-                    // Two segments overlap if: max(start1, start2) < min(end1, end2)
                     const overlap = Math.max(reqStart, tStart) < Math.min(reqEnd, tEnd);
                     if (overlap) {
                         occupied.push(t.siege);
                     }
                 } else {
-                    // Fallback
                     occupied.push(t.siege);
                 }
             }
@@ -210,12 +205,12 @@ exports.getOccupiedSeats = async (req, res) => {
 
         res.json([...new Set(occupied)]);
     } catch (err) {
-        console.error("Erreur occupied seats :", err);
-        res.status(500).json({ message: "Erreur récupération sièges" });
+        console.error("Erreur occupied seats", err);
+        res.status(500).json({ message: "Erreur recuperation sieges" });
     }
 };
 
-// Récupérer les statistiques de revenus pour une période donnée (semaine ou mois)
+// Calcule les revenus generes sur une periode donnee pour alimenter les graphiques du Dashboard
 exports.getRevenueStats = async (req, res) => {
     const { period } = req.query;
     const daysCount = period === 'month' ? 29 : 6;
@@ -249,12 +244,12 @@ exports.getRevenueStats = async (req, res) => {
 
         res.json(formattedData);
     } catch (err) {
-        console.error('Erreur getRevenueStats:', err);
+        console.error('Erreur getRevenueStats', err);
         res.status(500).json({ message: 'Erreur stats revenus' });
     }
 };
 
-// Récupérer la répartition des passagers par type de tarif
+// Recupere la repartition des types de passagers pour les statistiques du Dashboard
 exports.getPassengerStats = async (req, res) => {
     try {
         const query = `
@@ -266,7 +261,6 @@ exports.getPassengerStats = async (req, res) => {
         `;
         const result = await db.query(query);
 
-        // Formater pour correspondre au format attendu par le frontend (avec des couleurs par défaut)
         const colors = {
             'Normal': '#6366f1',
             'Étudiant': '#818cf8',
@@ -281,15 +275,15 @@ exports.getPassengerStats = async (req, res) => {
 
         res.json(stats);
     } catch (err) {
-        console.error('Erreur getPassengerStats:', err);
+        console.error('Erreur getPassengerStats', err);
         res.status(500).json({ message: 'Erreur stats passagers' });
     }
 };
 
+// Permet à un guichetier de consulter uniquement ses propres ventes de la journée en cours
 exports.getAgentDailySales = async (req, res) => {
     const { agentId } = req.params;
     try {
-        // 1. Vérifier si le service a déjà été clôturé aujourd'hui
         const checkClosed = await db.query(`
             SELECT id_fiche FROM fiche_cloture_service
             WHERE id_responsable_cloture = $1
@@ -298,7 +292,6 @@ exports.getAgentDailySales = async (req, res) => {
         `, [agentId]);
 
         if (checkClosed.rows.length > 0) {
-            // Si clôturé, on renvoie une liste vide pour ne plus rien afficher
             return res.json([]);
         }
 
@@ -342,12 +335,9 @@ exports.getAgentDailySales = async (req, res) => {
         res.status(500).json({ message: 'Erreur lors de la récupération des ventes du jour' });
     }
 };
-// Récupérer les statistiques avancées pour le dashboard (Ligne top, occupation, heure pointe)
+// Calcule la ligne la plus performante, le taux d'occupation moyen et l'heure de pointe pour l'administration
 exports.getAdvancedStats = async (req, res) => {
     try {
-        console.log("Calcul des stats avancées...");
-        
-        // 1. Recette du jour et Nombre de tickets (PRIORITÉ)
         let todayRevenue = 0;
         let todayTicketCount = 0;
         try {
@@ -364,7 +354,6 @@ exports.getAdvancedStats = async (req, res) => {
             console.error("Erreur calcul todayStats:", e);
         }
 
-        // 2. Ligne la plus fréquentée
         let topLine = null;
         try {
             const topLineQuery = `
@@ -382,7 +371,6 @@ exports.getAdvancedStats = async (req, res) => {
             topLine = topLineResult.rows[0];
         } catch (e) { console.error("Erreur topLine:", e); }
 
-        // 3. Taux de remplissage moyen
         let avgOccupancy = 0;
         try {
             const occupancyQuery = `
@@ -398,7 +386,6 @@ exports.getAdvancedStats = async (req, res) => {
             avgOccupancy = occupancyResult.rows[0]?.avg_rate || 0;
         } catch (e) { console.error("Erreur occupancy:", e); }
 
-        // 4. Horaire le plus demandé
         let peakHour = null;
         try {
             const peakHourQuery = `
@@ -429,7 +416,6 @@ exports.getAdvancedStats = async (req, res) => {
             todayTicketCount: todayTicketCount
         };
 
-        console.log("Stats envoyées au dashboard:", stats);
         res.json(stats);
     } catch (err) {
         console.error('Erreur CRITIQUE getAdvancedStats:', err);
@@ -437,9 +423,8 @@ exports.getAdvancedStats = async (req, res) => {
     }
 };
 
-// Scanner et valider un ticket
+// Permet à un contrôleur de scanner et valider un ticket en vérifiant sa date et s'il a déjà été utilisé (date, doublons, etc.)
 exports.scanTicket = async (req, res) => {
-    // Supporter à la fois qr_code et code_ticket pour la compatibilité mobile
     const inputCode = req.body.qr_code || req.body.code_ticket;
     const { id_controleur } = req.body;
     
@@ -451,26 +436,18 @@ exports.scanTicket = async (req, res) => {
         let uniqueId = inputCode;
         let searchParams = null;
 
-        // Tenter de parser si c'est du JSON (format Web Guichet)
         if (typeof inputCode === 'string' && (inputCode.startsWith('{') || inputCode.startsWith('['))) {
             try {
-                console.log("Tentative de parsing JSON du QR code...");
                 const parsed = JSON.parse(inputCode);
-                console.log("JSON parsé:", parsed);
-                // Si on a l'ID ou le code spécifique dans le JSON
                 if (parsed.code_ticket) uniqueId = parsed.code_ticket;
                 else if (parsed.id_ticket) uniqueId = parsed.id_ticket;
                 else {
-                    // Sinon on utilisera les champs pour une recherche combinée
                     searchParams = parsed;
                 }
             } catch (e) {
-                console.log("Échec du parsing JSON, traitement comme code brut");
-                // Pas du JSON valide, on traite comme un code brut
             }
         }
 
-        // 1. Recherche du ticket avec jointures pour avoir tous les détails
         let query = `
             SELECT 
                 t.*,
@@ -485,29 +462,21 @@ exports.scanTicket = async (req, res) => {
         let params = [];
 
         if (searchParams) {
-            // Recherche par critères (Ligne, Date, Heure, Siège) - Fallback pour les vieux tickets
-            // On utilise CAST en TEXT pour être sûr de la comparaison avec les strings du JSON
             query += ` AND CAST(t.num_ligne AS TEXT) = $1 AND CAST(t.date_voyage AS TEXT) = $2 AND CAST(t.heure_depart AS TEXT) LIKE $3 AND t.siege = $4`;
             params = [String(searchParams.ligne), String(searchParams.date), String(searchParams.heure) + '%', String(searchParams.siege)];
         } else {
-            // Recherche par identificateur unique
             query += ` AND (t.qr_code = $1 OR t.code_ticket = $1 OR CAST(t.id_ticket AS VARCHAR) = $1)`;
             params = [String(uniqueId)];
         }
 
-        console.log("Exécution de la requête de recherche avec params:", params);
         const result = await db.query(query + " LIMIT 1", params);
-        console.log("Nombre de tickets trouvés:", result.rows.length);
 
         if (result.rows.length === 0) {
-            console.log("Aucun ticket trouvé pour ces critères");
             return res.status(404).json({ message: "Ticket introuvable ou invalide" });
         }
 
         const ticket = result.rows[0];
-        console.log("Ticket trouvé, ID:", ticket.id_ticket);
 
-        // Formatage de la réponse pour le mobile
         const ticketInfo = {
             id_ticket: ticket.id_ticket,
             code_ticket: ticket.code_ticket,
@@ -526,8 +495,6 @@ exports.scanTicket = async (req, res) => {
             trajet: `${ticket.station_depart} → ${ticket.station_arrivee}`
         };
 
-        // 2. Vérification du statut
-        console.log("Vérification du statut 'est_scanne':", ticket.est_scanne);
         if (ticket.est_scanne) {
             return res.status(409).json({ 
                 message: "Ce ticket a déjà été validé",
@@ -536,7 +503,6 @@ exports.scanTicket = async (req, res) => {
             });
         }
 
-        // Vérification de la date (Optionnel)
         const voyageDate = new Date(ticket.date_voyage);
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -548,7 +514,6 @@ exports.scanTicket = async (req, res) => {
             });
         }
 
-        // 3. Marquage comme scanné
         const updateQuery = `
             UPDATE ticket 
             SET est_scanne = TRUE, date_scan = NOW(), id_controleur = $2
@@ -575,7 +540,7 @@ exports.scanTicket = async (req, res) => {
     }
 };
 
-// Récupérer les scans du jour pour un contrôleur spécifique
+// Affiche au contrôleur la liste des tickets qu'il a verifies pendant sa journee de service
 exports.getControleurDailyScans = async (req, res) => {
     const { controleurId } = req.params;
     try {
@@ -611,7 +576,7 @@ exports.getControleurDailyScans = async (req, res) => {
     }
 };
 
-// Manifeste du jour pour un bus donné (utilisé par le Receveur mobile)
+// Genere la liste de tous les passagers embarques pour un bus donne, utilise par le Receveur
 exports.getManifeste = async (req, res) => {
     const { numero_bus } = req.params;
     try {
@@ -639,7 +604,7 @@ exports.getManifeste = async (req, res) => {
         res.status(500).json({ message: 'Erreur lors de la récupération du manifeste' });
     }
 };
-// Récupérer le taux d'occupation des bus pour aujourd'hui
+// Affiche le taux de remplissage en temps réel des bus actuellement en service
 exports.getBusOccupancy = async (req, res) => {
     try {
         const query = `
@@ -665,13 +630,12 @@ exports.getBusOccupancy = async (req, res) => {
         res.status(500).json({ message: 'Erreur stats occupation' });
     }
 };
-// Clôturer le service d'un agent de guichet
+// Permet à l'agent de terminer sa journée et de remonter son bilan financier à la direction
 exports.closeAgentService = async (req, res) => {
     const { agentId } = req.params;
     const { heure_connexion } = req.body;
 
     try {
-        // 1. Vérifier si une clôture existe déjà pour aujourd'hui
         const checkExisting = await db.query(`
             SELECT id_fiche FROM fiche_cloture_service 
             WHERE id_responsable_cloture = $1 
@@ -683,7 +647,6 @@ exports.closeAgentService = async (req, res) => {
             return res.status(400).json({ message: "Le service pour aujourd'hui a déjà été clôturé." });
         }
 
-        // 2. Calculer le total des ventes et le nombre de tickets
         const stats = await db.query(`
             SELECT 
                 COALESCE(SUM(montant_total), 0) as total,
@@ -696,7 +659,6 @@ exports.closeAgentService = async (req, res) => {
         const totalRecette = parseFloat(stats.rows[0].total || 0);
         const ticketCount = parseInt(stats.rows[0].count || 0);
 
-        // 3. Calculer la durée si possible
         let dureeMinutes = null;
         if (heure_connexion) {
             const start = new Date(heure_connexion);
@@ -704,7 +666,6 @@ exports.closeAgentService = async (req, res) => {
             dureeMinutes = Math.floor((end.getTime() - start.getTime()) / 60000);
         }
 
-        // 4. Insérer la fiche de clôture
         const result = await db.query(`
             INSERT INTO fiche_cloture_service (
                 id_responsable_cloture, 

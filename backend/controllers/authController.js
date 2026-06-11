@@ -5,9 +5,13 @@ const bcrypt = require('bcryptjs');
 exports.loginAdmin = async (req, res) => {
     const { email, password } = req.body;
     try {
+        const identifier = (email || '').trim();
         // Note: I'm using 'matricule' to search for the admin if email is not in schema, 
         // but I'll update the logic to support an 'email' field as requested for login.
-        const result = await db.query('SELECT * FROM utilisateur WHERE (email = $1 OR matricule = $1) AND role = \'ADMIN\'', [email]);
+        const result = await db.query(
+            "SELECT * FROM utilisateur WHERE (LOWER(TRIM(email)) = LOWER($1) OR TRIM(matricule) = $1) AND LOWER(TRIM(role)) = 'admin'",
+            [identifier]
+        );
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Identifiants invalides' });
         }
@@ -26,7 +30,11 @@ exports.loginAdmin = async (req, res) => {
 exports.loginAgent = async (req, res) => {
     const { matricule, password } = req.body;
     try {
-        const result = await db.query('SELECT * FROM utilisateur WHERE matricule = $1 AND role = \'AGENT\'', [matricule]);
+        const normalizedMatricule = (matricule || '').trim();
+        const result = await db.query(
+            "SELECT * FROM utilisateur WHERE TRIM(matricule) = $1 AND LOWER(TRIM(role)) = 'agent'",
+            [normalizedMatricule]
+        );
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Matricule invalide' });
         }
@@ -67,7 +75,11 @@ exports.loginAgent = async (req, res) => {
 exports.loginReceveur = async (req, res) => {
     const { matricule, password } = req.body;
     try {
-        const result = await db.query("SELECT * FROM utilisateur WHERE matricule = $1 AND LOWER(role) = 'receveur'", [matricule]);
+        const normalizedMatricule = (matricule || '').trim();
+        const result = await db.query(
+            "SELECT * FROM utilisateur WHERE TRIM(matricule) = $1 AND LOWER(TRIM(role)) = 'receveur'",
+            [normalizedMatricule]
+        );
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Matricule invalide ou rôle non autorisé' });
         }
@@ -79,8 +91,7 @@ exports.loginReceveur = async (req, res) => {
             return res.status(403).json({ message: "Votre compte a été suspendu." });
         }
 
-        // Fetch assignment (bus and line) with date validation (optional)
-        let affectation = null;
+        // Fetch assignment if one exists. Receveurs can also choose their bus`r`n        // manually from the mobile dashboard, so this must not block login.`r`n        let affectation = null;
         try {
             const affectationResult = await db.query(`
                 SELECT b.numero_bus, l.num_ligne, l.ville_depart, l.ville_arrivee
@@ -120,9 +131,10 @@ exports.loginReceveur = async (req, res) => {
 exports.loginControleur = async (req, res) => {
     const { matricule, password } = req.body;
     try {
+        const normalizedMatricule = (matricule || '').trim();
         const result = await db.query(
-            "SELECT * FROM utilisateur WHERE matricule = $1 AND LOWER(role) = 'controleur'",
-            [matricule]
+            "SELECT * FROM utilisateur WHERE TRIM(matricule) = $1 AND LOWER(TRIM(role)) = 'controleur'",
+            [normalizedMatricule]
         );
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Matricule invalide ou rôle non autorisé' });

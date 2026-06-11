@@ -17,9 +17,7 @@ const transporter = nodemailer.createTransport({
 // Vérification de la connexion
 transporter.verify((error, success) => {
     if (error) {
-        console.log("Erreur de configuration Email:", error);
-    } else {
-        console.log("Le serveur est prêt à envoyer des e-mails");
+        console.error("Erreur de configuration Email:", error);
     }
 });
 

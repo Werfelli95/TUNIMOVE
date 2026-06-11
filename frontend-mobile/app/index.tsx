@@ -264,7 +264,11 @@ export default function LoginScreen() {
                 setForgotLoading(true);
                 setForgotError('');
                 try {
-                  await axios.post(`${PASSWORD_RESET_API}/request`, { matricule: forgotMatricule, email: forgotEmail });
+                  await axios.post(`${PASSWORD_RESET_API}/request`, {
+                    matricule: forgotMatricule.trim(),
+                    email: forgotEmail.trim(),
+                    role,
+                  });
                   setForgotSuccess(true);
                 } catch (err: any) {
                   setForgotError(err.response?.data?.message || 'Une erreur est survenue');
